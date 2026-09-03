@@ -170,8 +170,8 @@ class JurnalService
             'periode_bulan'  => $bulan,
             'kode_transaksi' => $header['kode_transaksi'] ?? null,
             'jenis_jurnal'   => $header['jenis_jurnal'],  // MANUAL / PENYESUAIAN
-            'source_type'    => null,   // jurnal manual tidak punya sumber objek
-            'source_id'      => null,
+            'source_type'    => $header['source_type'] ?? null,
+            'source_id'      => $header['source_id'] ?? null,
             'keterangan'     => $header['keterangan'],
         ], $barisInternal);
 
@@ -197,13 +197,6 @@ class JurnalService
         // karena id_koperasi ada di WHERE selanjutnya lewat findOrFail
         $jurnalAsal = JurnalHeader::with('detail')->findOrFail($idJurnal);
 
-        // Validasi: hanya jurnal POSTED yang bisa dibalik
-        if ($jurnalAsal->status !== 'POSTED') {
-            throw new \InvalidArgumentException(
-                "Jurnal #{$idJurnal} berstatus [{$jurnalAsal->status}], bukan POSTED."
-            );
-        }
-
         // Validasi: belum pernah dibalik
         // Cek apakah ada jurnal pembalik yang menunjuk ke jurnal ini
         $sudahDibalik = JurnalHeader::where('id_jurnal_asal', $idJurnal)->first();
@@ -211,13 +204,20 @@ class JurnalService
             throw new JurnalSudahDibalikException($idJurnal, $sudahDibalik->id_jurnal);
         }
 
+        // Validasi: hanya jurnal POSTED yang bisa dibalik
+        if ($jurnalAsal->status !== 'POSTED') {
+            throw new \InvalidArgumentException(
+                "Jurnal #{$idJurnal} berstatus [{$jurnalAsal->status}], bukan POSTED."
+            );
+        }
+
         // Bangun baris pembalik: balik posisi debet ↔ kredit
         $barisPembalik = $jurnalAsal->detail->map(function ($d, int $idx): array {
             return [
                 'urutan'    => $idx + 1,
                 'kode_anak' => $d->kode_anak,
-                'debet'     => $d->kredit,   // ← dibalik
-                'kredit'    => $d->debet,    // ← dibalik
+                'debet'     => (float) $d->kredit,   // ← dibalik
+                'kredit'    => (float) $d->debet,    // ← dibalik
                 'id_pihak'  => $d->id_pihak,
                 'keterangan'=> $d->keterangan,
             ];
@@ -243,18 +243,18 @@ class JurnalService
             'keterangan'     => "PEMBALIK jurnal #{$idJurnal}: {$alasan}",
         ], $barisPembalik);
 
-        // Jalankan dalam 1 transaksi: posting pembalik + tandai asal REVERSED
-        DB::transaction(function () use ($jsonPayload, $idJurnal, &$jurnalPembalik) {
-            $jurnalPembalik = $this->panggilStoredProcedure($jsonPayload, null, null, 'PEMBALIK');
+        // Posting pembalik via SP (SP sudah memiliki transaksi mandiri)
+        $jurnalPembalik = $this->panggilStoredProcedure($jsonPayload, null, null, 'PEMBALIK');
 
-            // Update jurnal asal: REVERSED + catat id_jurnal pembaliknya
-            DB::table('jurnal_header')
-                ->where('id_jurnal', $idJurnal)
-                ->update([
-                    'status'         => 'REVERSED',
-                    'id_jurnal_asal' => $jurnalPembalik->id_jurnal,
-                ]);
-        });
+        // Set id_jurnal_asal di jurnal pembalik menunjuk ke jurnal original
+        $jurnalPembalik->update(['id_jurnal_asal' => $idJurnal]);
+
+        // Update jurnal asal: REVERSED
+        JurnalHeader::where('id_jurnal', $idJurnal)->update([
+            'status'         => 'REVERSED',
+            'posted_by'      => auth()->id() ?? null,
+            'posted_at'      => now(),
+        ]);
 
         return $jurnalPembalik;
     }

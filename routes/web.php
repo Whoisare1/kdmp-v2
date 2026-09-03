@@ -125,7 +125,11 @@ Route::middleware('auth')->group(function () {
     Route::prefix('keuangan')->name('keuangan.')->group(function () {
         Route::resource('piutang', PiutangController::class)->only(['index', 'show']);
         Route::resource('hutang', HutangController::class)->only(['index', 'show']);
-        Route::resource('pelunasan', PelunasanController::class);
+        // AJAX: ambil piutang/hutang terbuka milik pihak tertentu (harus SEBELUM resource)
+        Route::get('pelunasan/pihak/{pihak}/terbuka', [PelunasanController::class, 'terbuka'])
+            ->name('pelunasan.terbuka');
+        // Pelunasan tidak bisa di-edit/hapus setelah posted — pembatalan via jurnal balik
+        Route::resource('pelunasan', PelunasanController::class)->except(['edit', 'update', 'destroy']);
         Route::resource('kas-transaksi', KasTransaksiController::class);
         Route::resource('simpanan', SimpananController::class);
     });
@@ -135,12 +139,15 @@ Route::middleware('auth')->group(function () {
         Route::resource('aset-tetap', AsetTetapController::class);
         Route::resource('config-shu', ConfigShuController::class);
         Route::get('tutup-bulan', [TutupBulanController::class, 'index'])->name('tutup-bulan.index');
+        Route::post('tutup-bulan', [TutupBulanController::class, 'store'])->name('tutup-bulan.store');
         Route::get('tutup-tahun', [TutupTahunController::class, 'index'])->name('tutup-tahun.index');
+        Route::post('tutup-tahun', [TutupTahunController::class, 'store'])->name('tutup-tahun.store');
 
         Route::prefix('laporan')->name('laporan.')->group(function () {
+            Route::get('neraca-saldo', [LaporanController::class, 'neracaSaldo'])->name('neraca-saldo');
+            Route::get('buku-besar', [LaporanController::class, 'bukuBesar'])->name('buku-besar');
             Route::get('neraca', [LaporanController::class, 'neraca'])->name('neraca');
             Route::get('laba-rugi', [LaporanController::class, 'labaRugi'])->name('laba-rugi');
-            Route::get('neraca-saldo', [LaporanController::class, 'neracaSaldo'])->name('neraca-saldo');
             Route::get('arus-kas', [LaporanController::class, 'arusKas'])->name('arus-kas');
         });
     });
