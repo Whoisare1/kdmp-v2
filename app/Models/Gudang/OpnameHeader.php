@@ -3,6 +3,7 @@
 namespace App\Models\Gudang;
 
 use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Master\Gudang as GudangModel;
 use Illuminate\Database\Eloquent\Model;
 
 class OpnameHeader extends Model
@@ -20,6 +21,11 @@ class OpnameHeader extends Model
     protected function casts(): array
     {
         return ['tanggal' => 'date'];
+    }
+
+    public function gudang()
+    {
+        return $this->belongsTo(GudangModel::class, 'id_gudang', 'id_gudang');
     }
 
     public function detail()

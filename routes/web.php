@@ -8,6 +8,7 @@ use App\Http\Controllers\Akuntansi\TutupBulanController;
 use App\Http\Controllers\Akuntansi\TutupTahunController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Gudang\GudangDashboardController;
 use App\Http\Controllers\Gudang\KartuStokController;
 use App\Http\Controllers\Gudang\KerusakanBarangController;
 use App\Http\Controllers\Gudang\OpnameController;
@@ -93,6 +94,7 @@ Route::middleware('auth')->group(function () {
 
     // ===== M4 — Gudang =====
     Route::prefix('gudang')->name('gudang.')->group(function () {
+        Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
         Route::resource('penerimaan', PenerimaanBarangController::class);
         Route::resource('opname', OpnameController::class);
         Route::resource('kerusakan', KerusakanBarangController::class);
