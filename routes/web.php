@@ -100,10 +100,23 @@ Route::middleware('auth')->group(function () {
         Route::resource('stok', StokController::class)->only(['index', 'show']);
     });
 
-    // ===== M5 — Pembelian =====
+    // ===== M5 â€” Pembelian =====
     Route::prefix('pembelian')->name('pembelian.')->group(function () {
-        Route::resource('pembelian', PembelianController::class);
-        Route::resource('retur', ReturPembelianController::class);
+    Route::resource('pembelian', PembelianController::class);
+
+    Route::patch('pembelian/{pembelian}/approve', [PembelianController::class, 'approve'])
+        ->name('approve');
+
+    Route::get('pembelian/{pembelian}/grn/create', [PembelianController::class, 'createGrn'])
+        ->name('create-grn');
+
+    Route::post('pembelian/{pembelian}/grn', [PembelianController::class, 'storeGrn'])
+        ->name('store-grn');
+
+    Route::get('pembelian/{pembelian}/retur', [PembelianController::class, 'showRetur'])
+        ->name('show-retur');
+
+    Route::resource('retur', ReturPembelianController::class);
     });
 
     // ===== M6 — Penjualan =====
