@@ -117,6 +117,10 @@ Route::middleware('auth')->group(function () {
     // ===== M7 — Konsinyasi Antar Desa =====
     Route::prefix('konsinyasi')->name('konsinyasi.')->group(function () {
         Route::resource('marketplace', MarketplaceController::class);
+        Route::get('pengiriman/{id}/posting', [PengirimanKonsinyasiController::class, 'postingPage'])
+            ->name('pengiriman.posting-page');
+        Route::post('pengiriman/{id}/posting', [PengirimanKonsinyasiController::class, 'posting'])
+            ->name('pengiriman.posting');
         Route::resource('pengiriman', PengirimanKonsinyasiController::class);
         Route::resource('stok', StokKonsinyasiController::class)->only(['index', 'show']);
         Route::resource('setoran', SetoranKonsinyasiController::class);
