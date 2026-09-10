@@ -2,6 +2,7 @@
 
 namespace App\Models\Akuntansi;
 
+use App\Models\Concerns\BelongsToKoperasi;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class BukuBesarPeriode extends Model
 {
+    use BelongsToKoperasi;
     protected $table = 'buku_besar_periode';
     public $timestamps = false;
     public $incrementing = false;

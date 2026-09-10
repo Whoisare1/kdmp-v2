@@ -45,4 +45,38 @@ class StokKonsinyasi extends Model
     {
         return $this->belongsTo(Barang::class, 'id_barang', 'id_barang');
     }
+
+    // =========================================================================
+    // LOCAL SCOPES
+    // =========================================================================
+
+    /**
+     * Stok titipan yang DIMILIKI oleh koperasi aktif (sudah dikirim ke desa lain).
+     * Contoh: halaman rekap aset titipan desa pemilik.
+     */
+    public function scopeMilikKoperasi($query): void
+    {
+        $query->where('id_koperasi_pemilik', app('koperasi_aktif'));
+    }
+
+    /**
+     * Stok titipan yang BERADA di gudang koperasi aktif (diterima dari desa lain).
+     * Contoh: halaman daftar stok titipan yang harus dijual.
+     */
+    public function scopeDiKoperasi($query): void
+    {
+        $query->where('id_koperasi_penerima', app('koperasi_aktif'));
+    }
+
+    /**
+     * Semua stok titipan yang melibatkan koperasi aktif (pemilik ATAU penerima).
+     */
+    public function scopeTerlibat($query): void
+    {
+        $id = app('koperasi_aktif');
+        $query->where(function ($q) use ($id) {
+            $q->where('id_koperasi_pemilik', $id)
+              ->orWhere('id_koperasi_penerima', $id);
+        });
+    }
 }

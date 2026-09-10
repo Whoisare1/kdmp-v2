@@ -8,6 +8,7 @@ use App\Http\Controllers\Akuntansi\TutupBulanController;
 use App\Http\Controllers\Akuntansi\TutupTahunController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Gudang\GudangDashboardController;
 use App\Http\Controllers\Gudang\KartuStokController;
 use App\Http\Controllers\Gudang\KerusakanBarangController;
 use App\Http\Controllers\Gudang\OpnameController;
@@ -93,6 +94,7 @@ Route::middleware('auth')->group(function () {
 
     // ===== M4 — Gudang =====
     Route::prefix('gudang')->name('gudang.')->group(function () {
+        Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
         Route::resource('penerimaan', PenerimaanBarangController::class);
         Route::resource('opname', OpnameController::class);
         Route::resource('kerusakan', KerusakanBarangController::class);
@@ -128,6 +130,10 @@ Route::middleware('auth')->group(function () {
     // ===== M7 — Konsinyasi Antar Desa =====
     Route::prefix('konsinyasi')->name('konsinyasi.')->group(function () {
         Route::resource('marketplace', MarketplaceController::class);
+        Route::get('pengiriman/{id}/posting', [PengirimanKonsinyasiController::class, 'postingPage'])
+            ->name('pengiriman.posting-page');
+        Route::post('pengiriman/{id}/posting', [PengirimanKonsinyasiController::class, 'posting'])
+            ->name('pengiriman.posting');
         Route::resource('pengiriman', PengirimanKonsinyasiController::class);
         Route::resource('stok', StokKonsinyasiController::class)->only(['index', 'show']);
         Route::resource('setoran', SetoranKonsinyasiController::class);
@@ -138,7 +144,11 @@ Route::middleware('auth')->group(function () {
     Route::prefix('keuangan')->name('keuangan.')->group(function () {
         Route::resource('piutang', PiutangController::class)->only(['index', 'show']);
         Route::resource('hutang', HutangController::class)->only(['index', 'show']);
-        Route::resource('pelunasan', PelunasanController::class);
+        // AJAX: ambil piutang/hutang terbuka milik pihak tertentu (harus SEBELUM resource)
+        Route::get('pelunasan/pihak/{pihak}/terbuka', [PelunasanController::class, 'terbuka'])
+            ->name('pelunasan.terbuka');
+        // Pelunasan tidak bisa di-edit/hapus setelah posted — pembatalan via jurnal balik
+        Route::resource('pelunasan', PelunasanController::class)->except(['edit', 'update', 'destroy']);
         Route::resource('kas-transaksi', KasTransaksiController::class);
         Route::resource('simpanan', SimpananController::class);
     });
@@ -148,12 +158,15 @@ Route::middleware('auth')->group(function () {
         Route::resource('aset-tetap', AsetTetapController::class);
         Route::resource('config-shu', ConfigShuController::class);
         Route::get('tutup-bulan', [TutupBulanController::class, 'index'])->name('tutup-bulan.index');
+        Route::post('tutup-bulan', [TutupBulanController::class, 'store'])->name('tutup-bulan.store');
         Route::get('tutup-tahun', [TutupTahunController::class, 'index'])->name('tutup-tahun.index');
+        Route::post('tutup-tahun', [TutupTahunController::class, 'store'])->name('tutup-tahun.store');
 
         Route::prefix('laporan')->name('laporan.')->group(function () {
+            Route::get('neraca-saldo', [LaporanController::class, 'neracaSaldo'])->name('neraca-saldo');
+            Route::get('buku-besar', [LaporanController::class, 'bukuBesar'])->name('buku-besar');
             Route::get('neraca', [LaporanController::class, 'neraca'])->name('neraca');
             Route::get('laba-rugi', [LaporanController::class, 'labaRugi'])->name('laba-rugi');
-            Route::get('neraca-saldo', [LaporanController::class, 'neracaSaldo'])->name('neraca-saldo');
             Route::get('arus-kas', [LaporanController::class, 'arusKas'])->name('arus-kas');
         });
     });
