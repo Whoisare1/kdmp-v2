@@ -59,7 +59,7 @@ BEGIN
     DECLARE v_debet         DECIMAL(18,2) DEFAULT 0;
     DECLARE v_kredit        DECIMAL(18,2) DEFAULT 0;
     DECLARE v_id_pihak      BIGINT UNSIGNED DEFAULT NULL;
-    DECLARE v_ket_baris     VARCHAR(255)  DEFAULT NULL;
+    DECLARE v_ket_baris     VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL;
 
     -- Untuk kalkulasi total header
     DECLARE v_total_debet   DECIMAL(18,2) DEFAULT 0;
