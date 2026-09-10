@@ -19,6 +19,7 @@ class StokService
         string $refTipe,
         int $refId,
         ?int $createdBy = null,
+        ?string $tanggal = null,
     ): KartuStok {
         $this->pastikanPositif($qty, 'qty');
         $this->pastikanTidakNegatif($hargaSatuan, 'harga satuan');
@@ -32,6 +33,7 @@ class StokService
             $refTipe,
             $refId,
             $createdBy,
+            $tanggal,
         ): KartuStok {
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
@@ -73,7 +75,7 @@ class StokService
                 'id_koperasi' => $koperasiId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
-                'tanggal' => now()->toDateString(),
+                'tanggal' => $tanggal ?? now()->toDateString(),
                 'jenis_mutasi' => 'IN',
                 'ref_tipe' => $refTipe,
                 'ref_id' => $refId,
@@ -97,6 +99,7 @@ class StokService
         string $refTipe,
         int $refId,
         ?int $createdBy = null,
+        ?string $tanggal = null,
     ): KartuStok {
         $this->pastikanPositif($qty, 'qty');
 
@@ -108,6 +111,7 @@ class StokService
             $refTipe,
             $refId,
             $createdBy,
+            $tanggal,
         ): KartuStok {
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
@@ -116,7 +120,8 @@ class StokService
                 ->first();
 
             if (! $stok || bccomp((string) $stok->qty_on_hand, $qty, 4) < 0) {
-                throw new RuntimeException('Stok tidak mencukupi.');
+                $tersedia = $stok?->qty_on_hand ?? '0';
+                throw new RuntimeException("Stok tidak mencukupi. Tersedia {$tersedia}, diminta {$qty}.");
             }
 
             $nilaiKeluar = bcmul($qty, (string) $stok->hpp_rata2, 2);
@@ -137,7 +142,7 @@ class StokService
                 'id_koperasi' => $koperasiId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
-                'tanggal' => now()->toDateString(),
+                'tanggal' => $tanggal ?? now()->toDateString(),
                 'jenis_mutasi' => 'OUT',
                 'ref_tipe' => $refTipe,
                 'ref_id' => $refId,
@@ -151,6 +156,22 @@ class StokService
                 'created_by' => $createdBy,
             ]);
         });
+    }
+
+    public function hppSaatIni(int $gudangId, int $barangId): string
+    {
+        return (string) (DB::table('stok')
+            ->where('id_gudang', $gudangId)
+            ->where('id_barang', $barangId)
+            ->value('hpp_rata2') ?? '0');
+    }
+
+    public function tersedia(int $gudangId, int $barangId): string
+    {
+        return (string) (DB::table('stok')
+            ->where('id_gudang', $gudangId)
+            ->where('id_barang', $barangId)
+            ->value('qty_on_hand') ?? '0');
     }
 
     private function pastikanPositif(string $value, string $field): void

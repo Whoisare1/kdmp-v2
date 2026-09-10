@@ -47,12 +47,14 @@ class PengirimanKonsinyasi extends Model
 
     public function gudangAsal()
     {
-        return $this->belongsTo(Gudang::class, 'id_gudang_asal', 'id_gudang');
+        return $this->belongsTo(Gudang::class, 'id_gudang_asal', 'id_gudang')
+            ->withoutGlobalScopes();
     }
 
     public function gudangTujuan()
     {
-        return $this->belongsTo(Gudang::class, 'id_gudang_tujuan', 'id_gudang');
+        return $this->belongsTo(Gudang::class, 'id_gudang_tujuan', 'id_gudang')
+            ->withoutGlobalScopes();
     }
 
     public function detail()

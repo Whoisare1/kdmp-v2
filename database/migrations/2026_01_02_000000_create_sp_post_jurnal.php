@@ -55,7 +55,7 @@ BEGIN
     DECLARE v_i             INT DEFAULT 0;
 
     -- Variabel per-baris jurnal_detail
-    DECLARE v_kode_anak     VARCHAR(10) COLLATE utf8mb4_unicode_ci;
+    DECLARE v_kode_anak     VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     DECLARE v_debet         DECIMAL(18,2) DEFAULT 0;
     DECLARE v_kredit        DECIMAL(18,2) DEFAULT 0;
     DECLARE v_id_pihak      BIGINT UNSIGNED DEFAULT NULL;
