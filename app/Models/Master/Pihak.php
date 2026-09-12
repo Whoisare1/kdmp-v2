@@ -32,4 +32,9 @@ class Pihak extends Model
     {
         return $this->belongsTo(Wilayah::class, 'id_wilayah');
     }
+
+    public function getNamaPihakAttribute(): string
+    {
+        return $this->nama;
+    }
 }
