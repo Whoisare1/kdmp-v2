@@ -78,10 +78,42 @@
     ];
 
     $finance = [
-        'no' => 'M8-9',
+        'no'    => 'M8-9',
         'label' => 'Keuangan & Akuntansi',
-        'route' => 'keuangan.piutang.index',
-        'match' => 'keuangan.*,akuntansi.*'
+        'match' => 'keuangan.*,akuntansi.*',
+    ];
+
+    $keuanganMenus = [
+        [
+            'group' => 'Keuangan',
+            'items' => [
+                ['label' => 'Piutang',       'route' => 'keuangan.piutang.index',       'match' => 'keuangan.piutang.*'],
+                ['label' => 'Hutang',        'route' => 'keuangan.hutang.index',        'match' => 'keuangan.hutang.*'],
+                ['label' => 'Pelunasan',     'route' => 'keuangan.pelunasan.index',     'match' => 'keuangan.pelunasan.*'],
+                ['label' => 'Kas & Transaksi','route'=> 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*'],
+                ['label' => 'Simpanan',      'route' => 'keuangan.simpanan.index',      'match' => 'keuangan.simpanan.*'],
+            ],
+        ],
+        [
+            'group' => 'Akuntansi',
+            'items' => [
+                ['label' => 'Jurnal',        'route' => 'akuntansi.jurnal.index',       'match' => 'akuntansi.jurnal.*'],
+                ['label' => 'Aset Tetap',    'route' => 'akuntansi.aset-tetap.index',   'match' => 'akuntansi.aset-tetap.*'],
+                ['label' => 'Config SHU',    'route' => 'akuntansi.config-shu.index',   'match' => 'akuntansi.config-shu.*'],
+                ['label' => 'Tutup Bulan',   'route' => 'akuntansi.tutup-bulan.index',  'match' => 'akuntansi.tutup-bulan.*'],
+                ['label' => 'Tutup Tahun',   'route' => 'akuntansi.tutup-tahun.index',  'match' => 'akuntansi.tutup-tahun.*'],
+            ],
+        ],
+        [
+            'group' => 'Laporan',
+            'items' => [
+                ['label' => 'Neraca Saldo',  'route' => 'akuntansi.laporan.neraca-saldo','match'=> 'akuntansi.laporan.neraca-saldo'],
+                ['label' => 'Buku Besar',    'route' => 'akuntansi.laporan.buku-besar',  'match'=> 'akuntansi.laporan.buku-besar'],
+                ['label' => 'Neraca',        'route' => 'akuntansi.laporan.neraca',       'match'=> 'akuntansi.laporan.neraca'],
+                ['label' => 'Laba Rugi',     'route' => 'akuntansi.laporan.laba-rugi',    'match'=> 'akuntansi.laporan.laba-rugi'],
+                ['label' => 'Arus Kas',      'route' => 'akuntansi.laporan.arus-kas',     'match'=> 'akuntansi.laporan.arus-kas'],
+            ],
+        ],
     ];
 
     $gudangActive = request()->routeIs('gudang.*');
@@ -272,35 +304,63 @@
 
 
         @php
-
             $activeFinance = collect(explode(',', $finance['match']))
                 ->contains(fn ($p) => request()->routeIs($p));
-
         @endphp
 
 
-        <a
-            href="{{ route($finance['route']) }}"
-            class="group flex items-center gap-3 rounded-sm border px-2 py-2.5 text-sm transition
+        {{-- M8-9 Keuangan & Akuntansi — header (non-link) --}}
+        <div
+            class="flex items-center gap-3 rounded-sm border px-2 py-2.5 text-sm
             {{ $activeFinance
                 ? 'border-merah-400 bg-merah-600/20 text-paper-50'
-                : 'border-merah-600/40 text-paper-100 hover:bg-merah-600/10'
+                : 'border-merah-600/40 text-paper-100'
             }}"
         >
-
             <span class="flex h-6 w-9 shrink-0 items-center justify-center rounded-[2px] border border-merah-400 font-mono text-[10px] text-merah-400">
-
                 {{ $finance['no'] }}
-
             </span>
 
             <span class="font-medium">
-
                 {{ $finance['label'] }}
-
             </span>
+        </div>
 
-        </a>
+
+        {{-- Submenu Keuangan & Akuntansi --}}
+        <div class="ml-3 mt-1 border-l border-merah-700/40 pl-3 space-y-3">
+
+            @foreach ($keuanganMenus as $section)
+
+                {{-- Section header --}}
+                <p class="pt-1 pb-0.5 font-mono text-[9px] uppercase tracking-widest text-paper-300/40">
+                    {{ $section['group'] }}
+                </p>
+
+                <ul class="space-y-0.5">
+                    @foreach ($section['items'] as $menu)
+                        @php
+                            $submenuActive = collect(explode(',', $menu['match']))
+                                ->contains(fn ($p) => request()->routeIs($p));
+                        @endphp
+                        <li>
+                            <a
+                                href="{{ route($menu['route']) }}"
+                                class="block rounded-sm px-3 py-1.5 text-xs transition
+                                {{ $submenuActive
+                                    ? 'bg-merah-600/20 text-merah-300'
+                                    : 'text-paper-300/70 hover:bg-ink-800 hover:text-paper-50'
+                                }}"
+                            >
+                                {{ $menu['label'] }}
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+
+            @endforeach
+
+        </div>
 
     </nav>
 
@@ -309,13 +369,13 @@
     <div class="border-t border-ink-700 px-5 py-4 text-[11px] text-paper-300/60">
 
         <p>
-            Kerangka dibangun — logika Finance
+            KDMP v2 — Skripsi
         </p>
 
         <p>
-            menyusul pada pendalaman berikutnya.
+            Modul Keuangan & Akuntansi aktif.
         </p>
 
     </div>
 
-</aside>
+</aside>

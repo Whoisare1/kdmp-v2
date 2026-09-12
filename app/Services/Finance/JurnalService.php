@@ -306,27 +306,36 @@ class JurnalService
             ->groupBy('jd.kode_anak')
             ->get();
 
+        // Kumpulkan semua akun (dari saldo_awal DAN dari mutasi)
+        $semuaAkun = collect($saldoAwalBulanLalu->keys())
+            ->merge($mutasi->pluck('kode_anak'))
+            ->unique();
+
         // Bangun ulang baris buku_besar_periode
-        $rows = $mutasi->map(function ($m) use ($saldoAwalBulanLalu, $idKoperasi, $tahun, $bulan) {
-            $saldoAwal = $saldoAwalBulanLalu->get($m->kode_anak);
+        $rows = $semuaAkun->map(function ($kodeAnak) use ($saldoAwalBulanLalu, $mutasi, $idKoperasi, $tahun, $bulan) {
+            $saldoAwal = $saldoAwalBulanLalu->get($kodeAnak);
+            $m         = $mutasi->firstWhere('kode_anak', $kodeAnak);
 
             $saldoAwalD = $saldoAwal ? (float) $saldoAwal->saldo_akhir_debet  : 0.0;
             $saldoAwalK = $saldoAwal ? (float) $saldoAwal->saldo_akhir_kredit : 0.0;
+
+            $mutasiD    = $m ? (float) $m->mutasi_debet  : 0.0;
+            $mutasiK    = $m ? (float) $m->mutasi_kredit : 0.0;
 
             return [
                 'id_koperasi'       => $idKoperasi,
                 'periode_tahun'     => $tahun,
                 'periode_bulan'     => $bulan,
-                'kode_anak'         => $m->kode_anak,
+                'kode_anak'         => $kodeAnak,
                 'saldo_awal_debet'  => $saldoAwalD,
                 'saldo_awal_kredit' => $saldoAwalK,
-                'mutasi_debet'      => (float) $m->mutasi_debet,
-                'mutasi_kredit'     => (float) $m->mutasi_kredit,
-                'saldo_akhir_debet' => $saldoAwalD + (float) $m->mutasi_debet,
-                'saldo_akhir_kredit'=> $saldoAwalK + (float) $m->mutasi_kredit,
+                'mutasi_debet'      => $mutasiD,
+                'mutasi_kredit'     => $mutasiK,
+                'saldo_akhir_debet' => $saldoAwalD + $mutasiD,
+                'saldo_akhir_kredit'=> $saldoAwalK + $mutasiK,
                 'dihitung_pada'     => now(),
             ];
-        })->toArray();
+        })->values()->toArray();
 
         if (!empty($rows)) {
             DB::table('buku_besar_periode')->insert($rows);
