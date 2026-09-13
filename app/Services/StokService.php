@@ -10,7 +10,6 @@ use RuntimeException;
 
 class StokService
 {
-{
     public function masuk(
         int $koperasiId,
         int $gudangId,
@@ -20,6 +19,7 @@ class StokService
         string $refTipe,
         int $refId,
         ?int $createdBy = null,
+        ?string $tanggal = null,
     ): KartuStok {
         $this->pastikanPositif($qty, 'qty');
         $this->pastikanTidakNegatif($hargaSatuan, 'harga satuan');
@@ -33,6 +33,7 @@ class StokService
             $refTipe,
             $refId,
             $createdBy,
+            $tanggal,
         ): KartuStok {
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
@@ -74,7 +75,7 @@ class StokService
                 'id_koperasi' => $koperasiId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
-                'tanggal' => now()->toDateString(),
+                'tanggal' => $tanggal ?? now()->toDateString(),
                 'jenis_mutasi' => 'IN',
                 'ref_tipe' => $refTipe,
                 'ref_id' => $refId,
@@ -98,6 +99,7 @@ class StokService
         string $refTipe,
         int $refId,
         ?int $createdBy = null,
+        ?string $tanggal = null,
     ): KartuStok {
         $this->pastikanPositif($qty, 'qty');
 
@@ -109,6 +111,7 @@ class StokService
             $refTipe,
             $refId,
             $createdBy,
+            $tanggal,
         ): KartuStok {
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
@@ -117,7 +120,8 @@ class StokService
                 ->first();
 
             if (! $stok || bccomp((string) $stok->qty_on_hand, $qty, 4) < 0) {
-                throw new RuntimeException('Stok tidak mencukupi.');
+                $tersedia = $stok?->qty_on_hand ?? '0';
+                throw new RuntimeException("Stok tidak mencukupi. Tersedia {$tersedia}, diminta {$qty}.");
             }
 
             $nilaiKeluar = bcmul($qty, (string) $stok->hpp_rata2, 2);
@@ -138,7 +142,7 @@ class StokService
                 'id_koperasi' => $koperasiId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
-                'tanggal' => now()->toDateString(),
+                'tanggal' => $tanggal ?? now()->toDateString(),
                 'jenis_mutasi' => 'OUT',
                 'ref_tipe' => $refTipe,
                 'ref_id' => $refId,
@@ -152,6 +156,22 @@ class StokService
                 'created_by' => $createdBy,
             ]);
         });
+    }
+
+    public function hppSaatIni(int $gudangId, int $barangId): string
+    {
+        return (string) (DB::table('stok')
+            ->where('id_gudang', $gudangId)
+            ->where('id_barang', $barangId)
+            ->value('hpp_rata2') ?? '0');
+    }
+
+    public function tersedia(int $gudangId, int $barangId): string
+    {
+        return (string) (DB::table('stok')
+            ->where('id_gudang', $gudangId)
+            ->where('id_barang', $barangId)
+            ->value('qty_on_hand') ?? '0');
     }
 
     private function pastikanPositif(string $value, string $field): void
@@ -169,7 +189,7 @@ class StokService
     }
 
     // --- Ditambahkan dari branch feature/pembelian-penjualan ---
-{
+
     /**
      * Update stok saat penerimaan barang (GRN).
      * Calculate moving average HPP.
@@ -334,6 +354,7 @@ class StokService
         }
     }
 
+
     /**
      * Reverse stock mutation (untuk pembatalan/koreksi).
      * Bayar perhatian: reversal hanya pada kartu stok, BUKAN update HPP.
@@ -348,31 +369,25 @@ class StokService
         try {
             $kartu = KartuStok::findOrFail($idKartuStok);
 
-            // 1. Ambil stok
             $where = ['id_gudang' => $kartu->id_gudang, 'id_barang' => $kartu->id_barang];
-            $stok = DB::table('stok')->where($where)->firstOrFail();
+            $stok = Stok::query()->where($where)->lockForUpdate()->firstOrFail();
 
-            // 2. Reverse: apa yang masuk jadi keluar, apa yang keluar jadi masuk
-            $qtyBaru = $stok->qty_on_hand - $kartu->qty_masuk + $kartu->qty_keluar;
+            // Reverse: stok sekarang - qty_masuk_di_kartu + qty_keluar_di_kartu
+            $qtyBaru = bcadd(
+                bcsub((string) $stok->qty_on_hand, (string) $kartu->qty_masuk, 4),
+                (string) $kartu->qty_keluar,
+                4
+            );
 
-            // 3. Recalculate nilai (tergantung jenis reversal)
-            if ($kartu->jenis_mutasi === 'PENERIMAAN') {
-                // Penerimaan di-reverse: stok berkurang, tapi HPP tetap
-                $hppBaru = $stok->hpp_rata2;
-            } else {
-                // Pengeluaran di-reverse: stok bertambah
-                $hppBaru = $stok->hpp_rata2;
-            }
+            $hppBaru = (string) $stok->hpp_rata2;
+            $nilaiPersediaanBaru = bcmul($qtyBaru, $hppBaru, 2);
 
-            $nilaiPersediaanBaru = $qtyBaru * $hppBaru;
-
-            // 4. Update stok
-            DB::table('stok')->where($where)->update([
+            Stok::query()->where($where)->update([
                 'qty_on_hand' => $qtyBaru,
                 'nilai_persediaan' => $nilaiPersediaanBaru,
+                'updated_at' => now(),
             ]);
 
-            // 5. Mark kartu stok as reversed
             $kartu->update(['is_reversed' => true]);
 
             DB::commit();
@@ -386,16 +401,11 @@ class StokService
      * Validate stok cocok antara sistem dan fisik (stock opname).
      *
      * @param int $idGudang
-     * @param array $stokFisik [
-     *     ['id_barang' => 1, 'qty_fisik' => 95],
-     *     ...
-     * ]
-     * @return array Selisih per barang
+     * @param array $stokFisik
+     * @return array
      */
-    public static function validateStockOpname(
-        int $idGudang,
-        array $stokFisik,
-    ): array {
+    public static function validateStockOpname(int $idGudang, array $stokFisik): array
+    {
         $selisih = [];
 
         foreach ($stokFisik as $item) {
@@ -404,17 +414,17 @@ class StokService
                 'id_barang' => $item['id_barang'],
             ])->first();
 
-            $qtySystem = $stok?->qty_on_hand ?? 0;
-            $qtyFisik = $item['qty_fisik'] ?? 0;
-            $diff = $qtyFisik - $qtySystem;
+            $qtySystem = $stok?->qty_on_hand ?? '0';
+            $qtyFisik = (string) ($item['qty_fisik'] ?? '0');
+            $diff = bcsub($qtyFisik, $qtySystem, 4);
 
-            if ($diff !== 0) {
+            if (bccomp($diff, '0', 4) !== 0) {
                 $selisih[] = [
                     'id_barang' => $item['id_barang'],
                     'qty_system' => $qtySystem,
                     'qty_fisik' => $qtyFisik,
                     'selisih' => $diff,
-                    'jenis_selisih' => $diff > 0 ? 'LEBIH' : 'KURANG',
+                    'jenis_selisih' => bccomp($diff, '0', 4) > 0 ? 'LEBIH' : 'KURANG',
                 ];
             }
         }
@@ -426,30 +436,31 @@ class StokService
      * Post stock opname adjustments ke kartu stok dan jurnal.
      *
      * @param int $idGudang
-     * @param array $adjustments dari validateStockOpname
+     * @param array $adjustments
      * @return void
      */
-    public static function postStockOpname(
-        int $idGudang,
-        array $adjustments,
-    ): void {
+    public static function postStockOpname(int $idGudang, array $adjustments): void
+    {
         DB::beginTransaction();
         try {
             foreach ($adjustments as $adj) {
                 $where = ['id_gudang' => $idGudang, 'id_barang' => $adj['id_barang']];
-                $stok = DB::table('stok')->where($where)->firstOrFail();
+                $stok = Stok::query()->where($where)->lockForUpdate()->firstOrFail();
 
-                // Update qty
-                $qtyBaru = $adj['qty_fisik'];
-                $hppPakai = $stok->hpp_rata2;
-                $nilaiPersediaanBaru = $qtyBaru * $hppPakai;
+                $qtyBaru = (string) $adj['qty_fisik'];
+                $hppPakai = (string) $stok->hpp_rata2;
+                $nilaiPersediaanBaru = bcmul($qtyBaru, $hppPakai, 2);
 
-                DB::table('stok')->where($where)->update([
+                Stok::query()->where($where)->update([
                     'qty_on_hand' => $qtyBaru,
                     'nilai_persediaan' => $nilaiPersediaanBaru,
+                    'updated_at' => now(),
                 ]);
 
-                // Create kartu stok untuk audit trail
+                $diff = (string) $adj['selisih'];
+                $absDiff = ltrim($diff, '-'); 
+                $nilaiMutasi = bcmul($absDiff, $hppPakai, 2);
+
                 KartuStok::create([
                     'id_koperasi' => 1,
                     'id_gudang' => $idGudang,
@@ -458,12 +469,10 @@ class StokService
                     'jenis_mutasi' => $adj['jenis_selisih'] === 'LEBIH' ? 'ADJ_IN' : 'ADJ_OUT',
                     'ref_tipe' => 'OPNAME',
                     'ref_id' => 0,
-                    'qty_masuk' => $adj['jenis_selisih'] === 'LEBIH' ? $adj['selisih'] : 0,
-                    'qty_keluar' => $adj['jenis_selisih'] === 'KURANG' ? abs($adj['selisih']) : 0,
+                    'qty_masuk' => $adj['jenis_selisih'] === 'LEBIH' ? $absDiff : '0',
+                    'qty_keluar' => $adj['jenis_selisih'] === 'KURANG' ? $absDiff : '0',
                     'harga_satuan' => $hppPakai,
-                    'nilai_mutasi' => $adj['jenis_selisih'] === 'LEBIH'
-                        ? $adj['selisih'] * $hppPakai
-                        : abs($adj['selisih']) * $hppPakai,
+                    'nilai_mutasi' => $nilaiMutasi,
                     'saldo_qty' => $qtyBaru,
                     'saldo_nilai' => $nilaiPersediaanBaru,
                     'hpp_rata2_setelah' => $hppPakai,

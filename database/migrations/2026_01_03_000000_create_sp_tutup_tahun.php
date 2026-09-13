@@ -116,18 +116,9 @@ BEGIN
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
     -- =========================================================
-    -- EXIT HANDLER: Rollback + lempar ulang error ke Laravel
+    -- SP dieksekusi di dalam Laravel DB::transaction
+    -- Error akan otomatis di-throw ke Laravel dan di-rollback
     -- =========================================================
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        RESIGNAL;
-    END;
-
-    -- =========================================================
-    -- MULAI TRANSAKSI
-    -- =========================================================
-    START TRANSACTION;
 
     -- Tanggal penutup = 31 Desember tahun yang ditutup
     SET v_tanggal_tutup = MAKEDATE(p_tahun, 365);
@@ -212,15 +203,15 @@ BEGIN
         )
         SELECT
             p_id_koperasi, p_tahun, 12, v_kode_anak,
-            saldo_awal_debet, saldo_awal_kredit,
+            bbp.saldo_awal_debet, bbp.saldo_awal_kredit,
             0, 0,
-            saldo_akhir_debet, saldo_akhir_kredit,
+            bbp.saldo_akhir_debet, bbp.saldo_akhir_kredit,
             NOW()
-        FROM buku_besar_periode
-        WHERE id_koperasi = p_id_koperasi AND periode_tahun = p_tahun AND periode_bulan = 12 AND kode_anak = v_kode_anak
+        FROM buku_besar_periode bbp
+        WHERE bbp.id_koperasi = p_id_koperasi AND bbp.periode_tahun = p_tahun AND bbp.periode_bulan = 12 AND bbp.kode_anak = v_kode_anak
         ON DUPLICATE KEY UPDATE
-            mutasi_debet       = mutasi_debet + v_saldo_bersih,
-            saldo_akhir_debet  = saldo_awal_debet + mutasi_debet + v_saldo_bersih,
+            mutasi_debet       = buku_besar_periode.mutasi_debet + v_saldo_bersih,
+            saldo_akhir_debet  = buku_besar_periode.saldo_awal_debet + buku_besar_periode.mutasi_debet + v_saldo_bersih,
             dihitung_pada      = NOW();
 
         SET v_urutan = v_urutan + 1;
@@ -229,9 +220,11 @@ BEGIN
     CLOSE cur_pendapatan;
 
     -- [K] Akun Ikhtisar 811 untuk menampung total Pendapatan
-    INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
-    VALUES (v_id_jurnal_penutup, v_urutan, '811', 0, v_total_pendapatan);
-    SET v_urutan = v_urutan + 1;
+    IF v_total_pendapatan > 0 THEN
+        INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
+        VALUES (v_id_jurnal_penutup, v_urutan, '811', 0, v_total_pendapatan);
+        SET v_urutan = v_urutan + 1;
+    END IF;
 
     -- =========================================================
     -- LANGKAH 3B: Loop akun Biaya+HPP → Kredit untuk meng-NOL-kan
@@ -257,15 +250,15 @@ BEGIN
         )
         SELECT
             p_id_koperasi, p_tahun, 12, v_kode_anak,
-            saldo_awal_debet, saldo_awal_kredit,
+            bbp.saldo_awal_debet, bbp.saldo_awal_kredit,
             0, 0,
-            saldo_akhir_debet, saldo_akhir_kredit,
+            bbp.saldo_akhir_debet, bbp.saldo_akhir_kredit,
             NOW()
-        FROM buku_besar_periode
-        WHERE id_koperasi = p_id_koperasi AND periode_tahun = p_tahun AND periode_bulan = 12 AND kode_anak = v_kode_anak
+        FROM buku_besar_periode bbp
+        WHERE bbp.id_koperasi = p_id_koperasi AND bbp.periode_tahun = p_tahun AND bbp.periode_bulan = 12 AND bbp.kode_anak = v_kode_anak
         ON DUPLICATE KEY UPDATE
-            mutasi_kredit      = mutasi_kredit + v_saldo_bersih,
-            saldo_akhir_kredit = saldo_awal_kredit + mutasi_kredit + v_saldo_bersih,
+            mutasi_kredit      = buku_besar_periode.mutasi_kredit + v_saldo_bersih,
+            saldo_akhir_kredit = buku_besar_periode.saldo_awal_kredit + buku_besar_periode.mutasi_kredit + v_saldo_bersih,
             dihitung_pada      = NOW();
 
         SET v_urutan = v_urutan + 1;
@@ -274,8 +267,11 @@ BEGIN
     CLOSE cur_biaya;
 
     -- [D] Akun Ikhtisar 811 untuk menampung total Biaya
-    INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
-    VALUES (v_id_jurnal_penutup, v_urutan, '811', v_total_biaya, 0);
+    IF v_total_biaya > 0 THEN
+        INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
+        VALUES (v_id_jurnal_penutup, v_urutan, '811', v_total_biaya, 0);
+        SET v_urutan = v_urutan + 1;
+    END IF;
 
     -- =========================================================
     -- LANGKAH 4: INSERT jurnal_header untuk distribusi SHU
@@ -315,37 +311,36 @@ BEGIN
 
     loop_shu: LOOP
         FETCH cur_shu INTO v_persentase, v_kode_akun_shu;
-        IF v_shu_done THEN LEAVE loop_shu; END IF;
+        IF v_done THEN LEAVE loop_shu; END IF;
 
         SET v_nilai_shu = ROUND(ABS(v_laba_bersih) * v_persentase / 100, 2);
-        SET v_total_shu_distribusi = v_total_shu_distribusi + v_nilai_shu;
+        
+        IF v_nilai_shu > 0 THEN
+            SET v_total_shu_distribusi = v_total_shu_distribusi + v_nilai_shu;
 
-        IF v_laba_bersih >= 0 THEN
-            -- Laba: [D] 811 (tutup ikhtisar), [K] akun SHU/Modal
-            INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
-            VALUES
-                (v_id_jurnal_shu, v_urutan,     '811',         v_nilai_shu, 0),
-                (v_id_jurnal_shu, v_urutan + 1, v_kode_akun_shu, 0, v_nilai_shu);
-        ELSE
-            -- Rugi: [K] 811 (tutup ikhtisar), [D] akun SHU/Modal (mengurangi modal)
-            INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
-            VALUES
-                (v_id_jurnal_shu, v_urutan,     '811',         0, v_nilai_shu),
-                (v_id_jurnal_shu, v_urutan + 1, v_kode_akun_shu, v_nilai_shu, 0);
+            IF v_laba_bersih >= 0 THEN
+                -- Laba: [D] 811 (tutup ikhtisar), [K] akun SHU/Modal
+                INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
+                VALUES
+                    (v_id_jurnal_shu, v_urutan,     '811',         v_nilai_shu, 0),
+                    (v_id_jurnal_shu, v_urutan + 1, v_kode_akun_shu, 0, v_nilai_shu);
+            ELSE
+                -- Rugi: [K] 811 (tutup ikhtisar), [D] akun SHU/Modal (mengurangi modal)
+                INSERT INTO jurnal_detail (id_jurnal, urutan, kode_anak, debet, kredit)
+                VALUES
+                    (v_id_jurnal_shu, v_urutan,     '811',         0, v_nilai_shu),
+                    (v_id_jurnal_shu, v_urutan + 1, v_kode_akun_shu, v_nilai_shu, 0);
+            END IF;
+
+            SET v_urutan = v_urutan + 2;
         END IF;
-
-        SET v_urutan = v_urutan + 2;
-        SET v_done = v_shu_done; -- reset dari CONTINUE HANDLER
     END LOOP;
 
     CLOSE cur_shu;
 
     -- =========================================================
-    -- COMMIT
-    -- =========================================================
-    COMMIT;
-
     -- Return ringkasan ke pemanggil
+    -- =========================================================
     SELECT
         v_id_jurnal_penutup AS id_jurnal_penutup,
         v_id_jurnal_shu     AS id_jurnal_shu,

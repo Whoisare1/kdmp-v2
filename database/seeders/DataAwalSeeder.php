@@ -70,7 +70,9 @@ class DataAwalSeeder extends Seeder
 
             DB::table('gudang')->updateOrInsert(
                 ['id_koperasi' => $koperasi->id_koperasi, 'kode_gudang' => 'UTAMA'],
-                ['nama_gudang' => 'Gudang Utama', 'is_active' => true]
+                ['nama_gudang' => $desa['kode'] === 'KDMP-A'
+                    ? 'Gudang Koperasi Desa Mekar Jaya'
+                    : 'Gudang Koperasi Desa Sukamaju', 'is_active' => true]
             );
 
             DB::table('master_kas_bank')->updateOrInsert(
