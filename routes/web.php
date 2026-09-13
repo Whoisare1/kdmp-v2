@@ -45,8 +45,8 @@ use App\Http\Controllers\Perencanaan\PerbandinganHargaController;
 use App\Http\Controllers\Perencanaan\PermintaanPengadaanController;
 use App\Http\Controllers\Perencanaan\PotensiProduksiController;
 use App\Http\Controllers\Perencanaan\StandarKebutuhanController;
-use App\Http\Controllers\Survei\PertanyaanController;
-use App\Http\Controllers\Survei\SesiSurveiController;
+use Survei\Controllers\PertanyaanController;
+use Survei\Controllers\SesiSurveiController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', LandingController::class)->name('landing');
@@ -55,6 +55,10 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 });
+
+// ===== Public Routes =====
+Route::get('/survei/isi/{token}', [\Survei\Controllers\PublicSurveiController::class, 'show'])->name('survei.public.show');
+Route::post('/survei/isi/{token}', [\Survei\Controllers\PublicSurveiController::class, 'store'])->name('survei.public.store');
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
