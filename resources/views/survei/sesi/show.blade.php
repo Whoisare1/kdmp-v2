@@ -60,6 +60,94 @@
         </div>
     </div>
 
+    <!-- ─── SESI-SESI PENGISIAN ──────────────────────────────────────────── -->
+    <div class="mt-6 mb-10">
+        <h2 class="font-display text-lg font-semibold mb-3 text-ink-900">Sesi Pengisian Data</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            {{-- Sesi 1: Data Demografi Desa --}}
+            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 flex flex-col gap-3">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider text-ink-400">Sesi 1</p>
+                        <h3 class="font-display text-sm font-semibold text-ink-900 mt-0.5">Demografi Desa</h3>
+                        <p class="text-[11px] text-ink-500 mt-1 leading-relaxed line-clamp-2">
+                            Jumlah KK dan penduduk.
+                        </p>
+                    </div>
+                    <span class="flex-shrink-0 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-paper-100 text-ink-600">
+                        {{ \Survei\Models\SesiSurvei::LABEL_STATUS_SESI1[$item->status_sesi1 ?? 'belum_diisi'] }}
+                    </span>
+                </div>
+                <a href="{{ route('survei.sesi1.show', $item->id) }}"
+                   class="mt-auto block w-full text-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-semibold text-white hover:bg-merah-600 shadow-sm transition-colors">
+                    Buka Sesi 1
+                </a>
+            </div>
+
+            {{-- Sesi 2: Potensi Produksi Desa --}}
+            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 flex flex-col gap-3">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider text-ink-400">Sesi 2</p>
+                        <h3 class="font-display text-sm font-semibold text-ink-900 mt-0.5">Potensi Produksi</h3>
+                        <p class="text-[11px] text-ink-500 mt-1 leading-relaxed line-clamp-2">
+                            Data produksi komoditas desa.
+                        </p>
+                    </div>
+                    <span class="flex-shrink-0 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-paper-100 text-ink-600">
+                        {{ \Survei\Models\SesiSurvei::LABEL_STATUS_SESI2[$item->status_sesi2 ?? 'belum_diisi'] }}
+                    </span>
+                </div>
+                <a href="{{ route('survei.sesi2.show', $item->id) }}"
+                   class="mt-auto block w-full text-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-semibold text-white hover:bg-merah-600 shadow-sm transition-colors">
+                    Buka Sesi 2
+                </a>
+            </div>
+
+            {{-- Sesi 3: Standar Konsumsi --}}
+            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 flex flex-col gap-3">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider text-ink-400">Sesi 3</p>
+                        <h3 class="font-display text-sm font-semibold text-ink-900 mt-0.5">Standar Konsumsi</h3>
+                        <p class="text-[11px] text-ink-500 mt-1 leading-relaxed line-clamp-2">
+                            Konsumsi rata-rata penduduk.
+                        </p>
+                    </div>
+                    <span class="flex-shrink-0 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-paper-100 text-ink-600">
+                        {{ \Survei\Models\SesiSurvei::LABEL_STATUS_SESI3[$item->status_sesi3 ?? 'belum_diisi'] }}
+                    </span>
+                </div>
+                <a href="{{ route('survei.sesi3.show', $item->id) }}"
+                   class="mt-auto block w-full text-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-semibold text-white hover:bg-merah-600 shadow-sm transition-colors">
+                    Buka Sesi 3
+                </a>
+            </div>
+
+            {{-- Sesi 4: Pemenuhan Komoditas --}}
+            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 flex flex-col gap-3 border-l-4 border-l-merah-500">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="text-xs font-mono uppercase tracking-wider text-ink-400">Sesi 4</p>
+                        <h3 class="font-display text-sm font-semibold text-ink-900 mt-0.5">Pemenuhan & Harga</h3>
+                        <p class="text-[11px] text-ink-500 mt-1 leading-relaxed line-clamp-2">
+                            Sumber pembelian & harga komoditas.
+                        </p>
+                    </div>
+                    <span class="flex-shrink-0 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-paper-100 text-ink-600">
+                        {{ \Survei\Models\SesiSurvei::LABEL_STATUS_SESI4[$item->status_sesi4 ?? 'belum_diisi'] }}
+                    </span>
+                </div>
+                <a href="{{ route('survei.sesi4.show', $item->id) }}"
+                   class="mt-auto block w-full text-center rounded-sm bg-merah-600 px-4 py-2 text-sm font-semibold text-white hover:bg-merah-700 shadow-sm transition-colors">
+                    Buka Sesi 4
+                </a>
+            </div>
+
+        </div>
+    </div>
+
     <!-- Simple Success Modal -->
     <div id="successModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink-900/50 backdrop-blur-sm">
         <div class="w-full max-w-sm rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-xl text-center">
