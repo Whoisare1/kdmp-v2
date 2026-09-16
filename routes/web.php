@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function () {
 
     // ===== M1 — Survey =====
     Route::prefix('survei')->name('survei.')->group(function () {
+        Route::post('sesi/{sesi}/sinkron', [SesiSurveiController::class, 'sinkron'])->name('sesi.sinkron');
         Route::resource('sesi', SesiSurveiController::class);
         Route::resource('pertanyaan', PertanyaanController::class);
     });
@@ -83,11 +84,15 @@ Route::middleware('auth')->group(function () {
         Route::resource('demografi', DemografiController::class);
         Route::resource('potensi-produksi', PotensiProduksiController::class);
         Route::resource('standar-kebutuhan', StandarKebutuhanController::class);
+        Route::post('kebutuhan-komoditas/kalkulasi', [KebutuhanKomoditasController::class, 'kalkulasi'])
+            ->name('kebutuhan-komoditas.kalkulasi');
         Route::resource('kebutuhan-komoditas', KebutuhanKomoditasController::class)
             ->only(['index', 'show']);
         Route::resource('neraca-komoditas', NeracaKomoditasController::class)
             ->only(['index', 'show']);
         Route::resource('perbandingan-harga', PerbandinganHargaController::class);
+        Route::get('permintaan-pengadaan/from-hasil/{hasil}', [PermintaanPengadaanController::class, 'fromHasil'])
+            ->name('permintaan-pengadaan.from-hasil');
         Route::resource('permintaan-pengadaan', PermintaanPengadaanController::class);
     });
 

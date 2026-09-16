@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             TransaksiTemplateSeeder::class,
             PeranSeeder::class,
             DataAwalSeeder::class,
+            M2PerencanaanSeeder::class,
         ]);
     }
 }
