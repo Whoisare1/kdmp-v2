@@ -62,6 +62,43 @@ Route::middleware('guest')->group(function () {
 });
 
 // ===== Public Routes =====
+// Survei RT
+Route::get('/survei/isi/rt/{token}', [\Survei\Controllers\PublicSurveiRtController::class, 'show'])->name('survei.public.rt.show');
+Route::post('/survei/isi/rt/{token}', [\Survei\Controllers\PublicSurveiRtController::class, 'store'])->name('survei.public.rt.store');
+Route::put('/survei/isi/rt/{token}/{id}', [\Survei\Controllers\PublicSurveiRtController::class, 'update'])->name('survei.public.rt.update');
+
+// Survei Produsen (Kelompok Tani & Ekraf)
+Route::get('/survei/isi/produsen/{token}', [\Survei\Controllers\PublicSurveiProdusenController::class, 'show'])->name('survei.public.produsen.show');
+Route::post('/survei/isi/produsen/{token}', [\Survei\Controllers\PublicSurveiProdusenController::class, 'store'])->name('survei.public.produsen.store');
+Route::delete('/survei/isi/produsen/{token}/{id}', [\Survei\Controllers\PublicSurveiProdusenController::class, 'destroy'])->name('survei.public.produsen.destroy');
+
+// Survei Masyarakat (Data Keluarga & Alamat)
+Route::get('/survei/isi/masyarakat/{token}', [\Survei\Controllers\PublicSurveiMasyarakatController::class, 'show'])
+    ->name('survei.public.masyarakat.show');
+Route::post('/survei/isi/masyarakat/{token}', [\Survei\Controllers\PublicSurveiMasyarakatController::class, 'store'])
+    ->name('survei.public.masyarakat.store');
+
+// Survei Masyarakat (Anggota Keluarga)
+Route::get('/survei/isi/masyarakat/{token}/{id_masyarakat}/anggota', [\Survei\Controllers\PublicSurveiMasyarakatController::class, 'showAnggota'])
+    ->name('survei.public.masyarakat.anggota.show');
+Route::post('/survei/isi/masyarakat/{token}/{id_masyarakat}/anggota', [\Survei\Controllers\PublicSurveiMasyarakatController::class, 'storeAnggota'])
+    ->name('survei.public.masyarakat.anggota.store');
+
+// Survei Masyarakat (Sesi 3 - Konsumsi)
+Route::get('/survei/isi/masyarakat/{token}/{id_masyarakat}/sesi3', [\Survei\Controllers\PublicMasyarakatSesi3Controller::class, 'show'])
+    ->name('survei.public.masyarakat.sesi3.show');
+Route::post('/survei/isi/masyarakat/{token}/{id_masyarakat}/sesi3', [\Survei\Controllers\PublicMasyarakatSesi3Controller::class, 'store'])
+    ->name('survei.public.masyarakat.sesi3.store');
+
+// Survei Masyarakat (Review & Submit)
+Route::get('/survei/isi/masyarakat/{token}/{id_masyarakat}/review', [\Survei\Controllers\PublicMasyarakatReviewController::class, 'show'])
+    ->name('survei.public.masyarakat.review.show');
+Route::post('/survei/isi/masyarakat/{token}/{id_masyarakat}/submit', [\Survei\Controllers\PublicMasyarakatReviewController::class, 'submit'])
+    ->name('survei.public.masyarakat.review.submit');
+Route::get('/survei/isi/masyarakat/{token}/terimakasih', [\Survei\Controllers\PublicMasyarakatReviewController::class, 'terimakasih'])
+    ->name('survei.public.masyarakat.terimakasih');
+
+// Survei Masyarakat (Legacy Landing)
 Route::get('/survei/isi/{token}', [\Survei\Controllers\PublicSurveiController::class, 'show'])->name('survei.public.show');
 Route::post('/survei/isi/{token}', [\Survei\Controllers\PublicSurveiController::class, 'store'])->name('survei.public.store');
 Route::get('/survei/isi/{token}/modul/{modul}', [\Survei\Controllers\PublicSurveiController::class, 'showModul'])->name('survei.public.modul.show');
@@ -120,7 +157,21 @@ Route::middleware('auth')->group(function () {
 
     // ===== M1 — Survey =====
     Route::prefix('survei')->name('survei.')->group(function () {
+        Route::view('dashboard', 'survei.dashboard')->name('dashboard.index');
         Route::resource('sesi', SesiSurveiController::class);
+        
+        // Master Data Baru
+        Route::resource('rt', \App\Http\Controllers\Survei\RtDesaController::class);
+        Route::resource('produsen', \App\Http\Controllers\Survei\ProdusenDesaController::class);
+        // Hapus entri komoditas produksi dari halaman admin
+        Route::delete('produksi/{id}', function (int $id) {
+            $item = \App\Models\Survei\ProduksiProdusen::findOrFail($id);
+            $item->delete();
+            return redirect()->route('survei.produsen.index')->with('success', 'Data komoditas berhasil dihapus.');
+        })->name('produksi.destroy');
+        Route::get('validasi', [\App\Http\Controllers\Survei\ValidasiSurveiController::class, 'index'])->name('validasi.index');
+        Route::get('validasi/rt/{id_sesi}/{nama_rt}/{rw?}', [\App\Http\Controllers\Survei\ValidasiSurveiController::class, 'showRtDetail'])->name('validasi.rt.show');
+
         Route::resource('pertanyaan', PertanyaanController::class);
 
         // ─── Sesi 1: Data Demografi Desa ─────────────────────────────────────

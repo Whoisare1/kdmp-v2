@@ -9,7 +9,7 @@
         [
             'no' => 'M1',
             'label' => 'Survey',
-            'route' => 'survei.sesi.index',
+            'route' => 'survei.dashboard.index',
             'match' => 'survei.*'
         ],
         [

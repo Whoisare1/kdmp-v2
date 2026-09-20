@@ -22,7 +22,7 @@ class PublicSesi1Controller extends Controller
 
     public function show(string $token): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with(['wilayah.parent.parent', 'petugas', 'narasumber.demografi'])
             ->firstOrFail();
 
@@ -57,7 +57,7 @@ class PublicSesi1Controller extends Controller
 
     public function storeNarasumber(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $validated = $request->validate([
             'nama_narasumber' => 'required|string|max:100',
@@ -84,7 +84,7 @@ class PublicSesi1Controller extends Controller
 
     public function showNarasumber(string $token, NarasumberSesi $narasumber): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with('wilayah')
             ->firstOrFail();
 
@@ -111,7 +111,7 @@ class PublicSesi1Controller extends Controller
 
     public function storeDemografi(Request $request, string $token, NarasumberSesi $narasumber): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         abort_if($narasumber->id_sesi !== $sesi->id, 403);
 
@@ -167,7 +167,7 @@ class PublicSesi1Controller extends Controller
 
     public function updateNarasumber(Request $request, string $token, NarasumberSesi $narasumber): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         abort_if($narasumber->id_sesi !== $sesi->id, 403);
 
@@ -189,7 +189,7 @@ class PublicSesi1Controller extends Controller
 
     public function destroyNarasumber(string $token, NarasumberSesi $narasumber): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         abort_if($narasumber->id_sesi !== $sesi->id, 403);
 
@@ -205,7 +205,7 @@ class PublicSesi1Controller extends Controller
 
     public function selesaikan(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $request->validate(['konfirmasi' => 'required|accepted']);
 
@@ -222,7 +222,7 @@ class PublicSesi1Controller extends Controller
     // ─── Salin Data dari Periode Sebelumnya ──────────────────────────────────
     public function salinSebelumnya(string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         $helper = new SesiSurveiController();
         $berhasil = $helper->salinDataNarasumberSesiSebelumnya($sesi);
 

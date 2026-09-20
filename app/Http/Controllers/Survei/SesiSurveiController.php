@@ -45,7 +45,9 @@ class SesiSurveiController extends ModuleCrudController
         ]);
 
         $validated['status'] = 'DRAFT';
-        $validated['token_publik'] = Str::random(32);
+        $validated['token_rt'] = Str::random(32);
+        $validated['token_masyarakat'] = Str::random(32);
+        $validated['token_produsen'] = Str::random(32);
         $validated['id_petugas'] = auth()->id();
 
         $sesi = SesiSurvei::create($validated);
@@ -57,6 +59,13 @@ class SesiSurveiController extends ModuleCrudController
     public function show(int|string $id): View
     {
         $item = SesiSurvei::with(['wilayah', 'petugas'])->findOrFail($id);
+        
+        // Auto-update status sesi 1 jika data RT sudah ada
+        $rtCount = \App\Models\Survei\RtDesa::where('id_sesi', $item->id)->count();
+        if ($rtCount > 0 && in_array($item->status_sesi1, ['belum_diisi', null])) {
+            $item->status_sesi1 = 'sedang_diisi'; // Mengubah status menjadi sedang diisi
+            $item->save();
+        }
         
         return view('survei.sesi.show', [
             'title' => 'Detail Sesi Survei',

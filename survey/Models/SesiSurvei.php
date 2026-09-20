@@ -18,7 +18,7 @@ class SesiSurvei extends Model
         'status_sesi2', 'selesai_sesi2_at', 'diselesaikan_sesi2_oleh',
         'status_sesi3', 'selesai_sesi3_at', 'diselesaikan_sesi3_oleh',
         'status_sesi4', 'selesai_sesi4_at', 'diselesaikan_sesi4_oleh',
-        'catatan', 'id_perangkat', 'uuid_sesi_klien', 'token_publik', 'token_kadaluarsa',
+        'catatan', 'id_perangkat', 'uuid_sesi_klien', 'token_rt', 'token_masyarakat', 'token_produsen', 'token_kadaluarsa',
     ];
 
     const LABEL_STATUS_SESI1 = [

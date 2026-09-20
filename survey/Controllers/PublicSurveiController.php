@@ -16,7 +16,7 @@ class PublicSurveiController extends Controller
     /** Landing page: daftar modul + status pengisian masing-masing. */
     public function show(string $token): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with(['wilayah.parent.parent', 'petugas'])
             ->firstOrFail();
 
@@ -64,7 +64,7 @@ class PublicSurveiController extends Controller
     /** Form isi satu modul tertentu. */
     public function showModul(string $token, int $modulId): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with(['wilayah.parent.parent', 'petugas'])
             ->firstOrFail();
 
@@ -93,7 +93,7 @@ class PublicSurveiController extends Controller
     /** Simpan jawaban satu modul, lalu kembali ke landing. */
     public function storeModul(Request $request, string $token, int $modulId): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         $modul = ModulSurvei::where('is_active', true)->findOrFail($modulId);
 
         $pertanyaanIds = Pertanyaan::where('id_modul', $modulId)
@@ -143,7 +143,7 @@ class PublicSurveiController extends Controller
     /** (Legacy) simpan semua jawaban sekaligus — masih dipertahankan untuk kompatibilitas. */
     public function store(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $data = $request->validate([
             'jawaban'   => 'required|array',

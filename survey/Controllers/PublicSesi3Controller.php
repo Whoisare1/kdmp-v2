@@ -24,7 +24,7 @@ class PublicSesi3Controller extends Controller
 
     public function show(string $token): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with(['wilayah.parent.parent', 'petugas', 'narasumber.demografi'])
             ->firstOrFail();
 
@@ -81,7 +81,7 @@ class PublicSesi3Controller extends Controller
 
     public function store(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $validated = $request->validate([
             'id_komoditas'    => 'required|exists:komoditas,id',
@@ -136,7 +136,7 @@ class PublicSesi3Controller extends Controller
 
     public function destroy(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $request->validate(['id_komoditas' => 'required|exists:komoditas,id']);
 
@@ -156,7 +156,7 @@ class PublicSesi3Controller extends Controller
 
     public function salinDariSesi2(string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         // Ambil komoditas unik dari Sesi 2 (Produksi)
         $komoditasSesi2 = \Survei\Models\ProduksiNarasumber::where('id_sesi', $sesi->id)
@@ -219,7 +219,7 @@ class PublicSesi3Controller extends Controller
 
     public function simpanDraft(string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $sesi->update(['status_sesi3' => 'sedang_diisi']);
 
@@ -232,7 +232,7 @@ class PublicSesi3Controller extends Controller
 
     public function selesaikan(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         // Tidak ada validasi konfirmasi checkbox di public, asalkan ditekan tombolnya.
         // Bisa juga nambahkan bila di form ada <input type="hidden" name="konfirmasi" value="1">

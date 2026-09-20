@@ -110,13 +110,19 @@ class SesiSurveiController extends ModuleCrudController
             $validated['id_wilayah'] = $userWilayahId;
         }
 
-        // Auto-sync bulan & tahun dari tanggal_survei
-        $dt = \Illuminate\Support\Carbon::parse($validated['tanggal_survei']);
-        $validated['tahun'] = (int) $dt->format('Y');
-        $validated['bulan'] = (int) $dt->format('n');
+        // Backend tidak lagi melakukan auto-sync paksa. 
+        // Menggunakan nilai dari input form (yang defaultnya diset oleh JS di frontend).
+        // Jika karena alasan tertentu null, fallback ke tanggal survei.
+        if (empty($validated['tahun']) || empty($validated['bulan'])) {
+            $dt = \Illuminate\Support\Carbon::parse($validated['tanggal_survei']);
+            $validated['tahun'] = $validated['tahun'] ?? (int) $dt->format('Y');
+            $validated['bulan'] = $validated['bulan'] ?? (int) $dt->format('n');
+        }
 
-        $validated['status']       = 'DRAFT';
-        $validated['token_publik'] = Str::random(32);
+        $validated['status']           = 'DRAFT';
+        $validated['token_rt']         = Str::random(32);
+        $validated['token_masyarakat'] = Str::random(32);
+        $validated['token_produsen']   = Str::random(32);
         $validated['id_petugas']   = $validated['id_petugas'] ?? auth()->id();
 
         $sesi = SesiSurvei::create($validated);
@@ -203,10 +209,12 @@ class SesiSurveiController extends ModuleCrudController
             $validated['id_wilayah'] = $userWilayahId;
         }
 
-        // Auto-sync bulan & tahun dari tanggal_survei
-        $dt = \Illuminate\Support\Carbon::parse($validated['tanggal_survei']);
-        $validated['tahun'] = (int) $dt->format('Y');
-        $validated['bulan'] = (int) $dt->format('n');
+        // Backend tidak lagi melakukan auto-sync paksa. 
+        if (empty($validated['tahun']) || empty($validated['bulan'])) {
+            $dt = \Illuminate\Support\Carbon::parse($validated['tanggal_survei']);
+            $validated['tahun'] = $validated['tahun'] ?? (int) $dt->format('Y');
+            $validated['bulan'] = $validated['bulan'] ?? (int) $dt->format('n');
+        }
 
         $sesi->update($validated);
 

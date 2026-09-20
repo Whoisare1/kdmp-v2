@@ -31,7 +31,7 @@ class PublicSesi2Controller extends Controller
 
     public function show(string $token): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with([
                 'wilayah.parent.parent',
                 'petugas',
@@ -64,7 +64,7 @@ class PublicSesi2Controller extends Controller
 
     public function storeNarasumber(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $validated = $request->validate([
             'nama_narasumber' => 'required|string|max:100',
@@ -103,7 +103,7 @@ class PublicSesi2Controller extends Controller
 
     public function storeProduksi(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         $this->resolveKomoditasInput($request);
 
         $validated = $request->validate([
@@ -156,7 +156,7 @@ class PublicSesi2Controller extends Controller
 
     public function updateProduksi(Request $request, string $token, ProduksiNarasumber $produksi): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         $this->resolveKomoditasInput($request);
 
         $validated = $request->validate([
@@ -204,7 +204,7 @@ class PublicSesi2Controller extends Controller
 
     public function destroyProduksi(string $token, ProduksiNarasumber $produksi): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         $produksi->delete();
 
         return back()->with('success', 'Data produksi komoditas berhasil dihapus.');
@@ -212,7 +212,7 @@ class PublicSesi2Controller extends Controller
 
     public function simpanDraft(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         $sesi->update(['status_sesi2' => 'sedang_diisi']);
 
         return back()->with('success', 'Draft Sesi 2 berhasil disimpan.');
@@ -220,7 +220,7 @@ class PublicSesi2Controller extends Controller
 
     public function selesaikan(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         if ($sesi->produksi->isEmpty()) {
             return back()->with('error', 'Sesi 2 tidak dapat diselesaikan karena belum ada data produksi komoditas.');

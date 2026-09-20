@@ -64,14 +64,14 @@
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div>
                     <label for="tahun" class="mb-1 block text-sm font-medium text-ink-800">Tahun Periode</label>
-                    <input type="number" name="tahun" id="tahun" value="{{ old('tahun', date('Y')) }}" required min="2000" max="2100" class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none cursor-not-allowed" readonly>
+                    <input type="number" name="tahun" id="tahun" value="{{ old('tahun', date('Y')) }}" required min="2000" max="2100" class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
                     @error('tahun')
                         <p class="mt-1 text-xs text-merah-600">{{ $message }}</p>
                     @enderror
                 </div>
                 <div>
                     <label for="bulan" class="mb-1 block text-sm font-medium text-ink-800">Bulan Periode</label>
-                    <select name="bulan" id="bulan" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none cursor-not-allowed" readonly style="pointer-events: none;">
+                    <select name="bulan" id="bulan" required class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
                         <option value="">-- Pilih Bulan --</option>
                         @foreach($bulans as $key => $nama)
                             <option value="{{ $key }}" {{ old('bulan', date('n')) == $key ? 'selected' : '' }}>
@@ -104,13 +104,29 @@
     </div>
 
     <script>
-        document.getElementById('tanggal_survei').addEventListener('change', function() {
+        const elTanggal = document.getElementById('tanggal_survei');
+        const elTahun = document.getElementById('tahun');
+        const elBulan = document.getElementById('bulan');
+
+        // Jika user ganti Tanggal -> update Bulan & Tahun
+        elTanggal.addEventListener('change', function() {
             if (!this.value) return;
             const parts = this.value.split('-');
             if (parts.length === 3) {
-                document.getElementById('tahun').value = parseInt(parts[0], 10);
-                document.getElementById('bulan').value = parseInt(parts[1], 10);
+                elTahun.value = parseInt(parts[0], 10);
+                elBulan.value = parseInt(parts[1], 10);
             }
         });
+
+        // Jika user ganti Bulan / Tahun -> update Tanggal (set ke tanggal 1 di bulan tsb)
+        function syncKeTanggal() {
+            if (!elTahun.value || !elBulan.value) return;
+            let yy = elTahun.value;
+            let mm = elBulan.value.padStart(2, '0');
+            elTanggal.value = `${yy}-${mm}-01`;
+        }
+
+        elTahun.addEventListener('change', syncKeTanggal);
+        elBulan.addEventListener('change', syncKeTanggal);
     </script>
 </x-layouts.app>

@@ -2,22 +2,17 @@
 
     <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h1 class="font-display text-2xl font-semibold text-ink-900">{{ $title }}</h1>
-            <p class="mt-1 text-sm text-ink-500">Daftar seluruh pelaksanaan sesi survei desa dan status pengisiannya.</p>
+            <p class="text-sm text-ink-500">Daftar sesi yang digunakan sebagai token pengisian kuesioner.</p>
         </div>
 
         <div class="flex items-center gap-3">
-            <form method="GET" class="flex items-center gap-2">
-                <input type="text"
-                       name="q"
-                       value="{{ request('q') }}"
-                       placeholder="Cari desa..."
-                       class="w-56 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm placeholder:text-ink-400 focus:border-merah-400 focus:outline-none">
-                <button type="submit"
-                        class="rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">
-                    Cari
-                </button>
-            </form>
+            <a href="{{ route('survei.dashboard.index') }}"
+               class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-paper-100 whitespace-nowrap">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Kembali ke Dashboard
+            </a>
 
             <a href="{{ route($routeBase . '.create') }}"
                class="flex items-center gap-1.5 rounded-sm bg-merah-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-merah-600 whitespace-nowrap">

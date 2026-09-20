@@ -41,21 +41,48 @@
             </table>
         </div>
 
-        <!-- Tautan Publik -->
-        <div class="rounded-sm border border-merah-200 bg-merah-50 p-6">
-            <h2 class="font-display text-lg font-semibold mb-2 text-merah-800">Tautan Pengisian Survei</h2>
-            <p class="text-sm text-merah-700 mb-4">
-                Bagikan tautan ini kepada surveyor atau petugas lapangan. Mereka tidak perlu login untuk mulai mengisi.
-            </p>
-            
-            <div class="mt-2 rounded-sm border border-merah-300 bg-white p-3 font-mono text-sm break-all text-ink-800">
-                {{ url('/survei/isi/' . $item->token_publik) }}
+        <!-- Tautan Survei -->
+        <div class="flex flex-col gap-4">
+            <!-- Tautan RT -->
+            <div class="rounded-sm border border-blue-200 bg-blue-50 p-5">
+                <h2 class="font-display text-base font-semibold mb-1 text-blue-800">Tautan Survei RT (Data Baseline)</h2>
+                <p class="text-xs text-blue-700 mb-3">Bagikan khusus untuk Ketua RT/Pemdes. Hanya mengisi data Kepala Keluarga.</p>
+                <div class="flex gap-2 items-center">
+                    <div class="flex-1 rounded-sm border border-blue-300 bg-white p-2.5 font-mono text-xs break-all text-ink-800">
+                        {{ url('/survei/isi/rt/' . $item->token_rt) }}
+                    </div>
+                    <button type="button" onclick="copyAndShowModal('{{ url('/survei/isi/rt/' . $item->token_rt) }}')" class="rounded-sm bg-blue-600 px-3 py-2.5 text-xs font-medium text-white hover:bg-blue-700 shadow-sm shrink-0">
+                        Salin
+                    </button>
+                </div>
             </div>
-            
-            <div class="mt-4 flex gap-3">
-                <button type="button" onclick="copyAndShowModal('{{ url('/survei/isi/' . $item->token_publik) }}')" class="rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-white hover:bg-merah-600 shadow-sm">
-                    Copy Tautan
-                </button>
+
+            <!-- Tautan Masyarakat -->
+            <div class="rounded-sm border border-merah-200 bg-merah-50 p-5">
+                <h2 class="font-display text-base font-semibold mb-1 text-merah-800">Tautan Survei Masyarakat</h2>
+                <p class="text-xs text-merah-700 mb-3">Bagikan untuk masyarakat umum (Keluarga). Wajib mengisi usia & gender anggota keluarga.</p>
+                <div class="flex gap-2 items-center">
+                    <div class="flex-1 rounded-sm border border-merah-300 bg-white p-2.5 font-mono text-xs break-all text-ink-800">
+                        {{ url('/survei/isi/masyarakat/' . $item->token_masyarakat) }}
+                    </div>
+                    <button type="button" onclick="copyAndShowModal('{{ url('/survei/isi/masyarakat/' . $item->token_masyarakat) }}')" class="rounded-sm bg-merah-600 px-3 py-2.5 text-xs font-medium text-white hover:bg-merah-700 shadow-sm shrink-0">
+                        Salin
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tautan Produsen -->
+            <div class="rounded-sm border border-green-200 bg-green-50 p-5">
+                <h2 class="font-display text-base font-semibold mb-1 text-green-800">Tautan Survei Produsen (Tani/Ekraf)</h2>
+                <p class="text-xs text-green-700 mb-3">Bagikan khusus untuk Kelompok Tani &amp; Pelaku Ekonomi Kreatif. Isi potensi produksi komoditas desa.</p>
+                <div class="flex gap-2 items-center">
+                    <div class="flex-1 rounded-sm border border-green-300 bg-white p-2.5 font-mono text-xs break-all text-ink-800">
+                        {{ url('/survei/isi/produsen/' . $item->token_produsen) }}
+                    </div>
+                    <button type="button" onclick="copyAndShowModal('{{ url('/survei/isi/produsen/' . $item->token_produsen) }}')" class="rounded-sm bg-green-600 px-3 py-2.5 text-xs font-medium text-white hover:bg-green-700 shadow-sm shrink-0">
+                        Salin
+                    </button>
+                </div>
             </div>
         </div>
     </div>

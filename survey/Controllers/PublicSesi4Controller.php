@@ -17,7 +17,7 @@ class PublicSesi4Controller extends Controller
 
     public function show(string $token): View
     {
-        $sesi = SesiSurvei::where('token_publik', $token)
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
             ->with(['wilayah', 'petugas'])
             ->firstOrFail();
 
@@ -59,7 +59,7 @@ class PublicSesi4Controller extends Controller
 
     public function store(Request $request, string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $validated = $request->validate([
             'id_komoditas'     => 'required|exists:komoditas,id',
@@ -112,7 +112,7 @@ class PublicSesi4Controller extends Controller
 
     public function destroy(string $token, PemenuhanKomoditas $pemenuhan): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         if ((int) $pemenuhan->id_sesi !== (int) $sesi->id) {
             abort(404, 'Data tidak ditemukan di sesi ini.');
@@ -129,7 +129,7 @@ class PublicSesi4Controller extends Controller
 
     public function simpanDraft(string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         
         $sesi->update(['status_sesi4' => 'sedang_diisi']);
 
@@ -142,7 +142,7 @@ class PublicSesi4Controller extends Controller
 
     public function selesaikan(string $token): RedirectResponse
     {
-        $sesi = SesiSurvei::where('token_publik', $token)->firstOrFail();
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         if (!$sesi->pemenuhan()->exists()) {
             return redirect()
