@@ -1,0 +1,527 @@
+# TUTORIAL
+
+## KONSEP DASAR: CARA MAINNYA
+Jangan langsung gabungkan fitur yang baru kamu buat ke branch `main`. Selalu gunakan branch perantara (biasanya bernama `developer` atau `staging`) sebagai tempat berkumpulnya semua fitur untuk dites terlebih dahulu.
+
+Ibaratnya:
+- Branch fitur (`feature/finance`, `feature/pembelian`, dll) = Bahan-bahan masakan.
+- Branch `developer` = Gelas tempat mengaduk dan menyatukan semua bahan.
+- Branch `main` = Gelas yang sudah sempurna dan siap disajikan ke pelanggan.
+
+---
+
+## LANGKAH-LANGKAH PENGGABUNGAN (MERGE)
+
+### 1. Pindah ke Branch Wadah (Developer)
+Pastikan kamu masuk ke branch developer dan pastikan branch ini adalah yang paling update.
+```bash
+git checkout developer
+git pull origin developer
+```
+
+### 2. Gabungkan Branch Fitur Kamu
+Mulai gabungkan branch fiturmu satu per satu ke dalam wadah developer ini.
+```bash
+git merge feature/nama-fitur-kamu
+```
+Jika muncul pesan **"Already up to date"**, artinya fiturmu SUDAH BERHASIL masuk ke dalam branch developer. Karena semua fitur sudah masuk ke satu wadah, kamu **tidak perlu pindah-pindah branch lagi** untuk mengetes fitur A atau fitur B. Semuanya sudah kumpul di `developer`.
+
+---
+
+## BAGAIMANA JIKA TERJADI ERROR / CONFLICT?
+
+Terkadang saat mencoba `git merge`, kamu akan mendapat error **CONFLICT**. Ini terjadi karena dua orang yang berbeda mengubah baris kode yang sama di file yang sama.
+
+Jika kamu kena pesan error seperti ini:
+`error: you need to resolve your current index first`
+Itu artinya Git kamu sedang *nyangkut* di tengah-tengah proses merge yang gagal. Git mengunci aplikasimu dan tidak akan membiarkanmu pindah branch sebelum urusan ini selesai!
+
+**Solusi 1: Jurus Kabur (Paling Aman)**
+Jika kamu bingung, tidak paham kode yang bentrok (karena itu pekerjaan orang lain), dan takut aplikasinya malah rusak, BATALKAN proses mergenya seketika dengan perintah:
+```bash
+git merge --abort
+```
+*(Perintah ini akan menyapu bersih proses merge yang nyangkut dan mengembalikan kodemu bersih seperti semula).*
+Setelah aman, minta tolong pembuat fitur tersebut untuk memperbaiki conflict-nya.
+
+**Solusi 2: Hadapi dan Selesaikan secara Manual**
+Jika kamu membuka file yang error, kamu akan melihat kode aneh pembatas seperti `<<<<<<< HEAD`, `=======`, dan `>>>>>>>`.
+- **Hati-hati:** Jangan asal menghapus salah satu sisi kode! Kadang, kedua sisi kode itu (misalnya fungsi A dari branch lama dan fungsi B dari branch baru) sama-sama dibutuhkan.
+- Gabungkan kodenya dengan baik (misal, jadikan satu di dalam class yang sama).
+- Hapus tanda-tanda kurung sikunya (`<<<<<<<`, dsb).
+- Simpan file, lalu beri tahu Git bahwa kamu sudah menyelesaikannya:
+```bash
+git add nama-file-yang-conflict.php
+git commit -m "Menyelesaikan conflict di nama file"
+```
+
+---
+
+## LANGKAH TERAKHIR: TESTING BERSAMA-SAMA
+
+Setelah semua branch fitur sukses di-merge tanpa sisa conflict, hal terpenting adalah **Mentes Aplikasinya**.
+
+Karena kamu sudah berada di `developer` yang berisi gabungan seluruh fitur, kamu harus menyiapkan ulang aplikasinya agar sinkron:
+
+1. Reset Database & Isi Data Palsu (Penting untuk Laravel):
+```bash
+php artisan migrate:fresh
+php artisan db:seed
+```
+2. Jalankan server backend dan frontend-nya:
+```bash
+php artisan serve
+npm run dev
+```
+3. Buka browser, kelilingi semua menunya. Pastikan fitur A tidak merusak fitur B.
+4. Jika sudah dites keliling dan 100% aman terkendali, barulah kodenya kita simpan ke server bersama-sama:
+```bash
+git push origin developer
+```
+Baru setelah itu semua aman, kode siap dibawa ke branch `main`.
+
+
+
+
+
+daftar desa desa di kabputane pati = Berikut daftar lengkap desa/kelurahan per kecamatan:
+
+1. Kecamatan Batangan — 18 desa
+Batursari
+Bulumulyo
+Bumimulyo
+Gajahkumpul
+Gunungsari
+Jembangan
+Kedalon
+Ketitangwetan
+Klayusiwalan
+Kuniran
+Lengkong
+Mangunlegi
+Ngening
+Pecangaan
+Raci
+Sukoagung
+Tlogomojo
+Tompomulyo
+2. Kecamatan Cluwak — 13 desa
+Bleber
+Gerit
+Gesengan
+Karangsari
+Medani
+Mojo
+Ngablak
+Ngawen
+Payak
+Plaosan
+Sentul
+Sirahan
+Sumur
+3. Kecamatan Dukuhseti — 12 desa
+Alasdowo
+Bakalan
+Banyutowo
+Dukuhseti
+Dumpil
+Grogolan
+Kembang
+Kenanti
+Ngagel
+Puncel
+Tegalombo
+Wedusan
+4. Kecamatan Gabus — 24 desa
+Babalan
+Banjarsari
+Bogotanjung
+Gabus
+Gebang
+Gempolsari
+Karaban
+Koripandriyo
+Koryokalangan
+Kosekan
+Mintobasuki
+Mojolawaran
+Pantirejo
+Penanggungan
+Plumbungan
+Sambirejo
+Soko
+Sugihrejo
+Sunggingwarno
+Tambahmulyo
+Tanjang
+Tanjunganom
+Tlogoayu
+Wuwur
+
+Daftar BPS juga mencatat 24 wilayah administratif di Kecamatan Gabus.
+
+5. Kecamatan Gembong — 11 desa
+Bageng
+Bermi
+Gembong
+Kedungbulus
+Ketanggan
+Klakahkasihan
+Plukaran
+Pohgading
+Semirejo
+Sitiluhur
+Wonosekar
+
+Catatan: nama Klakahkasihan juga sering ditulis Klakah Kasian.
+
+6. Kecamatan Gunungwungkal — 15 desa
+Bancak
+Gadu
+Gajihan
+Giling
+Gulangpungge
+Gunungwungkal
+Jembulwunut
+Jepalo
+Jrahi
+Ngetuk
+Perdopo
+Pesagen
+Sampok
+Sidomulyo
+Sumberejo
+7. Kecamatan Jaken — 21 desa
+Aromanis
+Boto
+Kebonturi
+Lundo
+Manjang
+Mantingan
+Mojolampir
+Mojoluhur
+Ronggo
+Sidoluhur
+Sidomukti
+Srikaton
+Sriwedari
+Sukorukun
+Sumberagung
+Sumberan
+Sumberarum
+Sumberrejo
+Tamansari
+Tegalarum
+Trikoyo
+8. Kecamatan Jakenan — 23 desa
+Bungasrejo
+Dukuhmulyo
+Glonggong
+Jakenan
+Jatisari
+Kalimulyo
+Karangrejo Lor
+Karangrowo
+Kedungmulyo
+Mantingan Tengah
+Ngastorejo
+Plosojenar
+Puluhan Tengah
+Sembaturagung
+Sendangsoko
+Sidoarum
+Sidomulyo
+Sonorejo
+Tambahmulyo
+Tanjungsari
+Tlogorejo
+Tondokerto
+Tondomulyo
+9. Kecamatan Juwana — 29 desa
+Agungmulyo
+Bajomulyo
+Bakarankulon
+Bakaranwetan
+Bendar
+Bringin
+Bumirejo
+Doropayung
+Dukutalit
+Gadingrejo
+Genengmulyo
+Growongkidul
+Growonglor
+Jepuro
+Karang
+Karangrejo
+Kauman
+Kebonsawahan
+Kedungpancing
+Ketip
+Kudukeras
+Langenharjo
+Margomulyo
+Mintomulyo
+Pajeksan
+Pekuwon
+Sejomulyo
+Tluwah
+Trimulyo
+10. Kecamatan Kayen — 17 desa
+Beketel
+Boloagung
+Brati
+Durensawit
+Jatiroto
+Jimbaran
+Kayen
+Pasuruhan
+Pesagi
+Purwokerto
+Rogomulyo
+Slungkep
+Srikaton
+Sumbersari
+Sundoluhur
+Talun
+Trimulyo
+11. Kecamatan Margorejo — 18 desa
+Badegan
+Banyuurip
+Bumirejo
+Dadirejo
+Jambean Kidul
+Jimbaran
+Langenharjo
+Langse
+Margorejo
+Metaraman
+Muktiharjo
+Ngawen
+Pegandan
+Penambuhan
+Sokokulon
+Sukobubuk
+Sukoharjo
+Wangunrejo
+12. Kecamatan Margoyoso — 22 desa
+Bulumanis Kidul
+Bulumanis Lor
+Cebolek Kidul
+Kajen
+Kertomulyo
+Langgenharjo
+Margotuhu Kidul
+Margoyoso
+Ngemplak Kidul
+Ngemplak Lor
+Pangkalan
+Pohijo
+Purwodadi
+Purworejo
+Sekarjalak
+Semerak
+Sidomukti
+Soneyan
+Tanjungrejo
+Tegalarum
+Tunjungrejo
+Waturoyo
+13. Kecamatan Pati — 24 desa + 5 kelurahan
+
+Desa:
+
+Blaru
+Dengkek
+Gajahmati
+Geritan
+Kutoharjo
+Mulyoharjo
+Mustokoharjo
+Ngarus
+Ngepungrejo
+Panjunan
+Payang
+Plangitan
+Puri
+Purworejo
+Sarirejo
+Semampir
+Sidoharjo
+Sidokerto
+Sinoman
+Sugiharjo
+Tambaharjo
+Tambahsari
+Widorokandang
+Winong
+
+Kelurahan:
+25. Pati Wetan
+26. Pati Kidul
+27. Pati Lor
+28. Parenggan
+29. Kalidoro
+
+14. Kecamatan Pucakwangi — 20 desa
+Bodeh
+Grogolsari
+Jetak
+Karangrejo
+Karangwotan
+Kepohkencono
+Kletek
+Lumbungmas
+Mencon
+Mojoagung
+Pelemgede
+Plosorejo
+Pucakwangi
+Sitimulyo
+Sokopuluhan
+Tanjungsekar
+Tegalwero
+Terteg
+Triguno
+Wateshaji
+15. Kecamatan Sukolilo — 16 desa
+Baleadi
+Baturejo
+Cengkalsewu
+Gadudero
+Kasiyan
+Kedumulyo
+Kedungwinong
+Kuwawur
+Pakem
+Porang Paring
+Prawoto
+Sukolilo
+Sumbersoko
+Tompegunung
+Wegil
+Wotan
+16. Kecamatan Tambakromo — 18 desa
+Angkatan Kidul
+Angkatan Lor
+Karangawen
+Karangmulyo
+Karangwono
+Keben
+Kedalingan
+Larangan
+Maitan
+Mangunrekso
+Mojomulyo
+Pakis
+Sinom
+Sitirejo
+Tambahagung
+Tambaharjo
+Tambakromo
+Wukirsari
+17. Kecamatan Tayu — 21 desa
+Bendokaton Kidul
+Bulungan
+Dororejo
+Jepat Kidul
+Jepat Lor
+Kalikalong
+Keboromo
+Kedungbang
+Kedungsari
+Luwang
+Margomulyo
+Pakis
+Pondowan
+Pundenrejo
+Purwokerto
+Sambiroto
+Sendangrejo
+Tayukulon
+Tayuwetan
+Tendas
+Tunggulsari
+18. Kecamatan Tlogowungu — 15 desa
+Cabak
+Gunungsari
+Guwo
+Klumpit
+Lahar
+Purwosari
+Regaloh
+Sambirejo
+Sumbermulyo
+Suwatu
+Tajungsari
+Tamansari
+Tlogorejo
+Tlogosari
+Wonorejo
+19. Kecamatan Trangkil — 16 desa
+Asempapan
+Guyangan
+Kadilangu
+Kajar
+Karanglegi
+Karangwage
+Kertomulyo
+Ketanen
+Krandan
+Mojoagung
+Pasucen
+Rejoagung
+Sambilawang
+Tegalharjo
+Tlutup
+Trangkil
+20. Kecamatan Wedarijaksa — 18 desa
+Bangsalrejo
+Bumiayu
+Jatimulyo
+Jetak
+Jontro
+Kepoh
+Margorejo
+Ngurenrejo
+Ngurensiti
+Pagerharjo
+Panggungroyom
+Sidoharjo
+Sukoharjo
+Suwaduk
+Tawangharjo
+Tlogoharum
+Tluwuk
+Wedarijaksa
+21. Kecamatan Winong — 30 desa
+Blingijati
+Bringinwareng
+Bumiharjo
+Danyangmulyo
+Degan
+Godo
+Gunungpanti
+Guyangan
+Karangkonang
+Karangsumber
+Kebolampang
+Kebowan
+Klecoregonang
+Kropak
+Kudur
+Mintorahayu
+Padangan
+Pagendisan
+Pekalongan
+Pohgading
+Pulorejo
+Sarimulyo
+Serutsadang
+Sugihan
+Sumbermulyo
+Tanggel
+Tawangrejo
+Tlogorejo
+Winong
+Wirun

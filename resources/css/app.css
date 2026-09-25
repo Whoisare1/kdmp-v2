@@ -49,3 +49,5 @@
     --color-ink: var(--color-ink-900);
     --color-paper: var(--color-paper-100);
 }
+
+[x-cloak] { display: none !important; }

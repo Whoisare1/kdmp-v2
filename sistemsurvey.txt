@@ -1,0 +1,126 @@
+PENJELASAN ALUR SISTEM /SURVEI (MODUL SURVEI)
+
+Sistem survei pada aplikasi KDMP dirancang untuk memudahkan manajemen jadwal survei dan pengisian data di lapangan. Alur sistemnya terbagi menjadi dua bagian utama: Bagian Admin/Manajer dan Bagian Publik (Petugas Lapangan).
+
+1. Manajemen Sesi (Bagian Admin/Manajer)
+   - Route: `/survei/sesi` dan `/survei/dashboard`
+   - Controller: `SesiSurveiController`
+   - Alur Kerja: Manajer (pengguna yang sudah login) membuat "Sesi Survei" baru dengan menentukan wilayah/desa, bulan, tahun, dan siapa petugasnya. 
+   - Setelah sesi berhasil dibuat, sistem akan men-generate sebuah token publik (link unik). Link inilah yang nantinya dibagikan ke petugas di lapangan melalui WhatsApp atau email.
+
+2. Pengisian Survei (Bagian Publik / Petugas Lapangan)
+   - Route: `/survei/isi/{token}`
+   - Controller Utama: `PublicSurveiController`, `PublicSesi1Controller`, `PublicSesi2Controller`, dst.
+   - Alur Kerja: Petugas membuka link survei publik tanpa perlu login. Proses pengisian survei dipecah menjadi 4 tahapan sistematis:
+     * Sesi 1: Data Demografi Desa (Mendata narasumber dan data kependudukan).
+     * Sesi 2: Potensi Produksi Desa (Mendata produksi komoditas di desa tersebut).
+     * Sesi 3: Standar Konsumsi Komoditas.
+     * Sesi 4: Pemenuhan & Harga Komoditas.
+   - Setiap tahapan memiliki opsi untuk menyimpan sebagai Draft (sementara) sebelum akhirnya diselesaikan (Selesaikan Sesi).
+
+3. Letak File Utama Sistem Survei:
+   - Logic / Controller: `app/Http/Controllers/Survei/`
+   - Tampilan / Views: `resources/views/survei/` (Dipecah per sesi seperti folder sesi1, sesi2, public, dll).
+   - Pengaturan URL / Routes: `routes/web.php` (di bagian M1 - Survey).
+
+---------------------------------------------------------
+
+PENJELASAN TENTANG FOLDER /FITUR
+
+Berdasarkan struktur direktorinya, folder `C:\Users\Liu\Downloads\kdmp-v2\fitur` bukanlah sekadar folder biasa penyimpan kode, melainkan **sebuah instalasi proyek Laravel lengkap yang berdiri sendiri** (Proyek di dalam Proyek).
+
+Fakta tentang folder `/fitur`:
+1. Proyek Independen: Folder ini memiliki struktur Laravel utuh, lengkap dengan folder `app`, `routes`, `database`, file `.env`, `artisan`, dan `composer.json` miliknya sendiri.
+2. Indikasi Penggunaan: Folder ini kemungkinan besar digunakan sebagai "Sandbox" (tempat uji coba). Developer menggunakannya untuk mengembangkan dan mengetes fitur baru secara terpisah agar tidak merusak kode di aplikasi utama. Hal ini terlihat dari adanya file `penjelasan_fitur_lokasi.txt` di dalamnya, yang menunjukkan bahwa fitur lokasi/maps pernah atau sedang dibangun di tempat terpisah ini.
+3. Cara Kerja: Karena berstatus sebagai proyek terpisah, sistem atau rute yang ada di dalam folder `/fitur` tidak akan terdeteksi oleh proyek utama KDMP. Jika Anda ingin menjalankan aplikasi yang ada di dalam folder `/fitur`, Anda harus masuk (cd) ke folder tersebut dan menjalankan servernya (php artisan serve) secara terpisah.
+
+TEKNOLOGI LOKASI YANG DIGUNAKAN (/FITUR)
+Aplikasi di dalam folder ini tidak menggunakan Google Maps yang berbayar, melainkan mengkombinasikan teknologi berikut:
+- Nominatim + OpenStreetMap (OSM): Berfungsi sebagai mesin *Geocoding* gratis. Digunakan untuk mengubah teks alamat yang diketik responden menjadi titik koordinat (Latitude & Longitude) pusat desa/wilayah tersebut.
+- Browser Geolocation API: Mengambil koordinat sinyal GPS perangkat (HP) pengguna.
+- Rumus Haversine (PHP): Menghitung jarak melengkung antara koordinat rumah asli vs koordinat OpenStreetMap di server.
+
+ALUR CARA KERJA APLIKASI DI DALAM FOLDER /FITUR (Jika Dijalankan)
+Aplikasi mini ini berfungsi sebagai purwarupa (prototipe) untuk Verifikasi Titik Lokasi Rumah Responden secara otomatis. Jika dijalankan, alurnya adalah:
+
+1. Layar 1 (Identitas) 
+   Responden diminta memasukkan Nama dan Nomor HP secara sederhana.
+   
+2. Layar 2 (Alamat & Geocoding)
+   Responden memasukkan alamat rumah mereka. Di balik layar, sistem akan langsung mengirim alamat ini ke satelit peta OpenStreetMap (Nominatim) untuk mendapatkan titik koordinat referensi desa tersebut. Jika alamat spesifik tidak ditemukan, sistem otomatis mencari area yang lebih luas (misalnya level kecamatan) agar pasti ketemu.
+
+3. Layar 3 (Akses GPS Otomatis) 
+   Browser akan meminta izin lokasi (Pop-up "Allow Location"). 
+   - Sistem akan mencoba menyedot sinyal GPS paling akurat dari satelit selama 20 detik.
+   - Jika responden sedang berada di dalam ruangan (sinyal jelek), sistem tidak akan error, melainkan otomatis menggunakan pelacakan via sinyal Wi-Fi/Menara Seluler terdekat (akurasi rendah) selama 30 detik agar lokasi pasti didapat.
+
+4. Validasi Anti-Blokir (Di Server)
+   Setelah koordinat asli HP responden didapat, server akan menggunakan Rumus Haversine untuk menghitung jarak antara rumah asli (GPS) dengan pusat desa (OpenStreetMap).
+   - Sistem ini sangat "ramah responden". Meskipun jaraknya melenceng jauh (> 5 KM), sistem TIDAK AKAN menolak formulir tersebut.
+   - Responden akan selalu melihat layar "Sukses!". Namun di database admin, datanya akan ditandai dengan status `PERLU_TINJAUAN_MANUAL`. Jika jaraknya dekat, maka ditandai `VALIDASI_BERHASIL`.
+
+
+
+note dari dosen saya =
+1. kaga bakal ada petugas survey soalnya efisiensi biaya
+2. speech to text nya untuk responden masyarakat nanti pas input kebutuhan konsumsi akan suatu komoditas dan juga responden kelompok tani tentang produksi pertanian desa tetap pakai web speech api tanpa memakai LLM / Ai karena speech to text itu hanya tambahan fitur agar mempermudah
+3. tidak terfokus pada pengenalan suara tiap individu soalnya udah ada titik lokasi untuk membedakan individu yg menginput
+4. batas main utama fokusnya potensi produksi desa itu lebih ke kebutuhan pangan sehari hari, misal 
+
+🌾 Pertanian
+Beras
+Cabai
+Bawang Merah
+Bawang Putih
+Kedelai
+🌴 Perkebunan
+Kopi
+Gula
+🐄 Peternakan
+Ayam
+Telur Ayam
+🌊 Kelautan
+Garam
+
+5. harus ada page khusus responder potensi produksi desa ntah itu dari pihak pengurus ekraf maupun kelompok tani, 
+
+RESPONDEN PRODUSEN DESA
+│
+├── KELOMPOK TANI
+│   │
+│   ├── Pertanian
+│   ├── Perkebunan
+│   ├── Peternakan
+│   └── Kelautan
+│        ↓
+│     Komoditas
+│        ↓
+│     Masa/Periode Produksi (musiman)
+│
+└── EKONOMI KREATIF
+    │
+    ├── Pangan
+    │    ↓
+    │  Kreativitas Pangan Desa
+    │    ↓
+    │  Masa Produksi (per bulan)
+    │
+    └── Non Pangan
+         ↓
+       Kreativitas Benda Desa
+         ↓
+       Masa Produksi (per bulan)
+
+
+
+6. harus ada page list khusus nama nama siapa saja yang tergabung kelompok tani dan siapa yang panitia ekraf
+7. pembukaan sesi survey itu pakai periode tadi di /sesi sudah ada pokoknya pas pendataan survey responden
+8. responden untuk potensi produksi desa dan responden konsumsi masyarakat di bedakan. karena yang masyarakat desa itu cuman ngisi yang bagian sesi 3 dan 4 kalau yang kelompok tani dan ekraf cuman sesi 2, dan tiap responder itu beda link
+note : Sistem menampilkan tautan unik (token) di halaman detail sesi — salin dan bagikan tautan ini ke petugas lapangan (lewat WhatsApp/SMS), tidak perlu login untuk mengisi.
+sesi survey iitu kek Survei dinamis lewat tautan berkode unik (token), bisa diisi manual atau lewat suara.
+
+9. jangan lupa yg responder pemerintah desa alias ketua rt untuk hanya masukin KK saja karena data kk penting buat nentuin dalam 1 desa ada berapa jiwa
+pokoknya ga nyampe sedetail laki/perempuan dan kelompok umur, ini si ketua rt / pemdesnya juga pake link responden terpisah dan harus punya page sendiri tentang daftar rt dalam 1 desa dan memuat informasi juga dalam 1 rt ada berapa kk dan ada berapa jiwa
+
+
+10. yg responden masyarakat itu wajib isi usia dan jenis kelamin juga, dalam 1 kk ada berapa anggota keluarga, trs tiap anggota keluarga wajib di tulis umurnya apa engga ya soalnya penting buat menentukan kelompok umur dan juga jenis kelamin, nah ntar data ini masuk sebagai 1 kk yg terverifikasi, nanti di hitunglah total jiwa tiap kelompok umur dan jenis kelamin tiap desa yg udah terkumpul pas sudah selesai survey lalu nanti di bandingkan sama data kk dari rt/ pemerintah desa
