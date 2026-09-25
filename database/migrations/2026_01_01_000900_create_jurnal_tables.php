@@ -56,8 +56,10 @@ return new class extends Migration
         });
 
         // Satu baris tidak boleh punya debet DAN kredit sekaligus
-        DB::statement('ALTER TABLE jurnal_detail ADD CONSTRAINT jd_satu_sisi
-            CHECK ((debet = 0 AND kredit > 0) OR (debet > 0 AND kredit = 0))');
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE jurnal_detail ADD CONSTRAINT jd_satu_sisi
+                CHECK ((debet = 0 AND kredit > 0) OR (debet > 0 AND kredit = 0))');
+        }
 
         /**
          * Ringkasan saldo per akun per bulan. Bisa DIBANGUN ULANG kapan saja
@@ -132,7 +134,8 @@ return new class extends Migration
         ");
 
         // Jurnal POSTED tidak boleh diubah atau dihapus. Koreksi = jurnal pembalik.
-        DB::unprepared("
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::unprepared("
             CREATE TRIGGER trg_jurnal_detail_no_update
             BEFORE UPDATE ON jurnal_detail
             FOR EACH ROW
@@ -144,9 +147,9 @@ return new class extends Migration
                     SET MESSAGE_TEXT = 'Detail jurnal POSTED tidak boleh diubah. Gunakan jurnal pembalik.';
                 END IF;
             END
-        ");
+            ");
 
-        DB::unprepared("
+            DB::unprepared("
             CREATE TRIGGER trg_jurnal_detail_no_delete
             BEFORE DELETE ON jurnal_detail
             FOR EACH ROW
@@ -158,7 +161,8 @@ return new class extends Migration
                     SET MESSAGE_TEXT = 'Detail jurnal POSTED tidak boleh dihapus.';
                 END IF;
             END
-        ");
+            ");
+        }
     }
 
     public function down(): void

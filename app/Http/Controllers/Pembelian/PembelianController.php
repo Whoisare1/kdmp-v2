@@ -13,6 +13,7 @@ use App\Models\Master\KasBank;
 use App\Services\PembelianService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PembelianController extends ModuleCrudController
@@ -21,7 +22,25 @@ class PembelianController extends ModuleCrudController
     protected string $view = 'pembelian.index';
     protected string $title = 'Pembelian';
     protected string $routeBase = 'pembelian.pembelian';
-    protected array $withRelations = ['pihak', 'unitUsaha', 'gudang', 'detail'];
+    protected array $withRelations = ['pihak', 'unitUsaha', 'gudang', 'detail.barang.satuanDasar', 'detail.satuanInput'];
+
+    public function index(Request $request): View
+    {
+        $query = Pembelian::with(['pihak', 'unitUsaha', 'gudang']);
+
+        if ($search = $request->query('q')) {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('kode_pembelian', 'like', "%{$search}%")
+                    ->orWhereHas('pihak', fn ($pihak) => $pihak->where('nama', 'like', "%{$search}%"));
+            });
+        }
+
+        return view('pembelian.index', [
+            'title' => $this->title,
+            'routeBase' => $this->routeBase,
+            'items' => $query->latest('id_pembelian')->paginate(15)->withQueryString(),
+        ]);
+    }
 
     /**
      * Tampilkan form create pembelian: pilih PR atau buat quick purchase
@@ -51,20 +70,40 @@ class PembelianController extends ModuleCrudController
     public function store(Request $request): RedirectResponse
     {
         try {
+            $koperasiId = auth()->user()->id_koperasi ?? app('koperasi_aktif');
+
             $validated = $request->validate([
                 'source' => 'required|in:from_pr,quick_purchase',
-                'id_permintaan' => 'required_if:source,from_pr|exists:permintaan_pengadaan,id_permintaan',
+                'id_permintaan' => [
+                    'exclude_unless:source,from_pr',
+                    'required',
+                    Rule::exists('permintaan_pengadaan', 'id_permintaan')
+                        ->where('id_koperasi', $koperasiId)
+                        ->where('status', 'disetujui'),
+                ],
                 'id_pihak' => 'required|exists:master_pihak,id_pihak',
                 'jenis_pembayaran' => 'required|in:tunai,transfer,kredit',
-                'id_kas_bank' => 'required_if:jenis_pembayaran,tunai,transfer|exists:master_kas_bank,id_kas_bank',
-                'tgl_jatuh_tempo' => 'required_if:jenis_pembayaran,kredit|date',
-                'id_unit_usaha' => 'required_if:source,quick_purchase|exists:master_unit_usaha,id_unit_usaha',
-                'id_gudang' => 'required_if:source,quick_purchase|exists:gudang,id_gudang',
-                'items' => 'required_if:source,quick_purchase|array|min:1',
-                'items.*.id_barang' => 'required_if:source,quick_purchase|exists:master_barang,id_barang',
-                'items.*.id_satuan' => 'required_if:source,quick_purchase|exists:satuan,id',
-                'items.*.qty_dasar' => 'required_if:source,quick_purchase|numeric|min:0.01',
-                'items.*.harga_satuan' => 'required_if:source,quick_purchase|numeric|min:0',
+                'id_kas_bank' => [
+                    'required_if:jenis_pembayaran,tunai,transfer',
+                    'exists:master_kas_bank,id_kas_bank',
+                    function ($attribute, $value, $fail) use ($koperasiId) {
+                        if (! KasBank::where('id_kas_bank', $value)->where('id_koperasi', $koperasiId)->exists()) {
+                            $fail('Kas/Bank tidak tersedia untuk koperasi aktif.');
+                        }
+                    },
+                ],
+                'tgl_jatuh_tempo' => [
+                    'nullable',
+                    'date_format:Y-m-d',
+                    Rule::requiredIf($request->input('jenis_pembayaran') === 'kredit'),
+                ],
+                'id_unit_usaha' => ['exclude_unless:source,quick_purchase', 'required', 'exists:master_unit_usaha,id_unit_usaha'],
+                'id_gudang' => ['exclude_unless:source,quick_purchase', 'required', 'exists:gudang,id_gudang'],
+                'items' => ['exclude_unless:source,quick_purchase', 'required', 'array', 'min:1'],
+                'items.*.id_barang' => ['required', 'exists:master_barang,id_barang'],
+                'items.*.id_satuan' => ['required', 'exists:satuan,id'],
+                'items.*.qty_dasar' => ['required', 'numeric', 'min:0.01'],
+                'items.*.harga_satuan' => ['required', 'numeric', 'min:0'],
             ]);
 
             if ($validated['source'] === 'from_pr') {
@@ -89,10 +128,8 @@ class PembelianController extends ModuleCrudController
                     ->values()
                     ->all();
 
-                $kooperasiId = auth()->user()->id_koperasi ?? app('koperasi_aktif');
-
                 $pembelian = PembelianService::createQuickPurchase(
-                    $kooperasiId,
+                    $koperasiId,
                     (int) $validated['id_pihak'],
                     (int) $validated['id_unit_usaha'],
                     (int) $validated['id_gudang'],
@@ -100,10 +137,23 @@ class PembelianController extends ModuleCrudController
                     $validated['jenis_pembayaran'],
                     $validated['id_kas_bank'] ?? null,
                 );
+
+                PembelianService::approvePembelian($pembelian);
+                PembelianService::createGRN(
+                    $pembelian->fresh('detail'),
+                    $pembelian->detail->map(fn ($detail) => [
+                        'id_detail' => $detail->id_detail,
+                        'qty_layak' => $detail->qty_dasar,
+                        'qty_tidak_layak' => 0,
+                        'harga_satuan' => $detail->faktor_konversi > 0
+                            ? $detail->harga_satuan_input / $detail->faktor_konversi
+                            : $detail->harga_satuan_input,
+                    ])->all(),
+                );
             }
 
-            return redirect()->route("{$this->routeBase}.show", $pembelian->id_pembelian)
-                ->with('success', "Pembelian {$pembelian->kode_pembelian} dibuat.");
+            return redirect()->route("{$this->routeBase}.index")
+                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil ditambahkan.");
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -141,6 +191,18 @@ class PembelianController extends ModuleCrudController
         }
     }
 
+    public function cancel(Pembelian $pembelian): RedirectResponse
+    {
+        try {
+            PembelianService::cancelPurchase($pembelian);
+
+            return redirect()->route("{$this->routeBase}.index")
+                ->with('success', "Pembelian {$pembelian->kode_pembelian} dibatalkan.");
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
     /**
      * Tampilkan form GRN (penerimaan barang)
      */
@@ -170,6 +232,10 @@ class PembelianController extends ModuleCrudController
                 'items.*.qty_tidak_layak' => 'nullable|numeric|min:0',
                 'items.*.harga_satuan' => 'required|numeric|min:0',
             ]);
+
+            if (count($validated['items']) !== count(array_unique(array_column($validated['items'], 'id_detail')))) {
+                throw new \Exception('Detail pembelian tidak boleh dikirim lebih dari satu kali.');
+            }
 
             $penerimaan = PembelianService::createGRN($pembelian, $validated['items']);
 

@@ -6,6 +6,7 @@ use App\Exceptions\Finance\AkunTidakDitemukanException;
 use App\Exceptions\Finance\JurnalSudahDibalikException;
 use App\Exceptions\Finance\JurnalTidakBalanceException;
 use App\Exceptions\Finance\PeriodeTutupException;
+use App\Models\Akuntansi\JurnalDetail;
 use App\Models\Akuntansi\JurnalHeader;
 use App\Models\Akuntansi\MasterDetailTransaksi;
 use App\Models\Master\KasBank;
@@ -513,6 +514,10 @@ class JurnalService
         string  $jenisJurnal
     ): JurnalHeader {
         try {
+            if (DB::getDriverName() === 'sqlite') {
+                return $this->postingSqlite($jsonPayload);
+            }
+
             // CALL SP — mengembalikan satu baris dengan kolom id_jurnal
             $hasil = DB::select('CALL sp_post_jurnal(?, ?, ?)', [
                 app('koperasi_aktif'),
@@ -542,5 +547,48 @@ class JurnalService
             // Jika bukan idempotency (no_jurnal duplikat, dsb) → lempar ulang
             throw $e;
         }
+    }
+
+    private function postingSqlite(string $jsonPayload): JurnalHeader
+    {
+        $payload = json_decode($jsonPayload, true, 512, JSON_THROW_ON_ERROR);
+        $baris = $payload['baris'] ?? [];
+        $idKoperasi = (int) ($payload['id_koperasi'] ?? app('koperasi_aktif'));
+
+        return DB::transaction(function () use ($payload, $baris, $idKoperasi) {
+            $header = JurnalHeader::create([
+                'id_koperasi' => $idKoperasi,
+                'no_jurnal' => $payload['no_jurnal'],
+                'nomor_nota' => $payload['nomor_nota'] ?? null,
+                'tanggal_jurnal' => $payload['tanggal_jurnal'],
+                'periode_tahun' => $payload['periode_tahun'],
+                'periode_bulan' => $payload['periode_bulan'],
+                'kode_transaksi' => $payload['kode_transaksi'] ?? null,
+                'jenis_jurnal' => $payload['jenis_jurnal'],
+                'source_type' => $payload['source_type'] ?? null,
+                'source_id' => $payload['source_id'] ?? null,
+                'keterangan' => $payload['keterangan'] ?? null,
+                'total_debet' => collect($baris)->sum('debet'),
+                'total_kredit' => collect($baris)->sum('kredit'),
+                'status' => 'POSTED',
+                'created_by' => Auth::id(),
+                'posted_by' => Auth::id(),
+                'posted_at' => now(),
+            ]);
+
+            foreach ($baris as $index => $line) {
+                JurnalDetail::create([
+                    'id_jurnal' => $header->id_jurnal,
+                    'urutan' => $index + 1,
+                    'kode_anak' => $line['kode_anak'],
+                    'debet' => $line['debet'],
+                    'kredit' => $line['kredit'],
+                    'keterangan' => $line['keterangan'] ?? null,
+                    'id_pihak' => $line['id_pihak'] ?? null,
+                ]);
+            }
+
+            return $header;
+        });
     }
 }
