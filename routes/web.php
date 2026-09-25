@@ -55,9 +55,11 @@ use Survei\Controllers\PublicSesi1Controller;
 use Survei\Controllers\PublicSesi2Controller;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
+Route::get('/', \App\Http\Controllers\LandingController::class)->name('landing');
+
+Route::middleware('auth')->get('/home', function () {
     return redirect()->route('dashboard');
-})->middleware('auth')->name('landing');
+});
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
