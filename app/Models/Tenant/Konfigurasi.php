@@ -10,5 +10,6 @@ class Konfigurasi extends Model
     public $timestamps = false;
     public $incrementing = false;
 
-    protected $fillable = ['id_koperasi', 'kunci', 'nilai', 'keterangan'];
+    protected $fillable = ['id_entitas', 'kunci', 'nilai', 'keterangan'];
 }
+

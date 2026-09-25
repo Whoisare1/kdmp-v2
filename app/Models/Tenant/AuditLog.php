@@ -11,7 +11,7 @@ class AuditLog extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'id_pengguna', 'tabel', 'record_id', 'aksi',
+        'id_entitas', 'id_pengguna', 'tabel', 'record_id', 'aksi',
         'data_lama', 'data_baru', 'ip_address',
     ];
 
@@ -20,3 +20,4 @@ class AuditLog extends Model
         return ['data_lama' => 'array', 'data_baru' => 'array'];
     }
 }
+

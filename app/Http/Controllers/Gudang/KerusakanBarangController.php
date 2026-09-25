@@ -77,7 +77,7 @@ class KerusakanBarangController extends ModuleCrudController
             $nilaiKerugian = bcmul((string) $data['qty'], $hpp, 2);
 
             $item = KerusakanBarang::query()->create([
-                'id_koperasi' => app()->bound('koperasi_aktif') ? app('koperasi_aktif') : null,
+                'id_entitas' => app()->bound('entitas_aktif') ? app('entitas_aktif') : null,
                 'id_gudang' => $data['id_gudang'],
                 'id_barang' => $data['id_barang'],
                 'tanggal' => $data['tanggal'],
@@ -93,7 +93,7 @@ class KerusakanBarangController extends ModuleCrudController
 
             $service = new StokService();
             $service->keluar(
-                koperasiId: (int) ($item->id_koperasi ?? app('koperasi_aktif')),
+                entitasId: (int) ($item->id_entitas ?? app('entitas_aktif')),
                 gudangId: (int) $data['id_gudang'],
                 barangId: (int) $data['id_barang'],
                 qty: (string) $data['qty'],
@@ -118,3 +118,6 @@ class KerusakanBarangController extends ModuleCrudController
         ]);
     }
 }
+
+
+

@@ -2,19 +2,19 @@
 
 namespace App\Models\Perencanaan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Pihak;
 use Illuminate\Database\Eloquent\Model;
 
 class PermintaanPengadaan extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'permintaan_pengadaan';
     protected $primaryKey = 'id_permintaan';
 
     protected $fillable = [
-        'id_koperasi', 'kode_permintaan', 'id_pihak', 'tgl_pengajuan', 'total_nilai',
+        'id_entitas', 'kode_permintaan', 'id_pihak', 'tgl_pengajuan', 'total_nilai',
         'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
     ];
 
@@ -37,3 +37,4 @@ class PermintaanPengadaan extends Model
         return $this->hasMany(PermintaanPengadaanDetail::class, 'id_permintaan', 'id_permintaan');
     }
 }
+

@@ -11,7 +11,7 @@ use RuntimeException;
 class StokService
 {
     public function masuk(
-        int $koperasiId,
+        int $entitasId,
         int $gudangId,
         int $barangId,
         string $qty,
@@ -25,7 +25,7 @@ class StokService
         $this->pastikanTidakNegatif($hargaSatuan, 'harga satuan');
 
         return DB::transaction(function () use (
-            $koperasiId,
+            $entitasId,
             $gudangId,
             $barangId,
             $qty,
@@ -72,7 +72,7 @@ class StokService
             );
 
             return KartuStok::create([
-                'id_koperasi' => $koperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
                 'tanggal' => $tanggal ?? now()->toDateString(),
@@ -92,7 +92,7 @@ class StokService
     }
 
     public function keluar(
-        int $koperasiId,
+        int $entitasId,
         int $gudangId,
         int $barangId,
         string $qty,
@@ -104,7 +104,7 @@ class StokService
         $this->pastikanPositif($qty, 'qty');
 
         return DB::transaction(function () use (
-            $koperasiId,
+            $entitasId,
             $gudangId,
             $barangId,
             $qty,
@@ -139,7 +139,7 @@ class StokService
                 ]);
 
             return KartuStok::create([
-                'id_koperasi' => $koperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
                 'tanggal' => $tanggal ?? now()->toDateString(),
@@ -295,7 +295,7 @@ class StokService
                 $nilaiMutasi = bcmul($absDiff, $hppPakai, 2);
 
                 KartuStok::create([
-                    'id_koperasi' => 1,
+                    'id_entitas' => 1,
                     'id_gudang' => $idGudang,
                     'id_barang' => $adj['id_barang'],
                     'tanggal' => now()->toDateString(),
@@ -319,3 +319,5 @@ class StokService
         }
     }
 }
+
+

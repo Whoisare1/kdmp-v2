@@ -77,7 +77,7 @@ class OpnameController extends ModuleCrudController
 
         return DB::transaction(function () use ($data) {
             $header = OpnameHeader::query()->create([
-                'id_koperasi' => app()->bound('koperasi_aktif') ? app('koperasi_aktif') : null,
+                'id_entitas' => app()->bound('entitas_aktif') ? app('entitas_aktif') : null,
                 'id_gudang' => $data['id_gudang'],
                 'kode_opname' => $data['kode_opname'],
                 'tanggal' => $data['tanggal'],
@@ -126,3 +126,5 @@ class OpnameController extends ModuleCrudController
         });
     }
 }
+
+

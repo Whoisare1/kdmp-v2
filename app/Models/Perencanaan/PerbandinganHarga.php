@@ -2,21 +2,21 @@
 
 namespace App\Models\Perencanaan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Komoditas;
 use App\Models\Tenant\Wilayah;
 use Illuminate\Database\Eloquent\Model;
 
 class PerbandinganHarga extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'perbandingan_harga';
     protected $primaryKey = 'id_perbandingan';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'id_komoditas', 'id_wilayah_sumber', 'bulan', 'tahun',
+        'id_entitas', 'id_komoditas', 'id_wilayah_sumber', 'bulan', 'tahun',
         'harga_ditawarkan', 'jumlah_tersedia', 'jarak_ke_gudang', 'estimasi_ongkir',
         'harga_efektif', 'rank_harga', 'dipilih',
     ];
@@ -41,3 +41,4 @@ class PerbandinganHarga extends Model
         return $this->belongsTo(Wilayah::class, 'id_wilayah_sumber');
     }
 }
+

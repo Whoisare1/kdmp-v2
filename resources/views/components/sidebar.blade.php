@@ -1,381 +1,229 @@
 @php
-    $groups = [
+    $sidebarGroups = [
         [
-            'no' => 'M0',
-            'label' => 'Master & Periode',
-            'route' => 'master.koperasi.index',
-            'match' => 'master.*'
-        ],
-        [
-            'no' => 'M1',
-            'label' => 'Survey',
-            'route' => 'survei.sesi.index',
-            'match' => 'survei.*'
-        ],
-        [
-            'no' => 'M2',
-            'label' => 'Kalkulasi Kebutuhan',
-            'route' => 'perencanaan.kebutuhan-komoditas.index',
-            'match' => 'perencanaan.kebutuhan-komoditas.*,perencanaan.neraca-komoditas.*,perencanaan.standar-kebutuhan.*,perencanaan.demografi.*,perencanaan.potensi-produksi.*'
-        ],
-        [
-            'no' => 'M3',
-            'label' => 'Perencanaan Pengadaan',
-            'route' => 'perencanaan.permintaan-pengadaan.index',
-            'match' => 'perencanaan.permintaan-pengadaan.*,perencanaan.perbandingan-harga.*'
-        ],
-        [
-            'no' => 'M5',
-            'label' => 'Pembelian',
-            'route' => 'pembelian.pembelian.index',
-            'match' => 'pembelian.*'
-        ],
-        [
-            'no' => 'M6',
-            'label' => 'Penjualan',
-            'route' => 'penjualan.penjualan.index',
-            'match' => 'penjualan.*'
-        ],
-        [
-            'no' => 'M7',
-            'label' => 'Konsinyasi Antar Desa',
-            'route' => 'konsinyasi.pengiriman.index',
-            'match' => 'konsinyasi.*'
-        ],
-    ];
-
-    $gudangMenus = [
-        [
-            'label' => 'Dashboard Gudang',
-            'route' => 'gudang.index',
-            'match' => 'gudang.index'
-        ],
-        [
-            'label' => 'Posisi Stok',
-            'route' => 'gudang.stok.index',
-            'match' => 'gudang.stok.*'
-        ],
-        [
-            'label' => 'Penerimaan Barang',
-            'route' => 'gudang.penerimaan.index',
-            'match' => 'gudang.penerimaan.*'
-        ],
-        [
-            'label' => 'Kerusakan Barang',
-            'route' => 'gudang.kerusakan.index',
-            'match' => 'gudang.kerusakan.*'
-        ],
-        [
-            'label' => 'Stock Opname',
-            'route' => 'gudang.opname.index',
-            'match' => 'gudang.opname.*'
-        ],
-        [
-            'label' => 'Kartu Stok',
-            'route' => 'gudang.kartu-stok.index',
-            'match' => 'gudang.kartu-stok.*'
-        ],
-    ];
-
-    $finance = [
-        'no'    => 'M8-9',
-        'label' => 'Keuangan & Akuntansi',
-        'match' => 'keuangan.*,akuntansi.*',
-    ];
-
-    $keuanganMenus = [
-        [
-            'group' => 'Keuangan',
+            'title' => 'Master Data',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>',
+            'match' => 'master.*',
             'items' => [
-                ['label' => 'Piutang',       'route' => 'keuangan.piutang.index',       'match' => 'keuangan.piutang.*'],
-                ['label' => 'Hutang',        'route' => 'keuangan.hutang.index',        'match' => 'keuangan.hutang.*'],
-                ['label' => 'Pelunasan',     'route' => 'keuangan.pelunasan.index',     'match' => 'keuangan.pelunasan.*'],
-                ['label' => 'Kas & Transaksi','route'=> 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*'],
-                ['label' => 'Simpanan',      'route' => 'keuangan.simpanan.index',      'match' => 'keuangan.simpanan.*'],
-            ],
+                ['label' => 'Entitas', 'route' => 'master.entitas.index', 'match' => 'master.entitas.*'],
+                ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
+                ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
+                ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
+                ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
+            ]
         ],
         [
-            'group' => 'Akuntansi',
+            'title' => 'Survei & Pemetaan',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>',
+            'match' => 'survei.*',
             'items' => [
-                ['label' => 'Jurnal',        'route' => 'akuntansi.jurnal.index',       'match' => 'akuntansi.jurnal.*'],
-                ['label' => 'Aset Tetap',    'route' => 'akuntansi.aset-tetap.index',   'match' => 'akuntansi.aset-tetap.*'],
-                ['label' => 'Config SHU',    'route' => 'akuntansi.config-shu.index',   'match' => 'akuntansi.config-shu.*'],
-                ['label' => 'Tutup Bulan',   'route' => 'akuntansi.tutup-bulan.index',  'match' => 'akuntansi.tutup-bulan.*'],
-                ['label' => 'Tutup Tahun',   'route' => 'akuntansi.tutup-tahun.index',  'match' => 'akuntansi.tutup-tahun.*'],
-            ],
+                ['label' => 'Sesi Survei', 'route' => 'survei.sesi.index', 'match' => 'survei.sesi.*'],
+                ['label' => 'Bank Pertanyaan', 'route' => 'survei.pertanyaan.index', 'match' => 'survei.pertanyaan.*'],
+            ]
         ],
         [
-            'group' => 'Laporan',
+            'title' => 'Kalkulasi & Perencanaan',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>',
+            'match' => 'perencanaan.*',
             'items' => [
-                ['label' => 'Neraca Saldo',  'route' => 'akuntansi.laporan.neraca-saldo','match'=> 'akuntansi.laporan.neraca-saldo'],
-                ['label' => 'Buku Besar',    'route' => 'akuntansi.laporan.buku-besar',  'match'=> 'akuntansi.laporan.buku-besar'],
-                ['label' => 'Neraca',        'route' => 'akuntansi.laporan.neraca',       'match'=> 'akuntansi.laporan.neraca'],
-                ['label' => 'Laba Rugi',     'route' => 'akuntansi.laporan.laba-rugi',    'match'=> 'akuntansi.laporan.laba-rugi'],
-                ['label' => 'Arus Kas',      'route' => 'akuntansi.laporan.arus-kas',     'match'=> 'akuntansi.laporan.arus-kas'],
-            ],
+                ['label' => 'Demografi', 'route' => 'perencanaan.demografi.index', 'match' => 'perencanaan.demografi.*'],
+                ['label' => 'Potensi Produksi', 'route' => 'perencanaan.potensi-produksi.index', 'match' => 'perencanaan.potensi-produksi.*'],
+                ['label' => 'Standar Kebutuhan', 'route' => 'perencanaan.standar-kebutuhan.index', 'match' => 'perencanaan.standar-kebutuhan.*'],
+                ['label' => 'Kebutuhan Komoditas', 'route' => 'perencanaan.kebutuhan-komoditas.index', 'match' => 'perencanaan.kebutuhan-komoditas.*'],
+                ['label' => 'Neraca Komoditas', 'route' => 'perencanaan.neraca-komoditas.index', 'match' => 'perencanaan.neraca-komoditas.*'],
+                ['label' => 'Permintaan Pengadaan', 'route' => 'perencanaan.permintaan-pengadaan.index', 'match' => 'perencanaan.permintaan-pengadaan.*'],
+                ['label' => 'Perbandingan Harga', 'route' => 'perencanaan.perbandingan-harga.index', 'match' => 'perencanaan.perbandingan-harga.*'],
+            ]
         ],
+        [
+            'title' => 'Manajemen Gudang',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>',
+            'match' => 'gudang.*',
+            'items' => [
+                ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
+                ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
+                ['label' => 'Penerimaan', 'route' => 'gudang.penerimaan.index', 'match' => 'gudang.penerimaan.*'],
+                ['label' => 'Kerusakan', 'route' => 'gudang.kerusakan.index', 'match' => 'gudang.kerusakan.*'],
+                ['label' => 'Stock Opname', 'route' => 'gudang.opname.index', 'match' => 'gudang.opname.*'],
+                ['label' => 'Kartu Stok', 'route' => 'gudang.kartu-stok.index', 'match' => 'gudang.kartu-stok.*'],
+            ]
+        ],
+        [
+            'title' => 'Pembelian & Penjualan',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>',
+            'match' => 'pembelian.*,penjualan.*',
+            'items' => [
+                ['label' => 'Order Pembelian', 'route' => 'pembelian.pembelian.index', 'match' => 'pembelian.pembelian.*'],
+                ['label' => 'Retur Pembelian', 'route' => 'pembelian.retur.index', 'match' => 'pembelian.retur.*'],
+                ['label' => 'Order Penjualan', 'route' => 'penjualan.penjualan.index', 'match' => 'penjualan.penjualan.*'],
+                ['label' => 'Retur Penjualan', 'route' => 'penjualan.retur.index', 'match' => 'penjualan.retur.*'],
+            ]
+        ],
+        [
+            'title' => 'Konsinyasi Antar Desa',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>',
+            'match' => 'konsinyasi.*',
+            'items' => [
+                ['label' => 'Marketplace', 'route' => 'konsinyasi.marketplace.index', 'match' => 'konsinyasi.marketplace.*'],
+                ['label' => 'Pengiriman', 'route' => 'konsinyasi.pengiriman.index', 'match' => 'konsinyasi.pengiriman.*'],
+                ['label' => 'Stok Konsinyasi', 'route' => 'konsinyasi.stok.index', 'match' => 'konsinyasi.stok.*'],
+                ['label' => 'Rekonsiliasi', 'route' => 'konsinyasi.rekonsiliasi.index', 'match' => 'konsinyasi.rekonsiliasi.*'],
+                ['label' => 'Setoran', 'route' => 'konsinyasi.setoran.index', 'match' => 'konsinyasi.setoran.*'],
+            ]
+        ],
+        [
+            'title' => 'Buku Keuangan',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /></svg>',
+            'match' => 'keuangan.*',
+            'items' => [
+                ['label' => 'Piutang', 'route' => 'keuangan.piutang.index', 'match' => 'keuangan.piutang.*'],
+                ['label' => 'Hutang', 'route' => 'keuangan.hutang.index', 'match' => 'keuangan.hutang.*'],
+                ['label' => 'Pelunasan', 'route' => 'keuangan.pelunasan.index', 'match' => 'keuangan.pelunasan.*'],
+                ['label' => 'Kas & Transaksi', 'route' => 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*'],
+            ]
+        ],
+        [
+            'title' => 'Akuntansi & Laporan',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
+            'match' => 'akuntansi.*',
+            'items' => [
+                ['label' => 'Jurnal', 'route' => 'akuntansi.jurnal.index', 'match' => 'akuntansi.jurnal.*'],
+                ['label' => 'Aset Tetap', 'route' => 'akuntansi.aset-tetap.index', 'match' => 'akuntansi.aset-tetap.*'],
+                ['label' => 'Tutup Bulan', 'route' => 'akuntansi.tutup-bulan.index', 'match' => 'akuntansi.tutup-bulan.*'],
+                ['label' => 'Tutup Tahun', 'route' => 'akuntansi.tutup-tahun.index', 'match' => 'akuntansi.tutup-tahun.*'],
+                ['label' => 'Neraca Saldo', 'route' => 'akuntansi.laporan.neraca-saldo', 'match' => 'akuntansi.laporan.neraca-saldo'],
+                ['label' => 'Buku Besar', 'route' => 'akuntansi.laporan.buku-besar', 'match' => 'akuntansi.laporan.buku-besar'],
+                ['label' => 'Neraca', 'route' => 'akuntansi.laporan.neraca', 'match' => 'akuntansi.laporan.neraca'],
+                ['label' => 'Laba Rugi', 'route' => 'akuntansi.laporan.laba-rugi', 'match' => 'akuntansi.laporan.laba-rugi'],
+                ['label' => 'Arus Kas', 'route' => 'akuntansi.laporan.arus-kas', 'match' => 'akuntansi.laporan.arus-kas'],
+            ]
+        ]
     ];
-
-    $gudangActive = request()->routeIs('gudang.*');
 @endphp
 
-
-<aside class="flex h-screen w-64 shrink-0 flex-col bg-ink-900 text-paper-100">
+<aside class="flex h-screen w-72 shrink-0 flex-col bg-ink-950 text-paper-100 shadow-xl z-50">
 
     {{-- Logo --}}
-    <div class="flex items-center gap-2 border-b border-ink-700 px-5 py-5">
-        <span class="flex h-8 w-8 items-center justify-center rounded-sm bg-merah-500 font-display text-sm font-semibold text-paper-50">
-            K
+    <a href="{{ route('dashboard') }}" class="flex items-center gap-3 border-b border-ink-800 px-6 py-5 hover:bg-ink-900 transition-colors">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-padi-500 font-display text-lg font-bold text-ink-950 shadow-sm">
+            N
         </span>
-
         <div class="leading-tight">
-            <p class="font-display text-base font-semibold tracking-tight">
-                KDMP
+            <p class="font-display text-base font-semibold tracking-tight text-white">
+                Ngobar
             </p>
-
-            <p class="text-[11px] text-paper-300/70">
-                Koperasi Desa Merah Putih
+            <p class="text-[10px] text-paper-400 uppercase tracking-widest mt-0.5">
+                Barter & Pemetaan
             </p>
         </div>
-    </div>
-
+    </a>
 
     {{-- Navigation --}}
-    <nav class="flex-1 overflow-y-auto px-3 py-4">
+    <nav class="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
 
-        <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-300/50">
-            Modul Operasional
-        </p>
-
-
-        <ul class="space-y-0.5">
-
-            {{-- M0 - M3 --}}
-            @foreach ($groups as $g)
-
-                @php
-                    $active = collect(explode(',', $g['match']))
-                        ->contains(fn ($p) => request()->routeIs($p));
-                @endphp
-
-                <li>
-
-                    <a
-                        href="{{ route($g['route']) }}"
-                        class="group flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition
-                        {{ $active
-                            ? 'bg-ink-700 text-paper-50'
-                            : 'text-paper-200/80 hover:bg-ink-800 hover:text-paper-50'
-                        }}"
-                    >
-
-                        <span
-                            class="flex h-6 w-9 shrink-0 items-center justify-center rounded-[2px] border font-mono text-[10px]
-                            {{ $active
-                                ? 'border-merah-400 text-merah-400'
-                                : 'border-ink-600 text-paper-300/60 group-hover:border-paper-300/40'
-                            }}"
-                        >
-                            {{ $g['no'] }}
-                        </span>
-
-                        <span>
-                            {{ $g['label'] }}
-                        </span>
-
-                    </a>
-
-                </li>
-
-            @endforeach
-
-
-            {{-- M4 GUDANG --}}
-            <li class="pt-1">
-
-                <div
-                    class="flex items-center gap-3 rounded-sm px-2 py-2 text-sm
-                    {{ $gudangActive
-                        ? 'bg-ink-700 text-paper-50'
-                        : 'text-paper-200/80'
-                    }}"
-                >
-
-                    <span
-                        class="flex h-6 w-9 shrink-0 items-center justify-center rounded-[2px] border font-mono text-[10px]
-                        {{ $gudangActive
-                            ? 'border-merah-400 text-merah-400'
-                            : 'border-ink-600 text-paper-300/60'
-                        }}"
-                    >
-                        M4
-                    </span>
-
-                    <span class="font-medium">
-                        Gudang
-                    </span>
-
-                </div>
-
-
-                {{-- Submenu Gudang --}}
-                <ul class="ml-6 mt-1 space-y-1 border-l border-ink-600 pl-4">
-
-                    @foreach ($gudangMenus as $menu)
-
-                        @php
-                            $submenuActive = request()->routeIs($menu['match']);
-                        @endphp
-
-                        <li>
-
-                            <a
-                                href="{{ route($menu['route']) }}"
-                                class="block rounded-sm px-3 py-1.5 text-xs transition
-                                {{ $submenuActive
-                                    ? 'bg-merah-600/20 text-merah-300'
-                                    : 'text-paper-300/70 hover:bg-ink-800 hover:text-paper-50'
-                                }}"
-                            >
-
-                                {{ $menu['label'] }}
-
-                            </a>
-
-                        </li>
-
-                    @endforeach
-
-                </ul>
-
-            </li>
-
-
-            {{-- M5 - M7 --}}
-            @foreach ($groups as $g)
-
-                @if (in_array($g['no'], ['M5', 'M6', 'M7']))
-
-                    @php
-                        $active = collect(explode(',', $g['match']))
-                            ->contains(fn ($p) => request()->routeIs($p));
-                    @endphp
-
-                    <li>
-
-                        <a
-                            href="{{ route($g['route']) }}"
-                            class="group flex items-center gap-3 rounded-sm px-2 py-2 text-sm transition
-                            {{ $active
-                                ? 'bg-ink-700 text-paper-50'
-                                : 'text-paper-200/80 hover:bg-ink-800 hover:text-paper-50'
-                            }}"
-                        >
-
-                            <span
-                                class="flex h-6 w-9 shrink-0 items-center justify-center rounded-[2px] border font-mono text-[10px]
-                                {{ $active
-                                    ? 'border-merah-400 text-merah-400'
-                                    : 'border-ink-600 text-paper-300/60 group-hover:border-paper-300/40'
-                                }}"
-                            >
-                                {{ $g['no'] }}
-                            </span>
-
-                            <span>
-                                {{ $g['label'] }}
-                            </span>
-
-                        </a>
-
-                    </li>
-
-                @endif
-
-            @endforeach
-
-        </ul>
-
-
-        {{-- Fokus Skripsi --}}
-        <p class="px-2 pb-2 pt-5 font-mono text-[10px] uppercase tracking-widest text-paper-300/50">
-            Fokus Skripsi
-        </p>
-
-
-        @php
-            $activeFinance = collect(explode(',', $finance['match']))
-                ->contains(fn ($p) => request()->routeIs($p));
-        @endphp
-
-
-        {{-- M8-9 Keuangan & Akuntansi — header (non-link) --}}
-        <div
-            class="flex items-center gap-3 rounded-sm border px-2 py-2.5 text-sm
-            {{ $activeFinance
-                ? 'border-merah-400 bg-merah-600/20 text-paper-50'
-                : 'border-merah-600/40 text-paper-100'
-            }}"
-        >
-            <span class="flex h-6 w-9 shrink-0 items-center justify-center rounded-[2px] border border-merah-400 font-mono text-[10px] text-merah-400">
-                {{ $finance['no'] }}
-            </span>
-
-            <span class="font-medium">
-                {{ $finance['label'] }}
-            </span>
-        </div>
-
-
-        {{-- Submenu Keuangan & Akuntansi --}}
-        <div class="ml-3 mt-1 border-l border-merah-700/40 pl-3 space-y-3">
-
-            @foreach ($keuanganMenus as $section)
-
-                {{-- Section header --}}
-                <p class="pt-1 pb-0.5 font-mono text-[9px] uppercase tracking-widest text-paper-300/40">
-                    {{ $section['group'] }}
+        @if(auth()->check() && auth()->user()->id_entitas === null)
+            <div class="mb-6">
+                <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                    Super Admin
                 </p>
+                <a
+                    href="{{ route('admin.dashboard') }}"
+                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors
+                    {{ request()->routeIs('admin.*') ? 'bg-padi-500/10 text-padi-400' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                >
+                    <span class="text-padi-500">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                    </span>
+                    <span class="font-medium">Persetujuan Entitas</span>
+                </a>
+            </div>
+        @endif
 
-                <ul class="space-y-0.5">
-                    @foreach ($section['items'] as $menu)
-                        @php
-                            $submenuActive = collect(explode(',', $menu['match']))
-                                ->contains(fn ($p) => request()->routeIs($p));
-                        @endphp
-                        <li>
-                            <a
-                                href="{{ route($menu['route']) }}"
-                                class="block rounded-sm px-3 py-1.5 text-xs transition
-                                {{ $submenuActive
-                                    ? 'bg-merah-600/20 text-merah-300'
-                                    : 'text-paper-300/70 hover:bg-ink-800 hover:text-paper-50'
-                                }}"
-                            >
-                                {{ $menu['label'] }}
-                            </a>
-                        </li>
-                    @endforeach
-                </ul>
+        <p class="px-2 pb-3 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+            Modul Sistem
+        </p>
 
+        <ul class="space-y-2">
+            @foreach ($sidebarGroups as $group)
+                @php
+                    $isGroupActive = collect(explode(',', $group['match']))->contains(fn ($p) => request()->routeIs($p));
+                @endphp
+                
+                <li x-data="{ expanded: {{ $isGroupActive ? 'true' : 'false' }} }">
+                    {{-- Accordion Header --}}
+                    <button 
+                        @click="expanded = !expanded" 
+                        class="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-padi-500/50
+                        {{ $isGroupActive ? 'bg-ink-800 text-white shadow-sm' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    >
+                        <div class="flex items-center gap-3">
+                            <span class="{{ $isGroupActive ? 'text-padi-400' : 'text-paper-500 group-hover:text-paper-300' }}">
+                                {!! $group['icon'] !!}
+                            </span>
+                            <span class="font-medium">{{ $group['title'] }}</span>
+                        </div>
+                        <svg 
+                            class="w-4 h-4 text-paper-500 transition-transform duration-200" 
+                            :class="expanded ? 'rotate-180' : ''"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    {{-- Accordion Body --}}
+                    <div 
+                        x-show="expanded" 
+                        x-transition
+                        x-cloak
+                        class="mt-1"
+                    >
+                        <ul class="space-y-1 py-1 pl-11 pr-2 relative before:absolute before:left-[1.375rem] before:top-2 before:bottom-2 before:w-px before:bg-ink-800">
+                            @foreach($group['items'] as $item)
+                                @php
+                                    $isItemActive = collect(explode(',', $item['match']))->contains(fn ($p) => request()->routeIs($p));
+                                @endphp
+                                <li>
+                                    <a 
+                                        href="{{ route($item['route']) }}" 
+                                        class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                        {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium relative before:absolute before:-left-[0.8125rem] before:top-1/2 before:-translate-y-1/2 before:w-[5px] before:h-[5px] before:rounded-full before:bg-padi-400' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                    >
+                                        {{ $item['label'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </li>
             @endforeach
-
-        </div>
-
+        </ul>
     </nav>
 
-
     {{-- Footer Sidebar --}}
-    <div class="border-t border-ink-700 px-5 py-4 text-[11px] text-paper-300/60">
-
-        <p>
-            KDMP v2 — Skripsi
-        </p>
-
-        <p>
-            Modul Keuangan & Akuntansi aktif.
-        </p>
-
+    <div class="border-t border-ink-800 px-6 py-4 bg-ink-950/50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-ink-800 flex items-center justify-center text-xs font-bold text-padi-400">
+                {{ substr(auth()->user()->nama ?? 'U', 0, 1) }}
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-medium text-white truncate">{{ auth()->user()->nama ?? 'User' }}</p>
+                <p class="text-[10px] text-paper-400 truncate">Ngobar v1.0</p>
+            </div>
+        </div>
     </div>
+</aside>
 
-</aside>
+<style>
+    /* Custom Scrollbar for Sidebar */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #3f3f46;
+        border-radius: 20px;
+    }
+</style>

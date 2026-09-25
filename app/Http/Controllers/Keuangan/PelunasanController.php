@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * PelunasanController — Mencatat:
+ * PelunasanController Ã¢â‚¬â€ Mencatat:
  *   1. Penerimaan pembayaran piutang dari anggota/pihak eksternal  (jenis: terima_piutang)
  *   2. Pembayaran hutang koperasi ke supplier/pihak ketiga         (jenis: bayar_hutang)
  *
@@ -34,15 +34,15 @@ use Illuminate\View\View;
 class PelunasanController extends Controller
 {
     // =========================================================================
-    // index() — Riwayat pelunasan
+    // index() Ã¢â‚¬â€ Riwayat pelunasan
     // =========================================================================
 
     public function index(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
         $query = Pelunasan::with(['pihak', 'kasBank'])
-            ->where('id_koperasi', $idKoperasi);
+            ->when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas));
 
         // Filter jenis
         if ($jenis = $request->query('jenis')) {
@@ -68,19 +68,19 @@ class PelunasanController extends Controller
     }
 
     // =========================================================================
-    // create() — Form input pelunasan baru
+    // create() Ã¢â‚¬â€ Form input pelunasan baru
     // =========================================================================
 
     public function create(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
-        $kasBanks = KasBank::where('id_koperasi', $idKoperasi)
+        $kasBanks = KasBank::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->where('is_active', 1)
             ->get();
 
         // Semua pihak: anggota + supplier (form akan filter via JS sesuai jenis)
-        $pihaks = Pihak::where('id_koperasi', $idKoperasi)
+        $pihaks = Pihak::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->orderBy('nama')
             ->get(['id_pihak', 'nama', 'tipe']);
 
@@ -88,7 +88,7 @@ class PelunasanController extends Controller
     }
 
     // =========================================================================
-    // terbuka() — AJAX: ambil piutang/hutang terbuka milik pihak
+    // terbuka() Ã¢â‚¬â€ AJAX: ambil piutang/hutang terbuka milik pihak
     // =========================================================================
 
     /**
@@ -97,16 +97,16 @@ class PelunasanController extends Controller
      */
     public function terbuka(Request $request, Pihak $pihak): JsonResponse
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         $jenis      = $request->query('jenis'); // 'terima_piutang' | 'bayar_hutang'
 
         // Guard: pastikan pihak milik koperasi aktif
-        if ($pihak->id_koperasi !== $idKoperasi) {
+        if ($pihak->id_entitas !== $idEntitas) {
             return response()->json(['error' => 'Pihak tidak ditemukan.'], 403);
         }
 
         if ($jenis === 'terima_piutang') {
-            $rows = Piutang::where('id_koperasi', $idKoperasi)
+            $rows = Piutang::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
                 ->where('id_pihak', $pihak->id_pihak)
                 ->whereIn('status', ['belum_lunas', 'sebagian'])
                 ->orderBy('tgl_jatuh_tempo')
@@ -128,7 +128,7 @@ class PelunasanController extends Controller
         }
 
         if ($jenis === 'bayar_hutang') {
-            $rows = Hutang::where('id_koperasi', $idKoperasi)
+            $rows = Hutang::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
                 ->where('id_pihak', $pihak->id_pihak)
                 ->whereIn('status', ['belum_lunas', 'sebagian'])
                 ->orderBy('tgl_jatuh_tempo')
@@ -153,12 +153,12 @@ class PelunasanController extends Controller
     }
 
     // =========================================================================
-    // store() — Simpan & posting jurnal
+    // store() Ã¢â‚¬â€ Simpan & posting jurnal
     // =========================================================================
 
     public function store(StorePelunasanRequest $request, JurnalService $jurnalService): RedirectResponse
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         $validated  = $request->validated();
         $jenis      = $validated['jenis'];
         $isPiutang  = ($jenis === 'terima_piutang');
@@ -170,7 +170,7 @@ class PelunasanController extends Controller
         $totalNilai    = '0';
         $resolvedItems = []; // [{model, nilai_bayar, kode_akun}]
 
-        $kasBank = KasBank::where('id_koperasi', $idKoperasi)
+        $kasBank = KasBank::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->findOrFail($validated['id_kas_bank']);
 
         foreach ($detailRows as $idx => $baris) {
@@ -182,7 +182,7 @@ class PelunasanController extends Controller
                 }
 
                 /** @var Piutang $piutang */
-                $piutang = Piutang::where('id_koperasi', $idKoperasi)
+                $piutang = Piutang::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
                     ->whereIn('status', ['belum_lunas', 'sebagian'])
                     ->find($baris['id_piutang']);
 
@@ -208,7 +208,7 @@ class PelunasanController extends Controller
                 }
 
                 /** @var Hutang $hutang */
-                $hutang = Hutang::where('id_koperasi', $idKoperasi)
+                $hutang = Hutang::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
                     ->whereIn('status', ['belum_lunas', 'sebagian'])
                     ->find($baris['id_hutang']);
 
@@ -235,7 +235,7 @@ class PelunasanController extends Controller
         $tanggal  = $validated['tanggal'];
         $yyyymm   = date('Ym', strtotime($tanggal));
 
-        $counter = Pelunasan::where('id_koperasi', $idKoperasi)
+        $counter = Pelunasan::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->where('kode_pelunasan', 'like', "{$prefix}-{$yyyymm}-%")
             ->count();
 
@@ -251,7 +251,7 @@ class PelunasanController extends Controller
                 'kode_anak' => $kasBank->kode_akun,
                 'posisi'    => 'D',
                 'nilai'     => (float) $totalNilai,
-                'keterangan'=> "Terima pelunasan piutang — {$kodePelunasan}",
+                'keterangan'=> "Terima pelunasan piutang Ã¢â‚¬â€ {$kodePelunasan}",
             ];
 
             // Group by kode_akun karena bisa ada piutang dagang + konsinyasi sekaligus
@@ -266,7 +266,7 @@ class PelunasanController extends Controller
                     'kode_anak' => $kodeAkun,
                     'posisi'    => 'K',
                     'nilai'     => (float) $nilaiGrup,
-                    'keterangan'=> "Pelunasan piutang — {$kodePelunasan}",
+                    'keterangan'=> "Pelunasan piutang Ã¢â‚¬â€ {$kodePelunasan}",
                 ];
             }
         } else {
@@ -282,7 +282,7 @@ class PelunasanController extends Controller
                     'kode_anak' => $kodeAkun,
                     'posisi'    => 'D',
                     'nilai'     => (float) $nilaiGrup,
-                    'keterangan'=> "Bayar hutang — {$kodePelunasan}",
+                    'keterangan'=> "Bayar hutang Ã¢â‚¬â€ {$kodePelunasan}",
                 ];
             }
 
@@ -290,7 +290,7 @@ class PelunasanController extends Controller
                 'kode_anak' => $kasBank->kode_akun,
                 'posisi'    => 'K',
                 'nilai'     => (float) $totalNilai,
-                'keterangan'=> "Bayar hutang — {$kodePelunasan}",
+                'keterangan'=> "Bayar hutang Ã¢â‚¬â€ {$kodePelunasan}",
             ];
         }
 
@@ -300,7 +300,7 @@ class PelunasanController extends Controller
 
             // 4a. INSERT header pelunasan
             $pelunasan = Pelunasan::create([
-                'id_koperasi'    => $idKoperasi,
+                'id_entitas'    => $idEntitas,
                 'kode_pelunasan' => $kodePelunasan,
                 'jenis'          => $jenis,
                 'id_pihak'       => $validated['id_pihak'],
@@ -341,7 +341,7 @@ class PelunasanController extends Controller
                 'kode_transaksi' => $prefix,
                 'nomor_nota'     => $kodePelunasan,
                 'keterangan'     => ($isPiutang ? 'Terima pelunasan piutang' : 'Bayar hutang')
-                    . ' — ' . $kodePelunasan
+                    . ' Ã¢â‚¬â€ ' . $kodePelunasan
                     . ($validated['catatan'] ? '. ' . $validated['catatan'] : ''),
             ];
 
@@ -366,15 +366,17 @@ class PelunasanController extends Controller
     }
 
     // =========================================================================
-    // show() — Detail satu pelunasan
+    // show() Ã¢â‚¬â€ Detail satu pelunasan
     // =========================================================================
 
     public function show(Pelunasan $pelunasan): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
-        // Guard tenant
-        abort_if($pelunasan->id_koperasi !== $idKoperasi, 403);
+        // Guard tenant (hanya jika entitas aktif dipilih)
+        if ($idEntitas) {
+            abort_if($pelunasan->id_entitas !== $idEntitas, 403);
+        }
 
         $pelunasan->load([
             'pihak',
@@ -386,3 +388,6 @@ class PelunasanController extends Controller
         return view('keuangan.pelunasan.show', compact('pelunasan'));
     }
 }
+
+
+

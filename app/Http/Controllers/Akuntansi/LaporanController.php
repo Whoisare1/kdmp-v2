@@ -9,21 +9,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * LaporanController — Menyajikan 4 laporan keuangan standar:
+ * LaporanController Ã¢â‚¬â€ Menyajikan 4 laporan keuangan standar:
  *
- *   1. neracaSaldo()  — Trial Balance: semua akun + saldo D/K per bulan
- *   2. bukuBesar()    — Ledger: mutasi per akun + running balance (dihitung PHP)
- *   3. labaRugi()     — Income Statement: Pendapatan − HPP − Biaya = Laba Bersih
- *   4. neraca()       — Balance Sheet: Aset = Kewajiban + Modal
+ *   1. neracaSaldo()  Ã¢â‚¬â€ Trial Balance: semua akun + saldo D/K per bulan
+ *   2. bukuBesar()    Ã¢â‚¬â€ Ledger: mutasi per akun + running balance (dihitung PHP)
+ *   3. labaRugi()     Ã¢â‚¬â€ Income Statement: Pendapatan Ã¢Ë†â€™ HPP Ã¢Ë†â€™ Biaya = Laba Bersih
+ *   4. neraca()       Ã¢â‚¬â€ Balance Sheet: Aset = Kewajiban + Modal
  *
  * Semua bersumber dari buku_besar_periode (sudah teragregasi per bulan)
  * dan jurnal_header/detail (untuk detail buku besar).
- * Tidak ada tabel laporan terpisah — single source of truth = jurnal.
+ * Tidak ada tabel laporan terpisah Ã¢â‚¬â€ single source of truth = jurnal.
  */
 class LaporanController extends Controller
 {
     // =========================================================================
-    // HELPER — parse filter tahun/bulan dari request
+    // HELPER Ã¢â‚¬â€ parse filter tahun/bulan dari request
     // =========================================================================
 
     private function parsePeriode(Request $request): array
@@ -51,7 +51,7 @@ class LaporanController extends Controller
 
     /**
      * Tampilkan semua akun dengan saldo Debet / Kredit per bulan yang dipilih.
-     * Total Debet harus = Total Kredit — jika tidak, ada posting yang salah.
+     * Total Debet harus = Total Kredit Ã¢â‚¬â€ jika tidak, ada posting yang salah.
      *
      * Sumber data: buku_besar_periode JOIN master_coa
      * Dua tambahan Plan A:
@@ -59,13 +59,13 @@ class LaporanController extends Controller
      */
     public function neracaSaldo(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         [$tahun, $bulan] = $this->parsePeriode($request);
 
         // Ambil semua akun yang punya data di periode ini
         $rows = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->orderBy('c.urutan_laporan')
@@ -108,14 +108,14 @@ class LaporanController extends Controller
     // =========================================================================
 
     /**
-     * Tampilkan mutasi per akun: saldo awal → baris transaksi → saldo akhir.
+     * Tampilkan mutasi per akun: saldo awal Ã¢â€ â€™ baris transaksi Ã¢â€ â€™ saldo akhir.
      * Running balance dihitung di PHP (Plan A tambahan #1).
      *
      * Sumber: jurnal_detail JOIN jurnal_header WHERE status = POSTED
      */
     public function bukuBesar(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         [$tahun, $bulan] = $this->parsePeriode($request);
         $kodeAnak = $request->query('kode_anak', '');
 
@@ -138,7 +138,7 @@ class LaporanController extends Controller
             $prevBulan  = ($bulan === 1) ? 12 : $bulan - 1;
 
             $bbpSebelum = DB::table('buku_besar_periode')
-                ->where('id_koperasi', $idKoperasi)
+                ->when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
                 ->where('periode_tahun', $prevTahun)
                 ->where('periode_bulan', $prevBulan)
                 ->where('kode_anak', $kodeAnak)
@@ -153,7 +153,7 @@ class LaporanController extends Controller
             // Ambil mutasi bulan ini dari jurnal
             $mutasi = DB::table('jurnal_detail as jd')
                 ->join('jurnal_header as jh', 'jh.id_jurnal', '=', 'jd.id_jurnal')
-                ->where('jh.id_koperasi', $idKoperasi)
+                ->when($idEntitas, fn($q) => $q->where('jh.id_entitas', $idEntitas))
                 ->where('jh.status', 'POSTED')
                 ->where('jh.periode_tahun', $tahun)
                 ->where('jh.periode_bulan', $bulan)
@@ -197,7 +197,7 @@ class LaporanController extends Controller
     // =========================================================================
 
     /**
-     * Tampilkan Pendapatan − HPP − Biaya = Laba Bersih untuk periode yang dipilih.
+     * Tampilkan Pendapatan Ã¢Ë†â€™ HPP Ã¢Ë†â€™ Biaya = Laba Bersih untuk periode yang dipilih.
      *
      * Filter: tahun + bulan_dari s.d. bulan_sampai
      * Sumber: SUM(mutasi) dari buku_besar_periode (bukan saldo_akhir, agar
@@ -205,7 +205,7 @@ class LaporanController extends Controller
      */
     public function labaRugi(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         $tahun      = (int) $request->query('tahun', date('Y'));
         $bulanDari  = (int) $request->query('bulan_dari', 1);
         $bulanSampai= (int) $request->query('bulan_sampai', (int) date('n'));
@@ -217,7 +217,7 @@ class LaporanController extends Controller
         // SUM mutasi debet & kredit per akun untuk range bulan yang dipilih
         $rows = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
             ->where('bbp.periode_tahun', $tahun)
             ->whereBetween('bbp.periode_bulan', [$bulanDari, $bulanSampai])
             ->whereIn('c.kelompok', $kelompokLR)
@@ -279,7 +279,7 @@ class LaporanController extends Controller
      */
     public function neraca(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         [$tahun, $bulan] = $this->parsePeriode($request);
 
         $kelompokNeraca = ['Aktiva', 'Kewajiban', 'Modal'];
@@ -287,7 +287,7 @@ class LaporanController extends Controller
         // Ambil saldo_akhir per akun untuk bulan yang dipilih
         $rows = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->whereIn('c.kelompok', $kelompokNeraca)
@@ -329,7 +329,7 @@ class LaporanController extends Controller
     }
 
     // =========================================================================
-    // 5. ARUS KAS — Belum Diimplementasi (butuh klasifikasi tambahan di COA)
+    // 5. ARUS KAS Ã¢â‚¬â€ Belum Diimplementasi (butuh klasifikasi tambahan di COA)
     // =========================================================================
 
     public function arusKas(): View
@@ -340,3 +340,6 @@ class LaporanController extends Controller
         ]);
     }
 }
+
+
+

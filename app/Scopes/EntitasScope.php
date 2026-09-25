@@ -9,20 +9,21 @@ use Illuminate\Database\Eloquent\Scope;
 /**
  * Isolasi tenant di level baris.
  *
- * Tenant aktif diambil dari container binding 'koperasi_aktif' yang diisi
- * middleware SetKoperasiAktif. Kalau tidak ada tenant aktif (mis. artisan
+ * Tenant aktif diambil dari container binding 'entitas_aktif' yang diisi
+ * middleware SetEntitasAktif. Kalau tidak ada tenant aktif (mis. artisan
  * command atau pengguna tingkat pusat), scope tidak dipasang.
  *
  * JANGAN gunakan withoutGlobalScope di luar modul pelaporan konsolidasi.
  */
-class KoperasiScope implements Scope
+class EntitasScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
-        $id = app()->bound('koperasi_aktif') ? app('koperasi_aktif') : null;
+        $id = app()->bound('entitas_aktif') ? app('entitas_aktif') : null;
 
         if ($id !== null) {
-            $builder->where($model->getTable().'.id_koperasi', $id);
+            $builder->where($model->getTable().'.id_entitas', $id);
         }
     }
 }
+

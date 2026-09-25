@@ -7,12 +7,12 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\DB;
 
 /**
- * TenantOwnershipRule — Memastikan ID yang dikirim via form adalah milik koperasi aktif.
+ * TenantOwnershipRule â€” Memastikan ID yang dikirim via form adalah milik koperasi aktif.
  *
  * MASALAH YANG DIPECAHKAN:
  *   Jika user Desa A mengganti id_kas_bank di form dengan ID milik Desa B,
  *   validasi `exists:master_kas_bank` akan lolos karena ID itu memang ada di database.
- *   Rule ini menambahkan filter `id_koperasi = ?` ke query `exists`.
+ *   Rule ini menambahkan filter `id_entitas = ?` ke query `exists`.
  *
  * PENGGUNAAN di Form Request:
  *   use App\Rules\TenantOwnershipRule;
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  *   'id_gudang'   => ['required', new TenantOwnershipRule('gudang', 'id_gudang')],
  *
  * KOLOM TENANT:
- *   Default: `id_koperasi`. Tabel yang menggunakan nama kolom berbeda bisa
+ *   Default: `id_entitas`. Tabel yang menggunakan nama kolom berbeda bisa
  *   di-override via parameter $kolom_tenant.
  *
  * EXCEPTION AMAN:
@@ -34,17 +34,17 @@ class TenantOwnershipRule implements ValidationRule
     /**
      * @param string $tabel        Nama tabel yang dicek (contoh: 'master_kas_bank')
      * @param string $kolom_id     Nama kolom primary key (contoh: 'id_kas_bank')
-     * @param string $kolom_tenant Nama kolom tenant di tabel tersebut (default: 'id_koperasi')
+     * @param string $kolom_tenant Nama kolom tenant di tabel tersebut (default: 'id_entitas')
      */
     public function __construct(
         private readonly string $tabel,
         private readonly string $kolom_id,
-        private readonly string $kolom_tenant = 'id_koperasi',
+        private readonly string $kolom_tenant = 'id_entitas',
     ) {}
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        // Mode konsolidasi pusat: tidak ada koperasi aktif → lewati validasi
+        // Mode konsolidasi pusat: tidak ada koperasi aktif â†’ lewati validasi
         if (!app()->bound('koperasi_aktif')) {
             return;
         }
@@ -61,3 +61,4 @@ class TenantOwnershipRule implements ValidationRule
         }
     }
 }
+

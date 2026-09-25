@@ -14,24 +14,24 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * JurnalService — Satu-satunya pintu resmi untuk menulis ke jurnal_header,
+ * JurnalService Ã¢â‚¬â€ Satu-satunya pintu resmi untuk menulis ke jurnal_header,
  * jurnal_detail, dan buku_besar_periode.
  *
  * ATURAN: Tidak ada kode lain yang boleh INSERT langsung ke tabel-tabel
  * tersebut. Semua harus lewat service ini.
  *
  * Tiga cara jurnal bisa dibuat:
- *   1. posting()        — dari template (JTW, BTU, TPI, dll)
- *   2. postingManual()  — baris bebas (KSM, KSK, MTK, penyesuaian)
- *   3. balik()          — membuat jurnal pembalik dari jurnal yang sudah POSTED
+ *   1. posting()        Ã¢â‚¬â€ dari template (JTW, BTU, TPI, dll)
+ *   2. postingManual()  Ã¢â‚¬â€ baris bebas (KSM, KSK, MTK, penyesuaian)
+ *   3. balik()          Ã¢â‚¬â€ membuat jurnal pembalik dari jurnal yang sudah POSTED
  *
  * Satu method tambahan untuk maintenance:
- *   4. bangunBukuBesar() — rebuild ringkasan saldo dari jurnal (idempoten)
+ *   4. bangunBukuBesar() Ã¢â‚¬â€ rebuild ringkasan saldo dari jurnal (idempoten)
  */
 class JurnalService
 {
     // =========================================================================
-    // METHOD 1: posting() — Jurnal dari Template
+    // METHOD 1: posting() Ã¢â‚¬â€ Jurnal dari Template
     // =========================================================================
 
     /**
@@ -54,7 +54,7 @@ class JurnalService
      * @param  string  $keterangan     Deskripsi manusiawi
      *
      * @throws AkunTidakDitemukanException   jika akun dinamis gagal di-resolve
-     * @throws JurnalTidakBalanceException   jika Debit ≠ Kredit setelah resolve
+     * @throws JurnalTidakBalanceException   jika Debit Ã¢â€°Â  Kredit setelah resolve
      * @throws PeriodeTutupException         jika periode sudah ditutup
      */
     public function posting(
@@ -63,11 +63,11 @@ class JurnalService
         string $sourceType,
         int    $sourceId,
         string $keterangan = '',
-        ?int   $koperasiId = null,
+        ?int   $entitasId = null,
     ): JurnalHeader {
         // --- LANGKAH 1: Ambil template dari database ---
-        // MasterDetailTransaksi tidak pakai BelongsToKoperasi karena tabel
-        // ini global (tidak per-koperasi) — semua desa pakai template sama.
+        // MasterDetailTransaksi tidak pakai BelongsToEntitas karena tabel
+        // ini global (tidak per-koperasi) Ã¢â‚¬â€ semua desa pakai template sama.
         $template = MasterDetailTransaksi::where('kode_transaksi', $kodeTransaksi)
             ->orderBy('urutan')
             ->get();
@@ -93,10 +93,10 @@ class JurnalService
         // --- LANGKAH 5: Validasi periode masih OPEN ---
         $tanggal = $payload['tanggal_jurnal'] ?? now()->toDateString();
         [$tahun, $bulan] = $this->parsePeriode($tanggal);
-        $this->pastikanPeriodeTerbuka($tahun, $bulan, $koperasiId);
+        $this->pastikanPeriodeTerbuka($tahun, $bulan, $entitasId);
 
         // --- LANGKAH 6: Generate nomor jurnal ---
-        $noJurnal = $this->generateNomorJurnal($tahun, $bulan, $koperasiId);
+        $noJurnal = $this->generateNomorJurnal($tahun, $bulan, $entitasId);
 
         // --- LANGKAH 7: Susun JSON & panggil SP ---
         $jsonPayload = $this->susunJsonPayload([
@@ -112,15 +112,15 @@ class JurnalService
             'keterangan'     => $keterangan,
         ], $baris);
 
-        return $this->panggilStoredProcedure($jsonPayload, $sourceType, $sourceId, 'OTOMATIS', $koperasiId);
+        return $this->panggilStoredProcedure($jsonPayload, $sourceType, $sourceId, 'OTOMATIS', $entitasId);
     }
 
     // =========================================================================
-    // METHOD 2: postingManual() — Jurnal Bebas (tanpa template)
+    // METHOD 2: postingManual() Ã¢â‚¬â€ Jurnal Bebas (tanpa template)
     // =========================================================================
 
     /**
-     * Posting jurnal manual — pengguna tentukan sendiri setiap baris.
+     * Posting jurnal manual Ã¢â‚¬â€ pengguna tentukan sendiri setiap baris.
      * Dipakai untuk: KSM (kas masuk lain), KSK (kas keluar lain),
      * MTK (mutasi antar kas), dan jurnal penyesuaian.
      *
@@ -180,7 +180,7 @@ class JurnalService
     }
 
     // =========================================================================
-    // METHOD 3: balik() — Jurnal Pembalik
+    // METHOD 3: balik() Ã¢â‚¬â€ Jurnal Pembalik
     // =========================================================================
 
     /**
@@ -195,7 +195,7 @@ class JurnalService
     {
         // Ambil jurnal asal beserta detailnya
         // withoutGlobalScope: kita akses by ID langsung, scope sudah dijaga
-        // karena id_koperasi ada di WHERE selanjutnya lewat findOrFail
+        // karena id_entitas ada di WHERE selanjutnya lewat findOrFail
         $jurnalAsal = JurnalHeader::with('detail')->findOrFail($idJurnal);
 
         // Validasi: belum pernah dibalik
@@ -212,13 +212,13 @@ class JurnalService
             );
         }
 
-        // Bangun baris pembalik: balik posisi debet ↔ kredit
+        // Bangun baris pembalik: balik posisi debet Ã¢â€ â€ kredit
         $barisPembalik = $jurnalAsal->detail->map(function ($d, int $idx): array {
             return [
                 'urutan'    => $idx + 1,
                 'kode_anak' => $d->kode_anak,
-                'debet'     => (float) $d->kredit,   // ← dibalik
-                'kredit'    => (float) $d->debet,    // ← dibalik
+                'debet'     => (float) $d->kredit,   // Ã¢â€ Â dibalik
+                'kredit'    => (float) $d->debet,    // Ã¢â€ Â dibalik
                 'id_pihak'  => $d->id_pihak,
                 'keterangan'=> $d->keterangan,
             ];
@@ -261,12 +261,12 @@ class JurnalService
     }
 
     // =========================================================================
-    // METHOD 4: bangunBukuBesar() — Rebuild ringkasan saldo (idempoten)
+    // METHOD 4: bangunBukuBesar() Ã¢â‚¬â€ Rebuild ringkasan saldo (idempoten)
     // =========================================================================
 
     /**
      * Membangun ulang tabel buku_besar_periode untuk satu bulan tertentu.
-     * Aman dipanggil berkali-kali — hasil selalu konsisten dengan data jurnal.
+     * Aman dipanggil berkali-kali Ã¢â‚¬â€ hasil selalu konsisten dengan data jurnal.
      *
      * Kapan dipakai:
      *   - Saat tutup bulan (TutupBulanService memanggil ini)
@@ -275,11 +275,11 @@ class JurnalService
      */
     public function bangunBukuBesar(int $tahun, int $bulan): void
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
-        // Hapus ringkasan periode ini — akan dibangun ulang dari nol
+        // Hapus ringkasan periode ini Ã¢â‚¬â€ akan dibangun ulang dari nol
         DB::table('buku_besar_periode')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->where('periode_tahun', $tahun)
             ->where('periode_bulan', $bulan)
             ->delete();
@@ -289,7 +289,7 @@ class JurnalService
         $tahunLalu       = $bulan === 1 ? $tahun - 1 : $tahun;
 
         $saldoAwalBulanLalu = DB::table('buku_besar_periode')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->where('periode_tahun', $tahunLalu)
             ->where('periode_bulan', $bulanLalu)
             ->get()
@@ -298,7 +298,7 @@ class JurnalService
         // Hitung mutasi bulan ini dari jurnal yang sudah POSTED
         $mutasi = DB::table('jurnal_detail as jd')
             ->join('jurnal_header as jh', 'jh.id_jurnal', '=', 'jd.id_jurnal')
-            ->where('jh.id_koperasi', $idKoperasi)
+            ->where('jh.id_entitas', $idEntitas)
             ->where('jh.periode_tahun', $tahun)
             ->where('jh.periode_bulan', $bulan)
             ->where('jh.status', 'POSTED')
@@ -312,7 +312,7 @@ class JurnalService
             ->unique();
 
         // Bangun ulang baris buku_besar_periode
-        $rows = $semuaAkun->map(function ($kodeAnak) use ($saldoAwalBulanLalu, $mutasi, $idKoperasi, $tahun, $bulan) {
+        $rows = $semuaAkun->map(function ($kodeAnak) use ($saldoAwalBulanLalu, $mutasi, $idEntitas, $tahun, $bulan) {
             $saldoAwal = $saldoAwalBulanLalu->get($kodeAnak);
             $m         = $mutasi->firstWhere('kode_anak', $kodeAnak);
 
@@ -323,7 +323,7 @@ class JurnalService
             $mutasiK    = $m ? (float) $m->mutasi_kredit : 0.0;
 
             return [
-                'id_koperasi'       => $idKoperasi,
+                'id_entitas'       => $idEntitas,
                 'periode_tahun'     => $tahun,
                 'periode_bulan'     => $bulan,
                 'kode_anak'         => $kodeAnak,
@@ -343,7 +343,7 @@ class JurnalService
     }
 
     // =========================================================================
-    // PRIVATE HELPERS — Logika internal, tidak dipanggil dari luar
+    // PRIVATE HELPERS Ã¢â‚¬â€ Logika internal, tidak dipanggil dari luar
     // =========================================================================
 
     /**
@@ -391,11 +391,11 @@ class JurnalService
                 'PERSEDIAAN_UNIT' => $this->resolveUnitField($unitUsaha, 'kode_akun_persediaan'),
                 'PENDAPATAN_UNIT' => $this->resolvePendapatan($unitUsaha, $payload),
                 'HPP_UNIT'        => $this->resolveUnitField($unitUsaha, 'kode_akun_hpp'),
-                default           => $t->kode_anak,  // null → kode_anak tetap
+                default           => $t->kode_anak,  // null Ã¢â€ â€™ kode_anak tetap
             };
 
             // Ambil nilai dari payload berdasarkan sumber_variabel
-            // Contoh: sumber_variabel = 'total_bayar' → $payload['total_bayar']
+            // Contoh: sumber_variabel = 'total_bayar' Ã¢â€ â€™ $payload['total_bayar']
             $nilai = (float) ($payload[$t->sumber_variabel] ?? 0);
 
             $baris[] = [
@@ -435,7 +435,7 @@ class JurnalService
         return $unitUsaha->$field;
     }
 
-    /** Resolve PENDAPATAN_UNIT — berbeda berdasarkan status anggota */
+    /** Resolve PENDAPATAN_UNIT Ã¢â‚¬â€ berbeda berdasarkan status anggota */
     private function resolvePendapatan(?object $unitUsaha, array $payload): string
     {
         if (!$unitUsaha) {
@@ -445,7 +445,7 @@ class JurnalService
             );
         }
 
-        // is_anggota harus ada di payload — Controller yang menentukannya
+        // is_anggota harus ada di payload Ã¢â‚¬â€ Controller yang menentukannya
         // berdasarkan data master_pihak (apakah pembeli adalah anggota koperasi)
         $isAnggota = $payload['is_anggota'] ?? false;
 
@@ -455,18 +455,18 @@ class JurnalService
     }
 
     /** Validasi bahwa periode akuntansi masih OPEN */
-    private function pastikanPeriodeTerbuka(int $tahun, int $bulan, ?int $koperasiId = null): void
+    private function pastikanPeriodeTerbuka(int $tahun, int $bulan, ?int $entitasId = null): void
     {
-        $koperasiId ??= app('koperasi_aktif');
+        $entitasId ??= app('entitas_aktif');
 
         $status = DB::table('periode_akuntansi')
-            ->where('id_koperasi', $koperasiId)
+            ->where('id_entitas', $entitasId)
             ->where('tahun', $tahun)
             ->where('bulan', $bulan)
             ->value('status');
 
         if ($status === null) {
-            // Periode belum dibuat — anggap terbuka (sistem baru / fresh)
+            // Periode belum dibuat Ã¢â‚¬â€ anggap terbuka (sistem baru / fresh)
             return;
         }
 
@@ -487,18 +487,18 @@ class JurnalService
      * Format: JRN-{tahun}-{bulan_2digit}-{sequence_4digit}
      * Contoh: JRN-2026-08-0042
      */
-    private function generateNomorJurnal(int $tahun, int $bulan, ?int $koperasiId = null): string
+    private function generateNomorJurnal(int $tahun, int $bulan, ?int $entitasId = null): string
     {
-        $koperasiId ??= app('koperasi_aktif');
+        $entitasId ??= app('entitas_aktif');
         $prefix = sprintf('JRN-%d-%02d-', $tahun, $bulan);
 
         // Ambil nomor urut terakhir untuk periode ini dari koperasi aktif
         $terakhir = DB::table('jurnal_header')
-            ->where('id_koperasi', $koperasiId)
+            ->where('id_entitas', $entitasId)
             ->where('periode_tahun', $tahun)
             ->where('periode_bulan', $bulan)
             ->where('no_jurnal', 'like', $prefix . '%')
-            ->lockForUpdate()   // ← penting: mencegah race condition
+            ->lockForUpdate()   // Ã¢â€ Â penting: mencegah race condition
             ->count();
 
         return $prefix . sprintf('%04d', $terakhir + 1);
@@ -514,28 +514,28 @@ class JurnalService
      * Memanggil Stored Procedure sp_post_jurnal dan mengembalikan JurnalHeader.
      *
      * Menangani dua kasus:
-     *   a. INSERT baru berhasil → kembalikan jurnal yang baru dibuat
-     *   b. UniqueConstraintViolation pada jurnal_idempoten →
+     *   a. INSERT baru berhasil Ã¢â€ â€™ kembalikan jurnal yang baru dibuat
+     *   b. UniqueConstraintViolation pada jurnal_idempoten Ã¢â€ â€™
      *      berarti jurnal sumber ini sudah pernah diposting.
-     *      Kembalikan jurnal yang sudah ada (idempoten — aman diulang).
+     *      Kembalikan jurnal yang sudah ada (idempoten Ã¢â‚¬â€ aman diulang).
      */
     private function panggilStoredProcedure(
         string  $jsonPayload,
         ?string $sourceType,
         ?int    $sourceId,
         string  $jenisJurnal,
-        ?int    $koperasiId = null,
+        ?int    $entitasId = null,
     ): JurnalHeader {
-        $koperasiId ??= app('koperasi_aktif');
+        $entitasId ??= app('entitas_aktif');
 
         try {
             // Pastikan string JSON dan variabel teks di stored procedure memakai
             // collation yang sama dengan kolom kode akun jurnal.
             DB::statement("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-            // CALL SP — mengembalikan satu baris dengan kolom id_jurnal
+            // CALL SP Ã¢â‚¬â€ mengembalikan satu baris dengan kolom id_jurnal
             $hasil = DB::select('CALL sp_post_jurnal(?, ?, ?)', [
-                $koperasiId,
+                $entitasId,
                 Auth::id(),
                 $jsonPayload,
             ]);
@@ -547,12 +547,12 @@ class JurnalService
 
         } catch (UniqueConstraintViolationException $e) {
             // Idempotency guard: jurnal untuk source ini sudah ada.
-            // Kembalikan yang sudah ada tanpa error — aman untuk retry.
+            // Kembalikan yang sudah ada tanpa error Ã¢â‚¬â€ aman untuk retry.
             if ($sourceType && $sourceId) {
                 $existing = JurnalHeader::where('source_type', $sourceType)
                     ->where('source_id', $sourceId)
                     ->where('jenis_jurnal', $jenisJurnal)
-                    ->where('id_koperasi', $koperasiId)
+                    ->where('id_entitas', $entitasId)
                     ->first();
 
                 if ($existing) {
@@ -560,8 +560,11 @@ class JurnalService
                 }
             }
 
-            // Jika bukan idempotency (no_jurnal duplikat, dsb) → lempar ulang
+            // Jika bukan idempotency (no_jurnal duplikat, dsb) Ã¢â€ â€™ lempar ulang
             throw $e;
         }
     }
 }
+
+
+

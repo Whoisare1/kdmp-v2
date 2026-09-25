@@ -3,12 +3,12 @@
 namespace App\Models\Konsinyasi;
 
 use App\Models\Master\Gudang;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Barang titipan TETAP MILIK desa pengirim sampai laku. Jurnal HANYA di
- * desa pengirim saat kirim — desa penerima tidak menjurnal apa pun.
+ * desa pengirim saat kirim Ã¢â‚¬â€ desa penerima tidak menjurnal apa pun.
  */
 class PengirimanKonsinyasi extends Model
 {
@@ -16,7 +16,7 @@ class PengirimanKonsinyasi extends Model
     protected $primaryKey = 'id_kiriman';
 
     protected $fillable = [
-        'kode_kiriman', 'id_penawaran_barter', 'id_koperasi_pemilik', 'id_koperasi_penerima',
+        'kode_kiriman', 'id_penawaran_barter', 'id_entitas_pemilik', 'id_entitas_penerima',
         'id_gudang_asal', 'id_gudang_tujuan', 'tgl_kirim', 'tgl_terima', 'tgl_batas_titip',
         'model_imbalan', 'persen_komisi', 'penanggung_susut', 'total_nilai_titip',
         'total_hpp_pemilik', 'status', 'status_posting', 'id_jurnal_kirim',
@@ -37,12 +37,12 @@ class PengirimanKonsinyasi extends Model
 
     public function koperasiPemilik()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi_pemilik', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas_pemilik', 'id_entitas');
     }
 
     public function koperasiPenerima()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi_penerima', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas_penerima', 'id_entitas');
     }
 
     public function gudangAsal()
@@ -63,8 +63,8 @@ class PengirimanKonsinyasi extends Model
     }
 
     // =========================================================================
-    // LOCAL SCOPES — Dipakai eksplisit di Controller, bukan Global Scope,
-    // karena konsinyasi secara desain bersifat lintas koperasi.
+    // LOCAL SCOPES Ã¢â‚¬â€ Dipakai eksplisit di Controller, bukan Global Scope,
+    // karena konsinyasi secara desain bersifat lintas entitas.
     // =========================================================================
 
     /**
@@ -75,10 +75,10 @@ class PengirimanKonsinyasi extends Model
      */
     public function scopeTerlibat($query): void
     {
-        $id = app('koperasi_aktif');
+        $id = app('entitas_aktif');
         $query->where(function ($q) use ($id) {
-            $q->where('id_koperasi_pemilik', $id)
-              ->orWhere('id_koperasi_penerima', $id);
+            $q->where('id_entitas_pemilik', $id)
+              ->orWhere('id_entitas_penerima', $id);
         });
     }
 
@@ -88,7 +88,7 @@ class PengirimanKonsinyasi extends Model
      */
     public function scopeMilikSaya($query): void
     {
-        $query->where('id_koperasi_pemilik', app('koperasi_aktif'));
+        $query->where('id_entitas_pemilik', app('entitas_aktif'));
     }
 
     /**
@@ -97,6 +97,9 @@ class PengirimanKonsinyasi extends Model
      */
     public function scopeTitipanMasuk($query): void
     {
-        $query->where('id_koperasi_penerima', app('koperasi_aktif'));
+        $query->where('id_entitas_penerima', app('entitas_aktif'));
     }
 }
+
+
+

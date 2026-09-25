@@ -2,20 +2,20 @@
 
 namespace App\Models\Gudang;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Gudang as GudangModel;
 use Illuminate\Database\Eloquent\Model;
 
 class OpnameHeader extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'opname_header';
     protected $primaryKey = 'id_opname';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'id_gudang', 'kode_opname', 'tanggal', 'status', 'approved_by',
+        'id_entitas', 'id_gudang', 'kode_opname', 'tanggal', 'status', 'approved_by',
     ];
 
     protected function casts(): array

@@ -6,7 +6,7 @@ use App\Http\Controllers\Akuntansi\LaporanController;
 use App\Models\Akuntansi\BukuBesarPeriode;
 use App\Models\Akuntansi\JurnalHeader;
 use App\Models\Pengguna;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use App\Models\Tenant\PeriodeAkuntansi;
 use App\Services\Finance\JurnalService;
 use App\Services\Finance\TutupBulanService;
@@ -40,9 +40,9 @@ class FinanceEndToEndTest extends TestCase
             'tingkat' => 'desa', 'nama' => 'Desa Finance E2E ' . $sfx, 'created_at' => now(),
         ]);
 
-        $this->idKoperasi = DB::table('koperasi_desa')->insertGetId([
-            'kode_koperasi'   => 'FN-' . $sfx,
-            'nama_koperasi'   => 'Koperasi Finance Test',
+        $this->idKoperasi = DB::table('entitas')->insertGetId([
+            'kode_entitas'   => 'FN-' . $sfx,
+            'nama_entitas'   => 'Koperasi Finance Test',
             'id_wilayah'      => $idWilayah,
             'tahun_buku_awal' => 2026,
             'is_active'       => 1,
@@ -55,7 +55,7 @@ class FinanceEndToEndTest extends TestCase
             'nama'        => 'User Finance',
             'email'       => 'finance-' . $sfx . '@test.local',
             'password'    => bcrypt('password'),
-            'id_koperasi' => $this->idKoperasi,
+            'id_entitas' => $this->idKoperasi,
             'created_at'  => now(),
         ]);
         $this->user = Pengguna::withoutGlobalScopes()->find($idUser);
@@ -72,7 +72,7 @@ class FinanceEndToEndTest extends TestCase
 
         // Open Periode 2026-12 (Desember)
         DB::table('periode_akuntansi')->insert([
-            'id_koperasi' => $this->idKoperasi,
+            'id_entitas' => $this->idKoperasi,
             'tahun'       => 2026,
             'bulan'       => 12,
             'status'      => 'OPEN',
@@ -80,7 +80,7 @@ class FinanceEndToEndTest extends TestCase
         
         // Open Periode 2027-01 (Januari, untuk test Tutup Tahun ke tahun berikutnya)
         DB::table('periode_akuntansi')->insert([
-            'id_koperasi' => $this->idKoperasi,
+            'id_entitas' => $this->idKoperasi,
             'tahun'       => 2027,
             'bulan'       => 1,
             'status'      => 'OPEN',
@@ -181,7 +181,7 @@ class FinanceEndToEndTest extends TestCase
         // SETUP Pra-Kondisi Tutup Tahun
         for ($bulan = 1; $bulan <= 11; $bulan++) {
             DB::table('periode_akuntansi')->insertOrIgnore([
-                'id_koperasi' => $this->idKoperasi,
+                'id_entitas' => $this->idKoperasi,
                 'tahun'       => 2026,
                 'bulan'       => $bulan,
                 'status'      => 'CLOSED',
@@ -191,7 +191,7 @@ class FinanceEndToEndTest extends TestCase
         }
         
         DB::table('config_shu')->insert([
-            'id_koperasi' => $this->idKoperasi,
+            'id_entitas' => $this->idKoperasi,
             'tahun'       => 2026,
             'pos'         => 'Laba Ditahan',
             'persentase'  => 100,
@@ -224,7 +224,7 @@ class FinanceEndToEndTest extends TestCase
         // 4. Verifikasi Buku Besar Tahun 2027 Bulan 1
         // Akun 312 (Laba Ditahan) harus bertambah 2.000.000 (kredit) sebagai saldo awal
         // Akun 111 (Kas) harus memiliki saldo awal 2.000.000 (debet)
-        $bbpLabaDitahan = BukuBesarPeriode::where('id_koperasi', $this->idKoperasi)
+        $bbpLabaDitahan = BukuBesarPeriode::where('id_entitas', $this->idKoperasi)
             ->where('periode_tahun', 2027)
             ->where('periode_bulan', 1)
             ->where('kode_anak', '312')
@@ -233,7 +233,7 @@ class FinanceEndToEndTest extends TestCase
         $this->assertNotNull($bbpLabaDitahan, "Buku Besar Laba Ditahan tahun berikutnya harus terbuat");
         $this->assertEquals(2000000, $bbpLabaDitahan->saldo_awal_kredit);
 
-        $bbpKas = BukuBesarPeriode::where('id_koperasi', $this->idKoperasi)
+        $bbpKas = BukuBesarPeriode::where('id_entitas', $this->idKoperasi)
             ->where('periode_tahun', 2027)
             ->where('periode_bulan', 1)
             ->where('kode_anak', '111')
@@ -243,7 +243,7 @@ class FinanceEndToEndTest extends TestCase
         $this->assertEquals(2000000, $bbpKas->saldo_awal_debet);
         
         // Cek jurnal otomatis tutup tahun
-        $jurnalTutup = JurnalHeader::where('id_koperasi', $this->idKoperasi)
+        $jurnalTutup = JurnalHeader::where('id_entitas', $this->idKoperasi)
             ->where('periode_tahun', 2026)
             ->where('jenis_jurnal', 'PENUTUP')
             ->first();
@@ -251,3 +251,4 @@ class FinanceEndToEndTest extends TestCase
         $this->assertNotNull($jurnalTutup, "Jurnal pembalik tutup tahun harus terbuat");
     }
 }
+

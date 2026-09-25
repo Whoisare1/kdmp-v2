@@ -50,7 +50,7 @@ class PembelianService
 
         try {
             $kodePembelian = self::generatePurchaseCode(
-                $pr->id_koperasi,
+                $pr->id_entitas,
                 $pr->tanggal_permintaan,
             );
 
@@ -61,7 +61,7 @@ class PembelianService
             }
 
             $pembelian = Pembelian::create([
-                'id_koperasi' => $pr->id_koperasi,
+                'id_entitas' => $pr->id_entitas,
                 'kode_pembelian' => $kodePembelian,
                 'id_permintaan' => $pr->id_permintaan,
                 'id_pihak' => $idPihak,
@@ -110,7 +110,7 @@ class PembelianService
      * Tunai  -> BPT
      * Transfer -> BTF
      *
-     * @param int $kooperasiId
+     * @param int $idEntitas
      * @param int $idPihak Farmer ID
      * @param int $idUnitUsaha
      * @param int $idGudang
@@ -121,7 +121,7 @@ class PembelianService
      * @throws \Exception
      */
     public static function createQuickPurchase(
-        int $kooperasiId,
+        int $idEntitas,
         int $idPihak,
         int $idUnitUsaha,
         int $idGudang,
@@ -145,7 +145,7 @@ class PembelianService
 
         try {
             $kodePembelian = self::generatePurchaseCode(
-                $kooperasiId,
+                $idEntitas,
                 now()->toDateString(),
             );
 
@@ -158,7 +158,7 @@ class PembelianService
             }
 
             $pembelian = Pembelian::create([
-                'id_koperasi' => $kooperasiId,
+                'id_entitas' => $idEntitas,
                 'kode_pembelian' => $kodePembelian,
                 'id_permintaan' => null,
                 'id_pihak' => $idPihak,
@@ -306,12 +306,12 @@ class PembelianService
 
         try {
             $kodePenerimaan = self::generateReceiptCode(
-                $pembelian->id_koperasi,
+                $pembelian->id_entitas,
                 now()->toDateString(),
             );
 
             $penerimaan = PenerimaanBarang::create([
-                'id_koperasi' => $pembelian->id_koperasi,
+                'id_entitas' => $pembelian->id_entitas,
                 'kode_penerimaan' => $kodePenerimaan,
                 'id_pembelian' => $pembelian->id_pembelian,
                 'id_pihak' => $pembelian->id_pihak,
@@ -369,7 +369,7 @@ class PembelianService
 
                 if ($qtyLayak > 0) {
                     StokService::masukBarang(
-                        $pembelian->id_koperasi,
+                        $pembelian->id_entitas,
                         $pembelian->id_gudang,
                         $detailPembelian->id_barang,
                         $qtyLayak,
@@ -456,7 +456,7 @@ class PembelianService
 
         try {
             $kodeRetur = self::generateReturnCode(
-                $pembelian->id_koperasi,
+                $pembelian->id_entitas,
                 now()->toDateString(),
             );
 
@@ -469,7 +469,7 @@ class PembelianService
             }
 
             $retur = ReturPembelian::create([
-                'id_koperasi' => $pembelian->id_koperasi,
+                'id_entitas' => $pembelian->id_entitas,
                 'kode_retur' => $kodeRetur,
                 'id_pembelian' => $pembelian->id_pembelian,
                 'tgl_retur' => now()->toDateString(),
@@ -592,13 +592,13 @@ class PembelianService
     }
 
     private static function generatePurchaseCode(
-        int $kooperasiId,
+        int $idEntitas,
         string $tanggal
     ): string {
         $tahun = date('Y', strtotime($tanggal));
         $bulan = date('m', strtotime($tanggal));
 
-        $last = Pembelian::where('id_koperasi', $kooperasiId)
+        $last = Pembelian::where('id_entitas', $idEntitas)
             ->whereYear('created_at', $tahun)
             ->whereMonth('created_at', $bulan)
             ->orderByDesc('id_pembelian')
@@ -626,13 +626,13 @@ class PembelianService
     }
 
     private static function generateReceiptCode(
-        int $kooperasiId,
+        int $idEntitas,
         string $tanggal
     ): string {
         $tahun = date('Y', strtotime($tanggal));
         $bulan = date('m', strtotime($tanggal));
 
-        $last = PenerimaanBarang::where('id_koperasi', $kooperasiId)
+        $last = PenerimaanBarang::where('id_entitas', $idEntitas)
             ->whereYear('created_at', $tahun)
             ->whereMonth('created_at', $bulan)
             ->orderByDesc('id_penerimaan')
@@ -660,13 +660,13 @@ class PembelianService
     }
 
     private static function generateReturnCode(
-        int $kooperasiId,
+        int $idEntitas,
         string $tanggal
     ): string {
         $tahun = date('Y', strtotime($tanggal));
         $bulan = date('m', strtotime($tanggal));
 
-        $last = ReturPembelian::where('id_koperasi', $kooperasiId)
+        $last = ReturPembelian::where('id_entitas', $idEntitas)
             ->whereYear('created_at', $tahun)
             ->whereMonth('created_at', $bulan)
             ->orderByDesc('id_retur')
@@ -693,3 +693,5 @@ class PembelianService
         );
     }
 }
+
+

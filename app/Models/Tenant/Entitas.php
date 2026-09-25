@@ -4,14 +4,14 @@ namespace App\Models\Tenant;
 
 use Illuminate\Database\Eloquent\Model;
 
-class KoperasiDesa extends Model
+class Entitas extends Model
 {
-    protected $table = 'koperasi_desa';
-    protected $primaryKey = 'id_koperasi';
+    protected $table = 'entitas';
+    protected $primaryKey = 'id_entitas';
 
     protected $fillable = [
-        'kode_koperasi', 'nama_koperasi', 'id_wilayah', 'badan_hukum_no',
-        'tgl_berdiri', 'tahun_buku_awal', 'is_active',
+        'kode_entitas', 'nama_entitas', 'jenis_entitas', 'id_wilayah', 'badan_hukum_no',
+        'tgl_berdiri', 'tahun_buku_awal', 'is_active', 'status'
     ];
 
     protected function casts(): array
@@ -26,11 +26,12 @@ class KoperasiDesa extends Model
 
     public function periodeAkuntansi()
     {
-        return $this->hasMany(PeriodeAkuntansi::class, 'id_koperasi', 'id_koperasi');
+        return $this->hasMany(PeriodeAkuntansi::class, 'id_entitas', 'id_entitas');
     }
 
     public function pengguna()
     {
-        return $this->hasMany(\App\Models\Pengguna::class, 'id_koperasi', 'id_koperasi');
+        return $this->hasMany(\App\Models\Pengguna::class, 'id_entitas', 'id_entitas');
     }
 }
+

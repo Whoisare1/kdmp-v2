@@ -10,16 +10,16 @@ use Illuminate\Support\Facades\DB;
  * dalam satu transaksi database yang tidak bisa "setengah jadi".
  *
  * Parameter masuk:
- *   p_id_koperasi  — ID koperasi aktif (dari app('koperasi_aktif'))
- *   p_user_id      — ID pengguna yang memposting (untuk audit trail)
- *   p_json         — JSON lengkap berisi header + array baris jurnal
+ *   p_id_entitas  â€” ID koperasi aktif (dari app('koperasi_aktif'))
+ *   p_user_id      â€” ID pengguna yang memposting (untuk audit trail)
+ *   p_json         â€” JSON lengkap berisi header + array baris jurnal
  *
  * Yang dilakukan di dalam (berurutan, dalam 1 TRANSACTION):
  *   1. Hitung total_debet dan total_kredit dari array baris
  *   2. INSERT satu baris ke jurnal_header (status langsung = POSTED)
- *   3. LOOP setiap baris di array → INSERT ke jurnal_detail
- *   4. LOOP setiap baris lagi   → UPSERT ke buku_besar_periode
- *   5. COMMIT — atau ROLLBACK semua jika ada error di langkah manapun
+ *   3. LOOP setiap baris di array â†’ INSERT ke jurnal_detail
+ *   4. LOOP setiap baris lagi   â†’ UPSERT ke buku_besar_periode
+ *   5. COMMIT â€” atau ROLLBACK semua jika ada error di langkah manapun
  *   6. SELECT id_jurnal yang baru dibuat sebagai return value
  *
  * Dipanggil dari PHP dengan:
@@ -32,10 +32,10 @@ return new class extends Migration
         // Hapus dulu jika sudah ada (aman untuk migrate:fresh)
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_post_jurnal');
 
-        // DELIMITER tidak dipakai di PHP — Laravel pakai unprepared() langsung
+        // DELIMITER tidak dipakai di PHP â€” Laravel pakai unprepared() langsung
         DB::unprepared("
 CREATE PROCEDURE sp_post_jurnal(
-    IN p_id_koperasi  BIGINT UNSIGNED,
+    IN p_id_entitas  BIGINT UNSIGNED,
     IN p_user_id      BIGINT UNSIGNED,
     IN p_json         JSON
 )
@@ -74,7 +74,7 @@ BEGIN
     DECLARE v_bulan         TINYINT  UNSIGNED;
 
     -- =========================================================
-    -- EXIT HANDLER: jika ada error SQL apapun → ROLLBACK
+    -- EXIT HANDLER: jika ada error SQL apapun â†’ ROLLBACK
     -- RESIGNAL: lempar ulang error ke pemanggil (Laravel)
     -- sehingga Laravel bisa catch exception-nya
     -- =========================================================
@@ -114,7 +114,7 @@ BEGIN
     --                      menjadi SQL NULL yang sesungguhnya
     -- =========================================================
     INSERT INTO jurnal_header (
-        id_koperasi,
+        id_entitas,
         no_jurnal,
         nomor_nota,
         tanggal_jurnal,
@@ -133,7 +133,7 @@ BEGIN
         posted_at,
         created_at
     ) VALUES (
-        p_id_koperasi,
+        p_id_entitas,
         JSON_UNQUOTE(JSON_EXTRACT(p_json, '$.no_jurnal')),
         NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p_json, '$.nomor_nota')),    'null'),
         JSON_UNQUOTE(JSON_EXTRACT(p_json, '$.tanggal_jurnal')),
@@ -192,7 +192,7 @@ BEGIN
         -- --- UPSERT buku_besar_periode ---
         -- Langkah 4a: ambil saldo_akhir bulan SEBELUMNYA sebagai saldo_awal
         -- Jika bulan pertama (1), ambil dari bulan 12 tahun sebelumnya.
-        -- Jika tidak ada data bulan lalu → default 0 (akun baru).
+        -- Jika tidak ada data bulan lalu â†’ default 0 (akun baru).
         SET v_saldo_awal_d = 0;
         SET v_saldo_awal_k = 0;
 
@@ -200,7 +200,7 @@ BEGIN
                IFNULL(saldo_akhir_kredit, 0)
         INTO   v_saldo_awal_d, v_saldo_awal_k
         FROM   buku_besar_periode
-        WHERE  id_koperasi   = p_id_koperasi
+        WHERE  id_entitas   = p_id_entitas
           AND  periode_tahun = IF(v_bulan = 1, v_tahun - 1, v_tahun)
           AND  periode_bulan = IF(v_bulan = 1, 12, v_bulan - 1)
           AND  kode_anak     = v_kode_anak
@@ -208,13 +208,13 @@ BEGIN
 
         -- Langkah 4b: UPSERT
         -- INSERT baru jika belum ada, UPDATE jika sudah ada.
-        -- ON DUPLICATE KEY pakai composite PK (id_koperasi, tahun, bulan, kode_anak).
+        -- ON DUPLICATE KEY pakai composite PK (id_entitas, tahun, bulan, kode_anak).
         --
         -- saldo_akhir_debet  = kumulatif sisi debet (saldo_awal_D + semua mutasi D)
         -- saldo_akhir_kredit = kumulatif sisi kredit (saldo_awal_K + semua mutasi K)
         -- Net saldo dihitung saat query laporan berdasarkan posisi_normal akun.
         INSERT INTO buku_besar_periode (
-            id_koperasi,
+            id_entitas,
             periode_tahun,
             periode_bulan,
             kode_anak,
@@ -226,7 +226,7 @@ BEGIN
             saldo_akhir_kredit,
             dihitung_pada
         ) VALUES (
-            p_id_koperasi,
+            p_id_entitas,
             v_tahun,
             v_bulan,
             v_kode_anak,
@@ -249,7 +249,7 @@ BEGIN
     END WHILE;
 
     -- =========================================================
-    -- COMMIT — semua berhasil, simpan permanen
+    -- COMMIT â€” semua berhasil, simpan permanen
     -- =========================================================
     COMMIT;
 
@@ -268,3 +268,4 @@ END
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_post_jurnal');
     }
 };
+
