@@ -13,7 +13,7 @@ class SesiSurvei extends Model
 
     protected $fillable = [
         'id_petugas', 'id_wilayah', 'tahun', 'bulan', 'tanggal_survei', 'status',
-        'catatan', 'id_perangkat', 'uuid_sesi_klien', 'token_publik', 'token_kadaluarsa',
+        'catatan', 'id_perangkat', 'uuid_sesi_klien', 'token_rt', 'token_masyarakat', 'token_produsen', 'token_kadaluarsa',
     ];
 
     protected function casts(): array
