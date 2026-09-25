@@ -144,16 +144,6 @@ class DataAwalSeeder extends Seeder
                 ['kode_akun' => '11121', 'is_default' => false, 'is_active' => true]
             );
 
-            DB::table('master_kas_bank')->updateOrInsert(
-                ['id_koperasi' => $koperasi->id_koperasi, 'jenis' => 'kas', 'nama' => 'Kas Demo'],
-                ['kode_akun' => '1111', 'is_default' => false, 'is_active' => true]
-            );
-
-            DB::table('master_kas_bank')->updateOrInsert(
-                ['id_koperasi' => $koperasi->id_koperasi, 'jenis' => 'bank', 'nama' => 'Bank Demo'],
-                ['kode_akun' => '11121', 'is_default' => false, 'is_active' => true]
-            );
-
             DB::table('master_pihak')->updateOrInsert(
                 ['id_entitas' => $entitas->id_entitas, 'nama' => 'Warga Contoh'],
                 [
