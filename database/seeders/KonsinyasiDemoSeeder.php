@@ -58,23 +58,23 @@ class KonsinyasiDemoSeeder extends Seeder
             ['faktor_ke_dasar' => 1, 'is_default_beli' => true, 'is_default_jual' => true]
         );
 
-        $koperasiA = DB::table('koperasi_desa')->where('kode_koperasi', 'KDMP-A')->first();
-        $koperasiB = DB::table('koperasi_desa')->where('kode_koperasi', 'KDMP-B')->first();
-        if (! $koperasiA || ! $koperasiB) {
+        $entitasA = DB::table('entitas')->where('kode_entitas', 'KDMP-A')->first();
+        $entitasB = DB::table('entitas')->where('kode_entitas', 'KDMP-B')->first();
+        if (! $entitasA || ! $entitasB) {
             $this->command?->warn('Koperasi demo belum tersedia. Jalankan db:seed terlebih dahulu.');
             return;
         }
 
-        $gudangA = DB::table('gudang')->where('id_koperasi', $koperasiA->id_koperasi)->where('kode_gudang', 'UTAMA')->first();
-        $gudangB = DB::table('gudang')->where('id_koperasi', $koperasiB->id_koperasi)->where('kode_gudang', 'UTAMA')->first();
+        $gudangA = DB::table('gudang')->where('id_entitas', $entitasA->id_entitas)->where('kode_gudang', 'UTAMA')->first();
+        $gudangB = DB::table('gudang')->where('id_entitas', $entitasB->id_entitas)->where('kode_gudang', 'UTAMA')->first();
         if (! $gudangA || ! $gudangB) {
             $this->command?->warn('Gudang demo belum tersedia. Jalankan db:seed terlebih dahulu.');
             return;
         }
 
-        foreach ([$koperasiA->id_koperasi, $koperasiB->id_koperasi] as $koperasiId) {
+        foreach ([$entitasA->id_entitas, $entitasB->id_entitas] as $entitasId) {
             DB::table('barang_per_koperasi')->updateOrInsert(
-                ['id_koperasi' => $koperasiId, 'id_barang' => $barangId],
+                ['id_entitas' => $entitasId, 'id_barang' => $barangId],
                 ['stok_minimum' => 0, 'stok_maksimum' => 1000, 'harga_jual_standar' => 13000, 'is_dijual' => true]
             );
         }
@@ -89,7 +89,7 @@ class KonsinyasiDemoSeeder extends Seeder
 
         if (! $sudahAda) {
             app(StokService::class)->masuk(
-                koperasiId: $koperasiA->id_koperasi,
+                entitasId: $entitasA->id_entitas,
                 gudangId: $gudangA->id_gudang,
                 barangId: $barangId,
                 qty: '100',
@@ -102,3 +102,6 @@ class KonsinyasiDemoSeeder extends Seeder
         $this->command?->info('Data demo konsinyasi siap: Desa A memiliki 100 kg beras @ Rp8.000.');
     }
 }
+
+
+

@@ -25,8 +25,9 @@ class Wilayah extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
-    public function koperasi()
+    public function entitas()
     {
-        return $this->hasOne(KoperasiDesa::class, 'id_wilayah');
+        return $this->hasOne(Entitas::class, 'id_wilayah');
     }
 }
+

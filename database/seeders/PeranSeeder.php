@@ -16,6 +16,7 @@ class PeranSeeder extends Seeder
             ['pembelian', 'Pembelian'],
             ['akuntan', 'Akuntan'],
             ['manajer', 'Manajer'],
+            ['super_admin', 'Super Admin'],
         ];
 
         foreach ($peran as [$kode, $nama]) {

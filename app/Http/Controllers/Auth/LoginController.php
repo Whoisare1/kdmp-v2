@@ -26,7 +26,19 @@ class LoginController extends Controller
             return back()->withErrors(['email' => 'Email atau kata sandi salah.'])->onlyInput('email');
         }
 
+        $user = Auth::user();
+
+        // Cek apakah akun aktif (disetujui admin)
+        if (!$user->is_active) {
+            Auth::logout();
+            return back()->withErrors(['email' => 'Akun Anda sedang menunggu persetujuan admin atau dinonaktifkan.'])->onlyInput('email');
+        }
+
         $request->session()->regenerate();
+
+        if ($user->id_entitas === null) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
 
         return redirect()->intended(route('dashboard'));
     }

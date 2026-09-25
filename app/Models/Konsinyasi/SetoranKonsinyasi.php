@@ -2,7 +2,7 @@
 
 namespace App\Models\Konsinyasi;
 
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Model;
 
 class SetoranKonsinyasi extends Model
@@ -12,7 +12,7 @@ class SetoranKonsinyasi extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'kode_setoran', 'id_koperasi_penyetor', 'id_koperasi_penerima_dana', 'tanggal',
+        'kode_setoran', 'id_entitas_penyetor', 'id_entitas_penerima_dana', 'tanggal',
         'total_nilai', 'id_kas_bank_penyetor', 'id_kas_bank_penerima',
         'status_posting', 'id_jurnal_penyetor', 'id_jurnal_penerima', 'catatan',
     ];
@@ -24,11 +24,12 @@ class SetoranKonsinyasi extends Model
 
     public function koperasiPenyetor()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi_penyetor', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas_penyetor', 'id_entitas');
     }
 
     public function koperasiPenerimaDana()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi_penerima_dana', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas_penerima_dana', 'id_entitas');
     }
 }
+

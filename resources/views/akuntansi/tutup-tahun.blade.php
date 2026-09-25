@@ -34,6 +34,11 @@
         </div>
     @endif
 
+    @if(isset($message))
+        <div class="mb-4 rounded border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            {{ $message }}
+        </div>
+    @else
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
 
         {{-- ===== Kolom Kiri: Pra-Kondisi & Preview Laba/Rugi ===== --}}
@@ -169,4 +174,5 @@
             </div>
         </div>
     </div>
+    @endif
 </x-layouts.app>

@@ -2,7 +2,7 @@
 
 namespace App\Models\Pembelian;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Gudang;
 use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
@@ -11,13 +11,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Pembelian extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'pembelian';
     protected $primaryKey = 'id_pembelian';
 
     protected $fillable = [
-        'id_koperasi', 'kode_pembelian', 'id_permintaan', 'id_pihak', 'id_unit_usaha',
+        'id_entitas', 'kode_pembelian', 'id_permintaan', 'id_pihak', 'id_unit_usaha',
         'id_gudang', 'tanggal_transaksi', 'jenis_pembayaran', 'id_kas_bank',
         'tgl_jatuh_tempo', 'total_pembelian', 'status', 'status_posting',
         'id_jurnal', 'created_by',
@@ -60,15 +60,5 @@ class Pembelian extends Model
     public function returs()
     {
         return $this->hasMany(ReturPembelian::class, 'id_pembelian', 'id_pembelian');
-    }
-
-    public function penerimaan()
-    {
-        return $this->hasMany(\App\Models\Gudang\PenerimaanBarang::class, 'id_pembelian', 'id_pembelian');
-    }
-
-    public function permintaan()
-    {
-        return $this->belongsTo(\App\Models\Perencanaan\PermintaanPengadaan::class, 'id_permintaan', 'id_permintaan');
     }
 }

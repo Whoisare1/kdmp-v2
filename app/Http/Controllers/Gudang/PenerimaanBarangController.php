@@ -88,7 +88,7 @@ class PenerimaanBarangController extends ModuleCrudController
         return DB::transaction(function () use ($data, $kodePenerimaan) {
             // Insert header penerimaan
             $header = PenerimaanBarang::query()->create([
-                'id_koperasi' => app()->bound('koperasi_aktif') ? app('koperasi_aktif') : null,
+                'id_entitas' => app()->bound('entitas_aktif') ? app('entitas_aktif') : null,
                 'id_gudang' => $data['id_gudang'],
                 'kode_penerimaan' => $kodePenerimaan,
                 'id_pembelian' => null,
@@ -125,7 +125,7 @@ class PenerimaanBarangController extends ModuleCrudController
 
                 // Update stok untuk item ini
                 $service->masuk(
-                    koperasiId: (int) ($header->id_koperasi ?? app('koperasi_aktif')),
+                    entitasId: (int) ($header->id_entitas ?? app('entitas_aktif')),
                     gudangId: (int) $data['id_gudang'],
                     barangId: (int) $item['id_barang'],
                     qty: $qty,
@@ -140,3 +140,6 @@ class PenerimaanBarangController extends ModuleCrudController
         });
     }
 }
+
+
+

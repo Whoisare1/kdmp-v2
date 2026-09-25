@@ -22,19 +22,19 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-700">Desa Pemilik</label>
-                        <select id="koperasiPemilik" name="id_koperasi_pemilik" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
+                        <select id="koperasiPemilik" name="id_entitas_pemilik" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
                             <option value="">Pilih desa pemilik</option>
-                            @foreach ($koperasi as $item)
-                                <option value="{{ $item->id_koperasi }}" {{ old('id_koperasi_pemilik') == $item->id_koperasi ? 'selected' : '' }}>{{ $item->nama_koperasi }}</option>
+                            @foreach ($entitas as $item)
+                                <option value="{{ $item->id_entitas }}" {{ old('id_entitas_pemilik') == $item->id_entitas ? 'selected' : '' }}>{{ $item->nama_entitas }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-700">Desa Penerima</label>
-                        <select id="koperasiPenerima" name="id_koperasi_penerima" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
+                        <select id="koperasiPenerima" name="id_entitas_penerima" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
                             <option value="">Pilih desa penerima</option>
-                            @foreach ($koperasi as $item)
-                                <option value="{{ $item->id_koperasi }}" {{ old('id_koperasi_penerima') == $item->id_koperasi ? 'selected' : '' }}>{{ $item->nama_koperasi }}</option>
+                            @foreach ($entitas as $item)
+                                <option value="{{ $item->id_entitas }}" {{ old('id_entitas_penerima') == $item->id_entitas ? 'selected' : '' }}>{{ $item->nama_entitas }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -115,9 +115,9 @@
         const oldGudangAsal = @json(old('id_gudang_asal'));
         const oldGudangTujuan = @json(old('id_gudang_tujuan'));
 
-        function isiGudang(select, koperasiId, placeholder, excludedId = null, selectedId = null) {
+        function isiGudang(select, entitasId, placeholder, excludedId = null, selectedId = null) {
             select.innerHTML = `<option value="">${placeholder}</option>`;
-            const pilihan = gudangData.filter(gudang => String(gudang.koperasi) === String(koperasiId) && String(gudang.id) !== String(excludedId));
+            const pilihan = gudangData.filter(gudang => String(gudang.koperasi) === String(entitasId) && String(gudang.id) !== String(excludedId));
 
             pilihan.forEach(gudang => {
                 const option = new Option(gudang.nama, gudang.id);
@@ -146,3 +146,6 @@
         filterGudang();
     </script>
 </x-layouts.app>
+
+
+

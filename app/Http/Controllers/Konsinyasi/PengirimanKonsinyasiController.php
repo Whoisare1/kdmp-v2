@@ -7,7 +7,7 @@ use App\Models\Master\Barang;
 use App\Models\Master\Gudang;
 use App\Models\Konsinyasi\PengirimanKonsinyasi;
 use App\Models\Konsinyasi\PengirimanKonsinyasiDetail;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use App\Services\KonsinyasiService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,12 +32,12 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             ->get();
 
         return view('konsinyasi.pengiriman.create', [
-            'koperasi' => KoperasiDesa::query()->where('is_active', true)->orderBy('nama_koperasi')->get(),
+            'koperasi' => Entitas::query()->where('is_active', true)->orderBy('nama_entitas')->get(),
             'gudang' => $gudang,
             'gudangData' => $gudang->map(function ($item) {
                 return [
                     'id' => $item->id_gudang,
-                    'koperasi' => $item->id_koperasi,
+                    'koperasi' => $item->id_entitas,
                     'nama' => $item->nama_gudang,
                 ];
             })->values(),
@@ -50,8 +50,8 @@ class PengirimanKonsinyasiController extends ModuleCrudController
     {
         $data = $request->validate([
             'kode_kiriman' => ['required', 'string', 'max:30', 'unique:pengiriman_konsinyasi,kode_kiriman'],
-            'id_koperasi_pemilik' => ['required', 'integer', 'exists:koperasi_desa,id_koperasi', 'different:id_koperasi_penerima'],
-            'id_koperasi_penerima' => ['required', 'integer', 'exists:koperasi_desa,id_koperasi'],
+            'id_entitas_pemilik' => ['required', 'integer', 'exists:entitas,id_entitas', 'different:id_entitas_penerima'],
+            'id_entitas_penerima' => ['required', 'integer', 'exists:entitas,id_entitas'],
             'id_gudang_asal' => ['required', 'integer', 'exists:gudang,id_gudang'],
             'id_gudang_tujuan' => ['required', 'integer', 'exists:gudang,id_gudang', 'different:id_gudang_asal'],
             'tgl_kirim' => ['required', 'date'],
@@ -67,7 +67,7 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             'items.*.harga_jual_saran' => ['nullable', 'numeric', 'gte:0'],
         ], [
             'id_gudang_tujuan.different' => 'Gudang tujuan harus berbeda dari gudang asal.',
-            'id_koperasi_pemilik.different' => 'Desa pemilik dan desa penerima harus berbeda.',
+            'id_entitas_pemilik.different' => 'Desa pemilik dan desa penerima harus berbeda.',
         ]);
 
         $gudang = Gudang::query()
@@ -76,19 +76,19 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             ->get()
             ->keyBy('id_gudang');
 
-        if ((int) $gudang[$data['id_gudang_asal']]->id_koperasi !== (int) $data['id_koperasi_pemilik']) {
+        if ((int) $gudang[$data['id_gudang_asal']]->id_entitas !== (int) $data['id_entitas_pemilik']) {
             return back()->withInput()->withErrors(['id_gudang_asal' => 'Gudang asal harus milik desa pemilik.']);
         }
 
-        if ((int) $gudang[$data['id_gudang_tujuan']]->id_koperasi !== (int) $data['id_koperasi_penerima']) {
+        if ((int) $gudang[$data['id_gudang_tujuan']]->id_entitas !== (int) $data['id_entitas_penerima']) {
             return back()->withInput()->withErrors(['id_gudang_tujuan' => 'Gudang tujuan harus milik desa penerima.']);
         }
 
         $idKiriman = DB::transaction(function () use ($data): int {
             $kiriman = PengirimanKonsinyasi::query()->create([
                 'kode_kiriman' => $data['kode_kiriman'],
-                'id_koperasi_pemilik' => $data['id_koperasi_pemilik'],
-                'id_koperasi_penerima' => $data['id_koperasi_penerima'],
+                'id_entitas_pemilik' => $data['id_entitas_pemilik'],
+                'id_entitas_penerima' => $data['id_entitas_penerima'],
                 'id_gudang_asal' => $data['id_gudang_asal'],
                 'id_gudang_tujuan' => $data['id_gudang_tujuan'],
                 'tgl_kirim' => $data['tgl_kirim'],
@@ -159,3 +159,4 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             ->with('warning', 'Halaman posting hanya diproses melalui tombol Posting Pengiriman.');
     }
 }
+

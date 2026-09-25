@@ -23,7 +23,7 @@
 
     <div class="mb-5 grid gap-4 md:grid-cols-2">
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-5"><p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Kode Kiriman</p><p class="mt-2 font-display text-xl font-semibold text-ink-900">{{ $item->kode_kiriman }}</p><p class="mt-1 text-sm text-ink-600">{{ $item->tgl_kirim?->format('d M Y') }}</p></div>
-        <div class="rounded-sm border border-paper-300 bg-paper-50 p-5"><dl class="grid grid-cols-2 gap-3 text-sm"><dt class="text-ink-600">Pemilik</dt><dd class="text-right font-medium text-ink-800">{{ $item->koperasiPemilik->nama_koperasi ?? '-' }}</dd><dt class="text-ink-600">Penerima</dt><dd class="text-right font-medium text-ink-800">{{ $item->koperasiPenerima->nama_koperasi ?? '-' }}</dd><dt class="text-ink-600">Status</dt><dd class="text-right font-medium text-sawah-600">{{ $item->status }}</dd><dt class="text-ink-600">Posting</dt><dd class="text-right font-medium text-ink-800">{{ $item->status_posting === 'T' ? 'Sudah diposting' : 'Draft' }}</dd></dl></div>
+        <div class="rounded-sm border border-paper-300 bg-paper-50 p-5"><dl class="grid grid-cols-2 gap-3 text-sm"><dt class="text-ink-600">Pemilik</dt><dd class="text-right font-medium text-ink-800">{{ $item->koperasiPemilik->nama_entitas ?? '-' }}</dd><dt class="text-ink-600">Penerima</dt><dd class="text-right font-medium text-ink-800">{{ $item->koperasiPenerima->nama_entitas ?? '-' }}</dd><dt class="text-ink-600">Status</dt><dd class="text-right font-medium text-sawah-600">{{ $item->status }}</dd><dt class="text-ink-600">Posting</dt><dd class="text-right font-medium text-ink-800">{{ $item->status_posting === 'T' ? 'Sudah diposting' : 'Draft' }}</dd></dl></div>
     </div>
 
     <div class="mb-5 rounded-sm border border-paper-300 bg-paper-50 p-5"><dl class="grid grid-cols-2 gap-3 text-sm md:grid-cols-4"><dt class="text-ink-600">Gudang asal</dt><dd class="font-medium text-ink-800">{{ $item->gudangAsal->nama_gudang ?? '-' }}</dd><dt class="text-ink-600">Gudang tujuan</dt><dd class="font-medium text-ink-800">{{ $item->gudangTujuan->nama_gudang ?? '-' }}</dd><dt class="text-ink-600">Model imbalan</dt><dd class="font-medium text-ink-800">{{ str_replace('_', ' ', $item->model_imbalan) }}</dd><dt class="text-ink-600">Batas titip</dt><dd class="font-medium text-ink-800">{{ $item->tgl_batas_titip?->format('d M Y') ?? '-' }}</dd></dl></div>
@@ -32,3 +32,4 @@
 
     @if ($item->catatan_pengiriman)<div class="mt-4 rounded-sm border border-paper-300 bg-paper-50 p-4 text-sm text-ink-700"><span class="font-medium">Catatan:</span> {{ $item->catatan_pengiriman }}</div>@endif
 </x-layouts.app>
+

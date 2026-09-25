@@ -6,14 +6,14 @@ use App\Exceptions\Finance\JurnalSudahDibalikException;
 use App\Exceptions\Finance\JurnalTidakBalanceException;
 use App\Exceptions\Finance\PeriodeTutupException;
 use App\Models\Akuntansi\JurnalHeader;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use App\Models\Tenant\PeriodeAkuntansi;
 use App\Services\Finance\JurnalService;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Tests\TestCase;
 
 /**
- * JurnalServiceTest — Unit test setiap skenario JurnalService.
+ * JurnalServiceTest â€” Unit test setiap skenario JurnalService.
  *
  * Fokus: postingManual() dan balik() karena tidak membutuhkan setup
  * master_detail_transaksi / master_transaksi (yang kompleks untuk disiapkan di test).
@@ -27,7 +27,7 @@ class JurnalServiceTest extends TestCase
     use DatabaseTruncation;
 
     private JurnalService $service;
-    private KoperasiDesa $koperasi;
+    private Entitas $entitas;
     private int $idKoperasi;
 
     protected function setUp(): void
@@ -36,16 +36,16 @@ class JurnalServiceTest extends TestCase
 
         $this->service = app(JurnalService::class);
 
-        // Buat wilayah dulu (required FK dari koperasi_desa)
+        // Buat wilayah dulu (required FK dari entitas)
         $sfx = uniqid();
         $idWilayah = \DB::table('wilayah')->insertGetId([
             'tingkat' => 'desa', 'nama' => 'Desa Test ' . $sfx, 'created_at' => now(),
         ]);
 
         // Buat koperasi dengan semua field wajib
-        $this->idKoperasi = \DB::table('koperasi_desa')->insertGetId([
-            'kode_koperasi'   => 'KT-' . $sfx,
-            'nama_koperasi'   => 'Koperasi Test',
+        $this->idKoperasi = \DB::table('entitas')->insertGetId([
+            'kode_entitas'   => 'KT-' . $sfx,
+            'nama_entitas'   => 'Koperasi Test',
             'id_wilayah'      => $idWilayah,
             'tahun_buku_awal' => 2026,
             'is_active'       => 1,
@@ -53,7 +53,7 @@ class JurnalServiceTest extends TestCase
         ]);
         app()->instance('koperasi_aktif', $this->idKoperasi);
 
-        // Insert COA minimal — kolom sesuai skema master_coa
+        // Insert COA minimal â€” kolom sesuai skema master_coa
         \DB::table('master_coa')->insertOrIgnore([
             [
                 'kode_anak'      => '111',
@@ -81,7 +81,7 @@ class JurnalServiceTest extends TestCase
 
         // Buka periode Agustus 2026
         \DB::table('periode_akuntansi')->insert([
-            'id_koperasi' => $this->idKoperasi,
+            'id_entitas' => $this->idKoperasi,
             'tahun'       => 2026,
             'bulan'       => 8,
             'status'      => 'OPEN',
@@ -89,12 +89,12 @@ class JurnalServiceTest extends TestCase
     }
 
     // =========================================================================
-    // TEST: postingManual() — skenario BERHASIL
+    // TEST: postingManual() â€” skenario BERHASIL
     // =========================================================================
 
     /**
      * @test
-     * postingManual() dengan Debet = Kredit → jurnal berhasil dibuat.
+     * postingManual() dengan Debet = Kredit â†’ jurnal berhasil dibuat.
      */
     public function posting_manual_berhasil_jika_debet_sama_dengan_kredit(): void
     {
@@ -114,16 +114,16 @@ class JurnalServiceTest extends TestCase
         $this->assertEquals('POSTED', $jurnal->status);
         $this->assertEquals(500000, $jurnal->total_debet);
         $this->assertEquals(500000, $jurnal->total_kredit);
-        $this->assertEquals($this->idKoperasi, $jurnal->id_koperasi);
+        $this->assertEquals($this->idKoperasi, $jurnal->id_entitas);
     }
 
     // =========================================================================
-    // TEST: postingManual() — Debet ≠ Kredit → Exception
+    // TEST: postingManual() â€” Debet â‰  Kredit â†’ Exception
     // =========================================================================
 
     /**
      * @test
-     * postingManual() dengan Debet ≠ Kredit → JurnalTidakBalanceException dilempar.
+     * postingManual() dengan Debet â‰  Kredit â†’ JurnalTidakBalanceException dilempar.
      */
     public function posting_manual_gagal_jika_debet_tidak_sama_kredit(): void
     {
@@ -137,23 +137,23 @@ class JurnalServiceTest extends TestCase
             ],
             baris: [
                 ['kode_anak' => '111', 'posisi' => 'D', 'nilai' => 500000],
-                ['kode_anak' => '411', 'posisi' => 'K', 'nilai' => 300000], // ← beda 200rb
+                ['kode_anak' => '411', 'posisi' => 'K', 'nilai' => 300000], // â† beda 200rb
             ]
         );
     }
 
     // =========================================================================
-    // TEST: postingManual() → PeriodeTutupException jika periode CLOSED
+    // TEST: postingManual() â†’ PeriodeTutupException jika periode CLOSED
     // =========================================================================
 
     /**
      * @test
-     * postingManual() ke periode yang sudah CLOSED → PeriodeTutupException.
+     * postingManual() ke periode yang sudah CLOSED â†’ PeriodeTutupException.
      */
     public function posting_manual_gagal_jika_periode_sudah_closed(): void
     {
         // Tutup periode Agustus 2026
-        PeriodeAkuntansi::where('id_koperasi', $this->idKoperasi)
+        PeriodeAkuntansi::where('id_entitas', $this->idKoperasi)
             ->where('tahun', 2026)
             ->where('bulan', 8)
             ->update(['status' => 'CLOSED']);
@@ -162,7 +162,7 @@ class JurnalServiceTest extends TestCase
 
         $this->service->postingManual(
             header: [
-                'tanggal_jurnal' => '2026-08-15', // ← tanggal di periode CLOSED
+                'tanggal_jurnal' => '2026-08-15', // â† tanggal di periode CLOSED
                 'jenis_jurnal'   => 'MANUAL',
                 'keterangan'     => 'Test periode tutup',
             ],
@@ -174,12 +174,12 @@ class JurnalServiceTest extends TestCase
     }
 
     // =========================================================================
-    // TEST: balik() — jurnal yang sudah REVERSED tidak bisa dibalik lagi
+    // TEST: balik() â€” jurnal yang sudah REVERSED tidak bisa dibalik lagi
     // =========================================================================
 
     /**
      * @test
-     * balik() jurnal yang sudah berstatus REVERSED → JurnalSudahDibalikException.
+     * balik() jurnal yang sudah berstatus REVERSED â†’ JurnalSudahDibalikException.
      */
     public function balik_gagal_jika_jurnal_sudah_pernah_dibalik(): void
     {
@@ -196,22 +196,22 @@ class JurnalServiceTest extends TestCase
             ]
         );
 
-        // Balik pertama kali → berhasil
+        // Balik pertama kali â†’ berhasil
         $this->service->balik($jurnal->id_jurnal, 'Balik pertama');
 
-        // Balik kedua kali → Exception
+        // Balik kedua kali â†’ Exception
         $this->expectException(JurnalSudahDibalikException::class);
 
-        $this->service->balik($jurnal->id_jurnal, 'Coba balik lagi — harus ditolak');
+        $this->service->balik($jurnal->id_jurnal, 'Coba balik lagi â€” harus ditolak');
     }
 
     // =========================================================================
-    // TEST: balik() — jurnal valid bisa dibalik
+    // TEST: balik() â€” jurnal valid bisa dibalik
     // =========================================================================
 
     /**
      * @test
-     * balik() pada jurnal POSTED → membuat jurnal pembalik baru.
+     * balik() pada jurnal POSTED â†’ membuat jurnal pembalik baru.
      */
     public function balik_berhasil_membuat_jurnal_pembalik(): void
     {
@@ -241,12 +241,12 @@ class JurnalServiceTest extends TestCase
     }
 
     // =========================================================================
-    // TEST: Idempoten — posting dua kali dengan source_id sama → Exception unik
+    // TEST: Idempoten â€” posting dua kali dengan source_id sama â†’ Exception unik
     // =========================================================================
 
     /**
      * @test
-     * Posting dengan source_type + source_id yang sama dua kali → UniqueConstraintViolationException
+     * Posting dengan source_type + source_id yang sama dua kali â†’ UniqueConstraintViolationException
      * (diproteksi oleh unique constraint 'jurnal_idempoten' di tabel jurnal_header).
      */
     public function posting_dua_kali_dengan_source_sama_ditolak(): void
@@ -263,11 +263,13 @@ class JurnalServiceTest extends TestCase
             ['kode_anak' => '411', 'posisi' => 'K', 'nilai' => 75000],
         ];
 
-        // Posting pertama → berhasil
+        // Posting pertama â†’ berhasil
         $this->service->postingManual($params, $baris);
 
-        // Posting kedua dengan source_id sama → harus ditolak
+        // Posting kedua dengan source_id sama â†’ harus ditolak
         $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
         $this->service->postingManual($params, $baris);
     }
 }
+
+

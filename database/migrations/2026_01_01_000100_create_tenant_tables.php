@@ -19,41 +19,43 @@ return new class extends Migration
             $t->timestamps();
         });
 
-        Schema::create('koperasi_desa', function (Blueprint $t) {
-            $t->id('id_koperasi');
-            $t->string('kode_koperasi', 20)->unique();
-            $t->string('nama_koperasi', 150);
+        Schema::create('entitas', function (Blueprint $t) {
+            $t->id('id_entitas');
+            $t->string('kode_entitas', 20)->unique();
+            $t->string('nama_entitas', 150);
+            $t->enum('jenis_entitas', ['BUMDes', 'Koperasi Desa', 'Kelompok Tani', 'Gapoktan', 'Perorangan', 'Lainnya'])->default('Lainnya');
             $t->foreignId('id_wilayah')->unique()->constrained('wilayah');
             $t->string('badan_hukum_no', 50)->nullable();
             $t->date('tgl_berdiri')->nullable();
             $t->year('tahun_buku_awal');
             $t->boolean('is_active')->default(true);
+            $t->enum('status', ['PENDING', 'APPROVED', 'REJECTED'])->default('PENDING');
             $t->timestamps();
         });
 
         // Bulan 13 = periode penyesuaian, dipakai untuk tutup buku Jan-Mar tahun N+1
         Schema::create('periode_akuntansi', function (Blueprint $t) {
             $t->id('id_periode');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->year('tahun');
             $t->unsignedTinyInteger('bulan');
             $t->enum('status', ['OPEN', 'CLOSED', 'LOCKED'])->default('OPEN');
             $t->dateTime('tgl_tutup')->nullable();
             $t->unsignedBigInteger('ditutup_oleh')->nullable();
-            $t->unique(['id_koperasi', 'tahun', 'bulan']);
+            $t->unique(['id_entitas', 'tahun', 'bulan']);
         });
 
         Schema::create('konfigurasi', function (Blueprint $t) {
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kunci', 50);
             $t->string('nilai');
             $t->string('keterangan')->nullable();
-            $t->primary(['id_koperasi', 'kunci']);
+            $t->primary(['id_entitas', 'kunci']);
         });
 
         Schema::create('pengguna', function (Blueprint $t) {
             $t->id();
-            $t->foreignId('id_koperasi')->nullable()->constrained('koperasi_desa', 'id_koperasi')
+            $t->foreignId('id_entitas')->nullable()->constrained('entitas', 'id_entitas')
               ->comment('NULL = pengguna tingkat pusat/pengawas');
             $t->string('nama');
             $t->string('email')->unique();
@@ -78,7 +80,7 @@ return new class extends Migration
 
         Schema::create('audit_log', function (Blueprint $t) {
             $t->id('id_log');
-            $t->unsignedBigInteger('id_koperasi')->nullable();
+            $t->unsignedBigInteger('id_entitas')->nullable();
             $t->unsignedBigInteger('id_pengguna')->nullable();
             $t->string('tabel', 50);
             $t->unsignedBigInteger('record_id');
@@ -99,7 +101,8 @@ return new class extends Migration
         Schema::dropIfExists('pengguna');
         Schema::dropIfExists('konfigurasi');
         Schema::dropIfExists('periode_akuntansi');
-        Schema::dropIfExists('koperasi_desa');
+        Schema::dropIfExists('entitas');
         Schema::dropIfExists('wilayah');
     }
 };
+

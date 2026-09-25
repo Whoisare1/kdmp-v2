@@ -64,12 +64,12 @@ return new class extends Migration
 
         Schema::create('config_shu', function (Blueprint $t) {
             $t->id('id_config');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->year('tahun');
             $t->string('pos', 50);
             $t->decimal('persentase', 5, 2);
             $t->string('kode_akun', 10);
-            $t->unique(['id_koperasi', 'tahun', 'pos']);
+            $t->unique(['id_entitas', 'tahun', 'pos']);
             $t->foreign('kode_akun')->references('kode_anak')->on('master_coa');
         });
     }
@@ -82,3 +82,4 @@ return new class extends Migration
         Schema::dropIfExists('master_coa');
     }
 };
+

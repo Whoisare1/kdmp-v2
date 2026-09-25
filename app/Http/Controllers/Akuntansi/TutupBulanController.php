@@ -34,6 +34,18 @@ class TutupBulanController extends Controller
             $tahun = now()->subYear()->year;
         }
 
+        $idEntitas = app('entitas_aktif');
+
+        if ($idEntitas === null) {
+            return view('akuntansi.tutup-bulan', [
+                'tahun' => $tahun,
+                'bulan' => $bulan,
+                'validasi' => [],
+                'semuaLulus' => false,
+                'message' => 'Harap pilih Entitas terlebih dahulu di pengaturan atas untuk melakukan Tutup Bulan.'
+            ]);
+        }
+
         $validasi = $this->service->cekValidasi($tahun, $bulan);
         $semuaLulus = collect($validasi)->every(fn($v) => $v['lulus']);
 
@@ -52,6 +64,11 @@ class TutupBulanController extends Controller
 
         $tahun = (int) $request->input('tahun');
         $bulan = (int) $request->input('bulan');
+
+        $idEntitas = app('entitas_aktif');
+        if ($idEntitas === null) {
+            return back()->with('error', 'Harap pilih Entitas terlebih dahulu untuk melakukan eksekusi Tutup Bulan.');
+        }
 
         try {
             $periode = $this->service->tutupBulan($tahun, $bulan);

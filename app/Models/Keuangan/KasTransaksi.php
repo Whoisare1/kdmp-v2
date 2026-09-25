@@ -2,20 +2,20 @@
 
 namespace App\Models\Keuangan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\KasBank;
 use Illuminate\Database\Eloquent\Model;
 
 class KasTransaksi extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'kas_transaksi';
     protected $primaryKey = 'id_kas_trx';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'kode_trx', 'tanggal', 'jenis', 'id_kas_bank',
+        'id_entitas', 'kode_trx', 'tanggal', 'jenis', 'id_kas_bank',
         'id_kas_bank_tujuan', 'kode_akun_lawan', 'nilai', 'keterangan',
         'status_posting', 'id_jurnal', 'created_by',
     ];
@@ -30,3 +30,4 @@ class KasTransaksi extends Model
         return $this->belongsTo(KasBank::class, 'id_kas_bank', 'id_kas_bank');
     }
 }
+

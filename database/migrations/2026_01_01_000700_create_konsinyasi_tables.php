@@ -21,7 +21,7 @@ return new class extends Migration
         // Marketplace pencocokan surplus-defisit antar desa
         Schema::create('permintaan_barter', function (Blueprint $t) {
             $t->id();
-            $t->foreignId('id_koperasi_pemohon')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas_pemohon')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_pemohon')->constrained('pengguna');
             $t->foreignId('id_barang')->constrained('master_barang', 'id_barang');
             $t->decimal('qty_diminta_dasar', 18, 4);
@@ -34,7 +34,7 @@ return new class extends Migration
         Schema::create('penawaran_barter', function (Blueprint $t) {
             $t->id();
             $t->foreignId('id_permintaan_barter')->constrained('permintaan_barter');
-            $t->foreignId('id_koperasi_penawar')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas_penawar')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_penawar')->constrained('pengguna');
             $t->decimal('qty_ditawarkan_dasar', 18, 4);
             $t->decimal('harga_titip_satuan', 18, 2);
@@ -51,8 +51,8 @@ return new class extends Migration
             $t->id('id_kiriman');
             $t->string('kode_kiriman', 30)->unique();
             $t->foreignId('id_penawaran_barter')->nullable()->constrained('penawaran_barter');
-            $t->foreignId('id_koperasi_pemilik')->constrained('koperasi_desa', 'id_koperasi');
-            $t->foreignId('id_koperasi_penerima')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas_pemilik')->constrained('entitas', 'id_entitas');
+            $t->foreignId('id_entitas_penerima')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_gudang_asal')->constrained('gudang', 'id_gudang');
             $t->foreignId('id_gudang_tujuan')->constrained('gudang', 'id_gudang');
             $t->date('tgl_kirim');
@@ -103,8 +103,8 @@ return new class extends Migration
         Schema::create('stok_konsinyasi', function (Blueprint $t) {
             $t->id('id_stok_konsinyasi');
             $t->foreignId('id_kiriman')->constrained('pengiriman_konsinyasi', 'id_kiriman');
-            $t->foreignId('id_koperasi_pemilik')->constrained('koperasi_desa', 'id_koperasi');
-            $t->foreignId('id_koperasi_penerima')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas_pemilik')->constrained('entitas', 'id_entitas');
+            $t->foreignId('id_entitas_penerima')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_gudang_penerima')->constrained('gudang', 'id_gudang');
             $t->foreignId('id_barang')->constrained('master_barang', 'id_barang');
             $t->decimal('qty_titip', 18, 4);
@@ -117,8 +117,8 @@ return new class extends Migration
             $t->decimal('hpp_pemilik', 18, 4);
             $t->enum('status', ['aktif', 'habis', 'dikembalikan'])->default('aktif');
             $t->timestamps();
-            $t->index(['id_koperasi_penerima', 'id_barang', 'status'], 'stokkon_pos_lookup');
-            $t->index(['id_koperasi_pemilik', 'status'], 'stokkon_pemilik_lookup');
+            $t->index(['id_entitas_penerima', 'id_barang', 'status'], 'stokkon_pos_lookup');
+            $t->index(['id_entitas_pemilik', 'status'], 'stokkon_pemilik_lookup');
         });
 
         // Kartu mutasi titipan. Setara kartu_stok, tapi untuk barang orang lain.
@@ -143,8 +143,8 @@ return new class extends Migration
         Schema::create('setoran_konsinyasi', function (Blueprint $t) {
             $t->id('id_setoran');
             $t->string('kode_setoran', 30)->unique();
-            $t->foreignId('id_koperasi_penyetor')->constrained('koperasi_desa', 'id_koperasi');
-            $t->foreignId('id_koperasi_penerima_dana')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas_penyetor')->constrained('entitas', 'id_entitas');
+            $t->foreignId('id_entitas_penerima_dana')->constrained('entitas', 'id_entitas');
             $t->date('tanggal');
             $t->decimal('total_nilai', 18, 2);
             $t->foreignId('id_kas_bank_penyetor')->constrained('master_kas_bank', 'id_kas_bank');
@@ -177,3 +177,4 @@ return new class extends Migration
         }
     }
 };
+

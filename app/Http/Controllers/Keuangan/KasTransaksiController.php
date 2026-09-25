@@ -17,16 +17,16 @@ class KasTransaksiController extends Controller
 {
     public function index(Request $request): View
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
         // Ambil list semua Kas/Bank yang aktif
-        $kasBanks = KasBank::where('id_koperasi', $idKoperasi)
+        $kasBanks = KasBank::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->where('is_active', 1)
             ->get();
 
         // Hitung saldo realtime dari v_saldo_berjalan (akumulasi semua periode)
         $saldoKas = DB::table('v_saldo_berjalan')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->whereIn('kode_anak', $kasBanks->pluck('kode_akun'))
             ->selectRaw('kode_anak, SUM(saldo_normal) as total_saldo')
             ->groupBy('kode_anak')
@@ -34,7 +34,7 @@ class KasTransaksiController extends Controller
             ->keyBy('kode_anak');
 
         // Siapkan data items untuk tabel riwayat
-        $query = KasTransaksi::with(['kasBank'])->where('id_koperasi', $idKoperasi);
+        $query = KasTransaksi::with(['kasBank'])->when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas));
 
         if ($search = $request->query('q')) {
             $query->where(function ($q) use ($search) {
@@ -50,8 +50,8 @@ class KasTransaksiController extends Controller
 
     public function create(): View
     {
-        $idKoperasi = app('koperasi_aktif');
-        $kasBanks = KasBank::where('id_koperasi', $idKoperasi)->where('is_active', 1)->get();
+        $idEntitas = app('entitas_aktif');
+        $kasBanks = KasBank::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))->where('is_active', 1)->get();
         // Ambil akun untuk lawan (selain header dan grup kas)
         $akunLawan = Coa::where('is_transaction', 1)
             ->where('is_active', 1)
@@ -63,7 +63,7 @@ class KasTransaksiController extends Controller
 
     public function store(StoreKasTransaksiRequest $request, JurnalService $jurnalService): RedirectResponse
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
         $validated = $request->validated();
         
         $jenis = $validated['jenis'];
@@ -74,7 +74,7 @@ class KasTransaksiController extends Controller
         
         // Buat record KasTransaksi
         $kasTrx = new KasTransaksi();
-        $kasTrx->id_koperasi = $idKoperasi;
+        $kasTrx->id_entitas = $idEntitas;
         $kasTrx->tanggal = $validated['tanggal'];
         $kasTrx->jenis = $jenis;
         $kasTrx->id_kas_bank = $kasBank->id_kas_bank;
@@ -113,7 +113,7 @@ class KasTransaksiController extends Controller
         }
 
         // Generate kode_trx
-        $countTrx = KasTransaksi::where('id_koperasi', $idKoperasi)
+        $countTrx = KasTransaksi::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->whereMonth('tanggal', date('m', strtotime($validated['tanggal'])))
             ->whereYear('tanggal', date('Y', strtotime($validated['tanggal'])))
             ->where('kode_trx', 'like', $kodeTrxPrefix . '%')
@@ -152,3 +152,6 @@ class KasTransaksiController extends Controller
         }
     }
 }
+
+
+

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * TutupBulanService — Melaksanakan proses "Soft-Close" satu periode bulan.
+ * TutupBulanService Ã¢â‚¬â€ Melaksanakan proses "Soft-Close" satu periode bulan.
  *
  * KONSEP:
  *   Tutup Bulan bukan berarti menghapus atau membekukan sistem.
@@ -34,7 +34,7 @@ class TutupBulanService
     public function __construct(private JurnalService $jurnalService) {}
 
     // =========================================================================
-    // METHOD PUBLIK: cekValidasi() — dipakai Controller untuk menampilkan status
+    // METHOD PUBLIK: cekValidasi() Ã¢â‚¬â€ dipakai Controller untuk menampilkan status
     // =========================================================================
 
     /**
@@ -49,41 +49,41 @@ class TutupBulanService
      */
     public function cekValidasi(int $tahun, int $bulan): array
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
         return [
-            $this->cek1TidakAdaDraft($idKoperasi, $tahun, $bulan),
-            $this->cek2TotalBalance($idKoperasi, $tahun, $bulan),
-            $this->cek3SaldoKasBank($idKoperasi, $tahun, $bulan),
-            $this->cek4SaldoPersediaan($idKoperasi, $tahun, $bulan),
-            $this->cek5SaldoPiutang($idKoperasi, $tahun, $bulan),
-            $this->cek6SaldoHutang($idKoperasi, $tahun, $bulan),
-            $this->cek7SaldoPersediaanKonsinyasi($idKoperasi, $tahun, $bulan),
-            $this->cek8RekonsiliasiKonsinyasi($idKoperasi),
+            $this->cek1TidakAdaDraft($idEntitas, $tahun, $bulan),
+            $this->cek2TotalBalance($idEntitas, $tahun, $bulan),
+            $this->cek3SaldoKasBank($idEntitas, $tahun, $bulan),
+            $this->cek4SaldoPersediaan($idEntitas, $tahun, $bulan),
+            $this->cek5SaldoPiutang($idEntitas, $tahun, $bulan),
+            $this->cek6SaldoHutang($idEntitas, $tahun, $bulan),
+            $this->cek7SaldoPersediaanKonsinyasi($idEntitas, $tahun, $bulan),
+            $this->cek8RekonsiliasiKonsinyasi($idEntitas),
         ];
     }
 
     // =========================================================================
-    // METHOD PUBLIK: tutupBulan() — eksekusi tutup bulan jika semua validasi lulus
+    // METHOD PUBLIK: tutupBulan() Ã¢â‚¬â€ eksekusi tutup bulan jika semua validasi lulus
     // =========================================================================
 
     /**
      * Tutup periode bulan secara resmi.
      *
      * Alur:
-     *   1. Jalankan semua 8 validasi — lempar exception jika ada yang gagal.
+     *   1. Jalankan semua 8 validasi Ã¢â‚¬â€ lempar exception jika ada yang gagal.
      *   2. Panggil JurnalService::bangunBukuBesar() untuk snapshot saldo final.
-     *   3. Upsert baris periode_akuntansi → status = CLOSED.
+     *   3. Upsert baris periode_akuntansi Ã¢â€ â€™ status = CLOSED.
      *
      * @throws \RuntimeException  jika ada validasi yang gagal
      * @throws \LogicException    jika periode sudah CLOSED atau LOCKED
      */
     public function tutupBulan(int $tahun, int $bulan): PeriodeAkuntansi
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
         // --- Cek apakah periode sudah ditutup ---
-        $periode = PeriodeAkuntansi::where('id_koperasi', $idKoperasi)
+        $periode = PeriodeAkuntansi::where('id_entitas', $idEntitas)
             ->where('tahun', $tahun)
             ->where('bulan', $bulan)
             ->first();
@@ -108,10 +108,10 @@ class TutupBulanService
         // --- Rebuild buku besar untuk snapshot saldo final ---
         $this->jurnalService->bangunBukuBesar($tahun, $bulan);
 
-        // --- Kunci periode → CLOSED ---
+        // --- Kunci periode Ã¢â€ â€™ CLOSED ---
         $periode = PeriodeAkuntansi::updateOrCreate(
             [
-                'id_koperasi' => $idKoperasi,
+                'id_entitas' => $idEntitas,
                 'tahun'       => $tahun,
                 'bulan'       => $bulan,
             ],
@@ -126,13 +126,13 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 1 — Tidak ada jurnal berstatus DRAFT
+    // VALIDASI 1 Ã¢â‚¬â€ Tidak ada jurnal berstatus DRAFT
     // =========================================================================
 
-    private function cek1TidakAdaDraft(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek1TidakAdaDraft(int $idEntitas, int $tahun, int $bulan): array
     {
         $jumlah = DB::table('jurnal_header')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->where('periode_tahun', $tahun)
             ->where('periode_bulan', $bulan)
             ->where('status', 'DRAFT')
@@ -147,13 +147,13 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 2 — Total Debet = Total Kredit (balance check seluruh periode)
+    // VALIDASI 2 Ã¢â‚¬â€ Total Debet = Total Kredit (balance check seluruh periode)
     // =========================================================================
 
-    private function cek2TotalBalance(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek2TotalBalance(int $idEntitas, int $tahun, int $bulan): array
     {
         $totals = DB::table('jurnal_header')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->where('periode_tahun', $tahun)
             ->where('periode_bulan', $bulan)
             ->where('status', 'POSTED')
@@ -174,17 +174,17 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 3 — Saldo Kas/Bank di Buku Besar sesuai kelompok Aktiva
+    // VALIDASI 3 Ã¢â‚¬â€ Saldo Kas/Bank di Buku Besar sesuai kelompok Aktiva
     // (Validasi sederhana: pastikan saldo tidak negatif)
     // =========================================================================
 
-    private function cek3SaldoKasBank(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek3SaldoKasBank(int $idEntitas, int $tahun, int $bulan): array
     {
         // Ambil semua akun Kas/Bank (kode_induk biasanya 111x)
         // Saldo negatif pada akun bertipe Debit = anomali
         $akunNegatif = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->where('c.kelompok', 'Aktiva')
@@ -208,15 +208,15 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 4 — Saldo Persediaan (BB) ≈ nilai fisik stok gudang
-    // (Pendekatan: pastikan keduanya tidak selisih > 0 — rekonsiliasi otomatis)
+    // VALIDASI 4 Ã¢â‚¬â€ Saldo Persediaan (BB) Ã¢â€°Ë† nilai fisik stok gudang
+    // (Pendekatan: pastikan keduanya tidak selisih > 0 Ã¢â‚¬â€ rekonsiliasi otomatis)
     // =========================================================================
 
-    private function cek4SaldoPersediaan(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek4SaldoPersediaan(int $idEntitas, int $tahun, int $bulan): array
     {
         // Total nilai persediaan dari buku besar (akun 112x)
         $saldoBB = DB::table('buku_besar_periode as bbp')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->whereIn('bbp.kode_anak', function ($q) {
@@ -227,12 +227,12 @@ class TutupBulanService
             ->sum(DB::raw('bbp.saldo_akhir_debet - bbp.saldo_akhir_kredit'));
 
         // Total nilai fisik stok dari tabel stok.
-        // Tabel stok PK = (id_gudang, id_barang) — tidak ada id_koperasi.
+        // Tabel stok PK = (id_gudang, id_barang) Ã¢â‚¬â€ tidak ada id_entitas.
         // Filter koperasi via join ke tabel gudang.
-        // Kolom nilai_persediaan sudah berisi qty_on_hand × hpp_rata2 (dikelola oleh modul gudang).
+        // Kolom nilai_persediaan sudah berisi qty_on_hand Ãƒâ€” hpp_rata2 (dikelola oleh modul gudang).
         $saldoFisik = DB::table('stok as s')
             ->join('gudang as g', 'g.id_gudang', '=', 's.id_gudang')
-            ->where('g.id_koperasi', $idKoperasi)
+            ->where('g.id_entitas', $idEntitas)
             ->sum('s.nilai_persediaan');
 
         $selisih = abs((float) $saldoBB - (float) $saldoFisik);
@@ -242,7 +242,7 @@ class TutupBulanService
 
         return [
             'no'     => 4,
-            'label'  => 'Saldo Persediaan (Buku Besar) ≈ nilai fisik stok',
+            'label'  => 'Saldo Persediaan (Buku Besar) Ã¢â€°Ë† nilai fisik stok',
             'lulus'  => $lulus,
             'detail' => !$lulus
                 ? sprintf('BB: %s | Fisik: %s | Selisih: %s',
@@ -254,14 +254,14 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 5 — Saldo Piutang (BB) = total sisa piutang (buku pembantu)
+    // VALIDASI 5 Ã¢â‚¬â€ Saldo Piutang (BB) = total sisa piutang (buku pembantu)
     // =========================================================================
 
-    private function cek5SaldoPiutang(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek5SaldoPiutang(int $idEntitas, int $tahun, int $bulan): array
     {
         // Saldo piutang dari buku besar (akun 113x)
         $saldoBB = DB::table('buku_besar_periode as bbp')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->whereIn('bbp.kode_anak', function ($q) {
@@ -274,7 +274,7 @@ class TutupBulanService
         // Total sisa piutang dari buku pembantu
         // Status: 'belum_lunas' atau 'sebagian' (bukan 'OPEN'/'PARTIAL')
         $saldoPembantu = DB::table('piutang')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->whereIn('status', ['belum_lunas', 'sebagian'])
             ->sum(DB::raw('nilai_awal - nilai_terbayar'));
 
@@ -295,14 +295,14 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 6 — Saldo Hutang (BB) = total sisa hutang (buku pembantu)
+    // VALIDASI 6 Ã¢â‚¬â€ Saldo Hutang (BB) = total sisa hutang (buku pembantu)
     // =========================================================================
 
-    private function cek6SaldoHutang(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek6SaldoHutang(int $idEntitas, int $tahun, int $bulan): array
     {
         // Saldo hutang dari buku besar (akun 211x dan 212x)
         $saldoBB = DB::table('buku_besar_periode as bbp')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->whereIn('bbp.kode_anak', function ($q) {
@@ -318,7 +318,7 @@ class TutupBulanService
         // Total sisa hutang dari buku pembantu
         // Status: 'belum_lunas' atau 'sebagian' (bukan 'OPEN'/'PARTIAL')
         $saldoPembantu = DB::table('hutang')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->whereIn('status', ['belum_lunas', 'sebagian'])
             ->sum(DB::raw('nilai_awal - nilai_terbayar'));
 
@@ -339,15 +339,15 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 7 — Saldo Persediaan Konsinyasi (BB) = nilai stok titipan
+    // VALIDASI 7 Ã¢â‚¬â€ Saldo Persediaan Konsinyasi (BB) = nilai stok titipan
     // =========================================================================
 
-    private function cek7SaldoPersediaanKonsinyasi(int $idKoperasi, int $tahun, int $bulan): array
+    private function cek7SaldoPersediaanKonsinyasi(int $idEntitas, int $tahun, int $bulan): array
     {
         // Akun persediaan konsinyasi biasanya 113x (piutang konsinyasi)
         // atau akun khusus yang sudah diset di COA
         $saldoBB = DB::table('buku_besar_periode as bbp')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->where('bbp.periode_bulan', $bulan)
             ->whereIn('bbp.kode_anak', function ($q) {
@@ -358,11 +358,11 @@ class TutupBulanService
             ->sum(DB::raw('bbp.saldo_akhir_debet - bbp.saldo_akhir_kredit'));
 
         // Nilai stok konsinyasi yang masih aktif di gudang koperasi ini (sebagai penerima).
-        // stok_konsinyasi punya id_koperasi_penerima, qty_sisa, dan harga_titip_satuan —
-        // nilai per unit sudah disnapsot saat pengiriman, tidak perlu join barang_per_koperasi.
+        // stok_konsinyasi punya id_entitas_penerima, qty_sisa, dan harga_titip_satuan Ã¢â‚¬â€
+        // nilai per unit sudah disnapsot saat pengiriman, tidak perlu join barang_per_entitas.
         // Status lowercase: 'aktif' (bukan 'AKTIF'/'PARTIAL').
         $nilaiKonsinyasi = DB::table('stok_konsinyasi as sk')
-            ->where('sk.id_koperasi_penerima', $idKoperasi)
+            ->where('sk.id_entitas_penerima', $idEntitas)
             ->where('sk.status', 'aktif')
             ->whereRaw('sk.qty_sisa > 0')
             ->sum(DB::raw('sk.qty_sisa * sk.harga_titip_satuan'));
@@ -384,18 +384,18 @@ class TutupBulanService
     }
 
     // =========================================================================
-    // VALIDASI 8 — Rekonsiliasi konsinyasi: piutang pemilik = hutang penerima
+    // VALIDASI 8 Ã¢â‚¬â€ Rekonsiliasi konsinyasi: piutang pemilik = hutang penerima
     // Sumber: view v_rekonsiliasi_konsinyasi (hanya menampilkan baris berselisih)
     // =========================================================================
 
-    private function cek8RekonsiliasiKonsinyasi(int $idKoperasi): array
+    private function cek8RekonsiliasiKonsinyasi(int $idEntitas): array
     {
         // View ini sudah difilter: WHERE selisih <> 0
         // Kita cukup ambil baris yang melibatkan koperasi ini (sebagai pemilik ATAU penerima)
         $jumlahSelisih = DB::table('v_rekonsiliasi_konsinyasi')
-            ->where(function ($q) use ($idKoperasi) {
-                $q->where('id_koperasi_pemilik', $idKoperasi)
-                  ->orWhere('id_koperasi_penerima', $idKoperasi);
+            ->where(function ($q) use ($idEntitas) {
+                $q->where('id_entitas_pemilik', $idEntitas)
+                  ->orWhere('id_entitas_penerima', $idEntitas);
             })
             ->count();
 
@@ -409,3 +409,6 @@ class TutupBulanService
         ];
     }
 }
+
+
+

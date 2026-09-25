@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -13,7 +13,7 @@ class Pengguna extends Authenticatable
     protected $table = 'pengguna';
 
     protected $fillable = [
-        'id_koperasi', 'nama', 'email', 'password', 'is_active',
+        'id_entitas', 'nama', 'email', 'password', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -28,9 +28,9 @@ class Pengguna extends Authenticatable
     }
 
     /** NULL = pengguna tingkat pusat/pengawas, bukan milik satu desa. */
-    public function koperasi()
+    public function entitas()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas', 'id_entitas');
     }
 
     public function peran()
@@ -43,3 +43,4 @@ class Pengguna extends Authenticatable
         return $this->peran->contains('kode', $kode);
     }
 }
+

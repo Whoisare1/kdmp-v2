@@ -1,40 +1,41 @@
 # KDMP — Kerangka (Rebuild)
 
 Kerangka Laravel 12 dibangun ulang dari sistem KDMP asli. Skema database
-**sama persis** dengan versi lama (12 migrasi disalin apa adanya, termasuk
-trigger & view khusus MySQL di tabel jurnal). Model, controller, routing,
-dan UI sudah lengkap untuk sembilan modul — tapi **logika bisnis belum
-diisi**: mesin jurnal, HPP moving average, tutup buku, dsb. sengaja
-dikosongkan dan menyusul saat pendalaman tiap modul, dimulai dari
-**Keuangan & Akuntansi**.
+**sama persis** dengan versi lama (16 migrasi, termasuk trigger & view
+khusus MySQL di tabel jurnal). Model, controller, routing, UI, dan seluruh
+service bisnis sudah diimplementasi untuk semua modul.
 
 ## Yang sudah ada
 
-- **Skema database identik** — 12 file migrasi di `database/migrations/`
+- **Skema database** — 16 file migrasi di `database/migrations/`
 - **66 model Eloquent**, terorganisir per modul di `app/Models/`
-- **50 controller**, sebagian besar lewat satu base class
-  `App\Http\Controllers\Concerns\ModuleCrudController` — `index()` sudah
-  menampilkan data sungguhan dari database, `create/store/edit/update`
-  masih placeholder
-- **Routing lengkap** sembilan modul di `routes/web.php`
+- **51 controller**, sebagian besar lewat satu base class
+  `App\Http\Controllers\Concerns\ModuleCrudController`
+- **Routing lengkap** semua modul di `routes/web.php`
 - **UI modern** — Tailwind 4, font Fraunces + IBM Plex, sidebar bermotif
-  tab buku besar M0–M9, sudah diverifikasi tampil benar di browser
-- Infrastruktur multi-tenant asli (`KoperasiScope`, `SetKoperasiAktif`,
-  trait `BelongsToKoperasi`) disalin apa adanya — itu fondasi yang sudah
-  teruji, bukan bagian yang perlu dibangun ulang
-- Seeder: `CoaSeeder` & `TransaksiTemplateSeeder` (data referensi COA dan
-  30 kode transaksi, disalin utuh dari sistem asli), `PeranSeeder`,
-  `DataAwalSeeder` (2 koperasi contoh + akun login)
+  tab buku besar M0–M10, sudah diverifikasi tampil benar di browser
+- Infrastruktur multi-tenant (`KoperasiScope`, `SetKoperasiAktif`,
+  trait `BelongsToKoperasi`) — fondasi isolasi data antar desa
+- Seeder: `CoaSeeder` & `TransaksiTemplateSeeder` (COA dan 30 kode
+  transaksi), `PeranSeeder`, `DataAwalSeeder` (2 koperasi contoh + akun login)
+- **Service bisnis lengkap** di `app/Services/`:
 
-## Yang BELUM ada (sengaja, untuk pendalaman berikutnya)
+  | Service | Lokasi | Fungsi |
+  |---|---|---|
+  | `StokService` | `Services/` | HPP moving average, mutasi kartu stok |
+  | `PembelianService` | `Services/` | PO, GRN, jalur cepat petani |
+  | `KonsinyasiService` | `Services/` | Transfer barang & jurnal antar desa |
+  | `JurnalService` | `Services/Finance/` | Mesin jurnal bertemplate, posting, pembalik |
+  | `TutupBulanService` | `Services/Finance/` | 8 validasi + tutup periode bulanan |
+  | `TutupTahunService` | `Services/Finance/` | Jurnal penutup & pembagian SHU |
 
-- `JurnalService`, `TutupBukuService`, `PelunasanService`,
-  `KasTransaksiService`, `SimpananService`, `AsetTetapService`,
-  `PeriodeService`, `StokService`, `KonsinyasiService` — semua service
-  bisnis dari dokumen pembelajaran modul Finance
-- Form create/edit sungguhan di semua modul (saat ini placeholder)
+## Yang BELUM ada / masih dalam pengerjaan
+
+- Form `create/edit` sungguhan di beberapa modul (sebagian masih placeholder)
 - Fitur survei via suara (Speech-to-Text) — ada di sistem asli, belum
   dibawa ke kerangka ini
+- Service tambahan: `PelunasanService`, `KasTransaksiService`,
+  `SimpananService`, `AsetTetapService`, `PeriodeService`
 
 ## Setup
 
@@ -86,9 +87,8 @@ routes/web.php                  Semua rute, dikelompokkan per modul
 
 ## Langkah berikutnya
 
-Pendalaman modul **Keuangan & Akuntansi** — membangun `JurnalService`
-(posting bertemplate, posting manual, jurnal pembalik), buku pembantu
-piutang/hutang/kas/simpanan, delapan validasi tutup bulan, tutup tahun +
-pembagian SHU, dan empat laporan keuangan. Rujukan detail lengkapnya ada
-di dokumen pembelajaran yang sudah dibuat sebelumnya
-(*Panduan-Sistem-KDMP-Modul-Finance.docx*).
+- Melengkapi form `create/edit` yang masih placeholder di semua modul
+- Mengimplementasi service yang masih kurang: `PelunasanService`,
+  `KasTransaksiService`, `SimpananService`, `AsetTetapService`, `PeriodeService`
+- Mengintegrasikan fitur survei via suara (Speech-to-Text)
+- Penyelesaian laporan keuangan (M10): Neraca, Laba Rugi, Neraca Saldo, Arus Kas

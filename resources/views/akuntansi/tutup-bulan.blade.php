@@ -43,7 +43,12 @@
         </div>
     @endif
 
-    {{-- ===== Tabel Daftar Validasi ===== --}}
+    @if(isset($message))
+        <div class="mb-4 rounded border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            {{ $message }}
+        </div>
+    @else
+        {{-- ===== Tabel Daftar Validasi ===== --}}
     <div class="overflow-hidden rounded border border-paper-200">
         <table class="w-full text-sm">
             <thead class="bg-paper-100 text-xs uppercase text-ink-600">
@@ -114,4 +119,5 @@
             </p>
         @endif
     </div>
+    @endif
 </x-layouts.app>

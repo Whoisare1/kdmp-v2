@@ -5,22 +5,22 @@ namespace Tests\Feature;
 use App\Models\Akuntansi\BukuBesarPeriode;
 use App\Models\Akuntansi\JurnalHeader;
 use App\Models\Pengguna;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * TenantIsolationTest — Membuktikan sistem tidak bocor data antar koperasi.
+ * TenantIsolationTest â€” Membuktikan sistem tidak bocor data antar entitas.
  *
  * PRASYARAT:
  *   Database `kdmp_test` sudah dibuat dan sudah dijalankan migration.
- *   Seeder minimal dibutuhkan: 2 baris koperasi_desa, 2 baris pengguna.
+ *   Seeder minimal dibutuhkan: 2 baris entitas, 2 baris pengguna.
  *
  * CARA JALANKAN:
  *   php artisan test --filter TenantIsolationTest
  *
  * FILOSOFI TEST INI:
- *   Test ini bukan unit test — test ini adalah "trust boundary" test.
+ *   Test ini bukan unit test â€” test ini adalah "trust boundary" test.
  *   Jika ada satu test di sini yang FAIL, berarti ada kebocoran data antar tenant
  *   yang wajib diperbaiki sebelum deploy ke production.
  */
@@ -28,8 +28,8 @@ class TenantIsolationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private KoperasiDesa $desaA;
-    private KoperasiDesa $desaB;
+    private Entitas $desaA;
+    private Entitas $desaB;
     private Pengguna $userA;
     private Pengguna $userB;
 
@@ -37,7 +37,7 @@ class TenantIsolationTest extends TestCase
     {
         parent::setUp();
 
-        // Buat baris wilayah (required FK dari koperasi_desa)
+        // Buat baris wilayah (required FK dari entitas)
         $sfx = uniqid(); // suffix unik per test agar tidak duplicate
         $idWilayahA = \DB::table('wilayah')->insertGetId([
             'tingkat' => 'desa', 'nama' => 'Desa Alpha ' . $sfx, 'created_at' => now(),
@@ -62,39 +62,39 @@ class TenantIsolationTest extends TestCase
             ]
         ]);
 
-        $idDesaA = \DB::table('koperasi_desa')->insertGetId([
-            'kode_koperasi'  => 'DA-' . $sfx,
-            'nama_koperasi'  => 'Koperasi Desa A Test',
+        $idDesaA = \DB::table('entitas')->insertGetId([
+            'kode_entitas'  => 'DA-' . $sfx,
+            'nama_entitas'  => 'Koperasi Desa A Test',
             'id_wilayah'     => $idWilayahA,
             'tahun_buku_awal'=> 2026,
             'is_active'      => 1,
             'created_at'     => now(),
         ]);
-        $idDesaB = \DB::table('koperasi_desa')->insertGetId([
-            'kode_koperasi'  => 'DB-' . $sfx,
-            'nama_koperasi'  => 'Koperasi Desa B Test',
+        $idDesaB = \DB::table('entitas')->insertGetId([
+            'kode_entitas'  => 'DB-' . $sfx,
+            'nama_entitas'  => 'Koperasi Desa B Test',
             'id_wilayah'     => $idWilayahB,
             'tahun_buku_awal'=> 2026,
             'is_active'      => 1,
             'created_at'     => now(),
         ]);
 
-        $this->desaA = KoperasiDesa::withoutGlobalScopes()->find($idDesaA);
-        $this->desaB = KoperasiDesa::withoutGlobalScopes()->find($idDesaB);
+        $this->desaA = Entitas::withoutGlobalScopes()->find($idDesaA);
+        $this->desaB = Entitas::withoutGlobalScopes()->find($idDesaB);
 
         // Buat pengguna masing-masing desa
         $idUserA = \DB::table('pengguna')->insertGetId([
             'nama'        => 'User Desa A',
             'email'       => 'usera-' . $sfx . '@test.local',
             'password'    => bcrypt('password'),
-            'id_koperasi' => $idDesaA,
+            'id_entitas' => $idDesaA,
             'created_at'  => now(),
         ]);
         $idUserB = \DB::table('pengguna')->insertGetId([
             'nama'        => 'User Desa B',
             'email'       => 'userb-' . $sfx . '@test.local',
             'password'    => bcrypt('password'),
-            'id_koperasi' => $idDesaB,
+            'id_entitas' => $idDesaB,
             'created_at'  => now(),
         ]);
 
@@ -103,7 +103,7 @@ class TenantIsolationTest extends TestCase
     }
 
     // =========================================================================
-    // TEST 1: Global Scope BelongsToKoperasi memfilter query Eloquent
+    // TEST 1: Global Scope BelongsToEntitas memfilter query Eloquent
     // =========================================================================
 
     /**
@@ -114,7 +114,7 @@ class TenantIsolationTest extends TestCase
     {
         // Buat data buku besar untuk Desa B
         BukuBesarPeriode::withoutGlobalScopes()->create([
-            'id_koperasi'      => $this->desaB->id_koperasi,
+            'id_entitas'      => $this->desaB->id_entitas,
             'periode_tahun'    => 2026,
             'periode_bulan'    => 1,
             'kode_anak'        => '111',
@@ -126,10 +126,10 @@ class TenantIsolationTest extends TestCase
             'saldo_akhir_kredit'=> 0,
         ]);
 
-        // Simulasi: User A login → koperasi_aktif = desaA
-        app()->instance('koperasi_aktif', $this->desaA->id_koperasi);
+        // Simulasi: User A login â†’ koperasi_aktif = desaA
+        app()->instance('koperasi_aktif', $this->desaA->id_entitas);
 
-        // Query via Eloquent — seharusnya kosong karena BelongsToKoperasi scope
+        // Query via Eloquent â€” seharusnya kosong karena BelongsToEntitas scope
         $hasil = BukuBesarPeriode::where('periode_tahun', 2026)->get();
 
         $this->assertCount(0, $hasil,
@@ -146,7 +146,7 @@ class TenantIsolationTest extends TestCase
         // Buat jurnal untuk kedua desa
         JurnalHeader::withoutGlobalScopes()->insert([
             [
-                'id_koperasi'    => $this->desaA->id_koperasi,
+                'id_entitas'    => $this->desaA->id_entitas,
                 'no_jurnal'      => 'JU-A-001',
                 'tanggal_jurnal' => '2026-01-15',
                 'periode_tahun'  => 2026,
@@ -157,7 +157,7 @@ class TenantIsolationTest extends TestCase
                 'created_at'     => now(),
             ],
             [
-                'id_koperasi'    => $this->desaB->id_koperasi,
+                'id_entitas'    => $this->desaB->id_entitas,
                 'no_jurnal'      => 'JU-B-001',
                 'tanggal_jurnal' => '2026-01-15',
                 'periode_tahun'  => 2026,
@@ -170,7 +170,7 @@ class TenantIsolationTest extends TestCase
         ]);
 
         // Login sebagai User A
-        app()->instance('koperasi_aktif', $this->desaA->id_koperasi);
+        app()->instance('koperasi_aktif', $this->desaA->id_entitas);
 
         $jurnal = JurnalHeader::all();
 
@@ -184,13 +184,13 @@ class TenantIsolationTest extends TestCase
 
     /**
      * @test
-     * POST kas transaksi dengan id_kas_bank milik Desa B → validation error.
+     * POST kas transaksi dengan id_kas_bank milik Desa B â†’ validation error.
      */
     public function post_kas_transaksi_dengan_id_kas_bank_desa_lain_ditolak(): void
     {
         // Buat kas bank untuk Desa B
         $idKasB = \DB::table('master_kas_bank')->insertGetId([
-            'id_koperasi' => $this->desaB->id_koperasi,
+            'id_entitas' => $this->desaB->id_entitas,
             'nama'        => 'Kas Utama Desa B',
             'jenis'       => 'kas',
             'kode_akun'   => '111',
@@ -203,7 +203,7 @@ class TenantIsolationTest extends TestCase
             ->post(route('keuangan.kas-transaksi.store'), [
                 'tanggal'    => '2026-01-20',
                 'jenis'      => 'masuk',
-                'id_kas_bank'=> $idKasB, // ← ID milik Desa B!
+                'id_kas_bank'=> $idKasB, // â† ID milik Desa B!
                 'kode_akun_lawan' => '411',
                 'nilai'      => 100000,
                 'keterangan' => 'Test isolasi',
@@ -220,10 +220,10 @@ class TenantIsolationTest extends TestCase
      * @test
      * withoutGlobalScopes() tetap bisa membaca data lintas koperasi (untuk konsolidasi pusat).
      */
-    public function admin_pusat_bisa_baca_data_semua_koperasi(): void
+    public function admin_pusat_bisa_baca_data_semua_entitas(): void
     {
         BukuBesarPeriode::withoutGlobalScopes()->create([
-            'id_koperasi'       => $this->desaA->id_koperasi,
+            'id_entitas'       => $this->desaA->id_entitas,
             'periode_tahun'     => 2026,
             'periode_bulan'     => 2,
             'kode_anak'         => '111',
@@ -236,7 +236,7 @@ class TenantIsolationTest extends TestCase
         ]);
 
         BukuBesarPeriode::withoutGlobalScopes()->create([
-            'id_koperasi'       => $this->desaB->id_koperasi,
+            'id_entitas'       => $this->desaB->id_entitas,
             'periode_tahun'     => 2026,
             'periode_bulan'     => 2,
             'kode_anak'         => '111',
@@ -258,3 +258,5 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(2, $semua, 'Admin pusat seharusnya bisa melihat data kedua desa');
     }
 }
+
+

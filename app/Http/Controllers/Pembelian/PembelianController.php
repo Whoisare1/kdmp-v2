@@ -128,8 +128,10 @@ class PembelianController extends ModuleCrudController
                     ->values()
                     ->all();
 
+                $idEntitas = auth()->user()->id_entitas ?? app('entitas_aktif');
+
                 $pembelian = PembelianService::createQuickPurchase(
-                    $koperasiId,
+                    $idEntitas,
                     (int) $validated['id_pihak'],
                     (int) $validated['id_unit_usaha'],
                     (int) $validated['id_gudang'],
@@ -261,3 +263,5 @@ class PembelianController extends ModuleCrudController
         ]);
     }
 }
+
+

@@ -39,7 +39,7 @@ class KonsinyasiService
                 throw new RuntimeException('Pengiriman ini sudah diposting.');
             }
 
-            if ($kiriman->id_koperasi_pemilik === $kiriman->id_koperasi_penerima) {
+            if ($kiriman->id_entitas_pemilik === $kiriman->id_entitas_penerima) {
                 throw new RuntimeException('Pemilik dan penerima harus merupakan koperasi yang berbeda.');
             }
 
@@ -105,7 +105,7 @@ class KonsinyasiService
                 } else {
                     $hpp = $this->stok->hppSaatIni((int) $kiriman->id_gudang_asal, (int) $item->id_barang);
                     $kartuStok = $this->stok->keluar(
-                        koperasiId: (int) $kiriman->id_koperasi_pemilik,
+                        entitasId: (int) $kiriman->id_entitas_pemilik,
                         gudangId: (int) $kiriman->id_gudang_asal,
                         barangId: (int) $item->id_barang,
                         qty: (string) $item->qty_dasar,
@@ -136,8 +136,8 @@ class KonsinyasiService
                 if (! $stokKonsinyasi) {
                     $stokKonsinyasiId = DB::table('stok_konsinyasi')->insertGetId([
                         'id_kiriman' => $idKiriman,
-                        'id_koperasi_pemilik' => $kiriman->id_koperasi_pemilik,
-                        'id_koperasi_penerima' => $kiriman->id_koperasi_penerima,
+                        'id_entitas_pemilik' => $kiriman->id_entitas_pemilik,
+                        'id_entitas_penerima' => $kiriman->id_entitas_penerima,
                         'id_gudang_penerima' => $kiriman->id_gudang_tujuan,
                         'id_barang' => $item->id_barang,
                         'qty_titip' => $item->qty_dasar,
@@ -176,7 +176,7 @@ class KonsinyasiService
                 sourceType: 'pengiriman_konsinyasi',
                 sourceId: $idKiriman,
                 keterangan: "Kirim titipan {$kiriman->kode_kiriman}",
-                koperasiId: (int) $kiriman->id_koperasi_pemilik,
+                entitasId: (int) $kiriman->id_entitas_pemilik,
             );
 
             DB::table('pengiriman_konsinyasi')
@@ -194,3 +194,5 @@ class KonsinyasiService
         })();
     }
 }
+
+

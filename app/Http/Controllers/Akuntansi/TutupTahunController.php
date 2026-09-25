@@ -32,6 +32,18 @@ class TutupTahunController extends Controller
         // Default: tahun lalu (yang paling mungkin akan difinalisasi)
         $tahun = (int) $request->query('tahun', now()->subYear()->year);
 
+        $idEntitas = app('entitas_aktif');
+
+        if ($idEntitas === null) {
+            return view('akuntansi.tutup-tahun', [
+                'tahun' => $tahun,
+                'praKondisi' => [],
+                'semuaLulus' => false,
+                'ringkasan' => ['total_pendapatan' => 0, 'total_hpp' => 0, 'total_biaya' => 0, 'net_non_operasional' => 0, 'laba_bersih' => 0],
+                'message' => 'Harap pilih Entitas terlebih dahulu di pengaturan atas untuk melakukan Tutup Tahun.'
+            ]);
+        }
+
         $praKondisi   = $this->service->cekPraKondisi($tahun);
         $semuaLulus   = collect($praKondisi)->every(fn($v) => $v['lulus']);
         $ringkasan    = $this->service->ringkasanLabaRugi($tahun);
@@ -52,6 +64,11 @@ class TutupTahunController extends Controller
         ]);
 
         $tahun = (int) $request->input('tahun');
+
+        $idEntitas = app('entitas_aktif');
+        if ($idEntitas === null) {
+            return back()->with('error', 'Harap pilih Entitas terlebih dahulu untuk melakukan eksekusi Tutup Tahun.');
+        }
 
         try {
             $this->service->tutupTahun($tahun);
