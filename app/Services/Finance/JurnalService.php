@@ -63,7 +63,8 @@ class JurnalService
         array  $payload,
         string $sourceType,
         int    $sourceId,
-        string $keterangan = ''
+        string $keterangan = '',
+        ?int   $koperasiId = null,
     ): JurnalHeader {
         // --- LANGKAH 1: Ambil template dari database ---
         // MasterDetailTransaksi tidak pakai BelongsToKoperasi karena tabel
@@ -93,10 +94,10 @@ class JurnalService
         // --- LANGKAH 5: Validasi periode masih OPEN ---
         $tanggal = $payload['tanggal_jurnal'] ?? now()->toDateString();
         [$tahun, $bulan] = $this->parsePeriode($tanggal);
-        $this->pastikanPeriodeTerbuka($tahun, $bulan);
+        $this->pastikanPeriodeTerbuka($tahun, $bulan, $koperasiId);
 
         // --- LANGKAH 6: Generate nomor jurnal ---
-        $noJurnal = $this->generateNomorJurnal($tahun, $bulan);
+        $noJurnal = $this->generateNomorJurnal($tahun, $bulan, $koperasiId);
 
         // --- LANGKAH 7: Susun JSON & panggil SP ---
         $jsonPayload = $this->susunJsonPayload([
@@ -112,7 +113,7 @@ class JurnalService
             'keterangan'     => $keterangan,
         ], $baris);
 
-        return $this->panggilStoredProcedure($jsonPayload, $sourceType, $sourceId, 'OTOMATIS');
+        return $this->panggilStoredProcedure($jsonPayload, $sourceType, $sourceId, 'OTOMATIS', $koperasiId);
     }
 
     // =========================================================================
@@ -171,8 +172,8 @@ class JurnalService
             'periode_bulan'  => $bulan,
             'kode_transaksi' => $header['kode_transaksi'] ?? null,
             'jenis_jurnal'   => $header['jenis_jurnal'],  // MANUAL / PENYESUAIAN
-            'source_type'    => null,   // jurnal manual tidak punya sumber objek
-            'source_id'      => null,
+            'source_type'    => $header['source_type'] ?? null,
+            'source_id'      => $header['source_id'] ?? null,
             'keterangan'     => $header['keterangan'],
         ], $barisInternal);
 
@@ -198,13 +199,6 @@ class JurnalService
         // karena id_koperasi ada di WHERE selanjutnya lewat findOrFail
         $jurnalAsal = JurnalHeader::with('detail')->findOrFail($idJurnal);
 
-        // Validasi: hanya jurnal POSTED yang bisa dibalik
-        if ($jurnalAsal->status !== 'POSTED') {
-            throw new \InvalidArgumentException(
-                "Jurnal #{$idJurnal} berstatus [{$jurnalAsal->status}], bukan POSTED."
-            );
-        }
-
         // Validasi: belum pernah dibalik
         // Cek apakah ada jurnal pembalik yang menunjuk ke jurnal ini
         $sudahDibalik = JurnalHeader::where('id_jurnal_asal', $idJurnal)->first();
@@ -212,13 +206,20 @@ class JurnalService
             throw new JurnalSudahDibalikException($idJurnal, $sudahDibalik->id_jurnal);
         }
 
+        // Validasi: hanya jurnal POSTED yang bisa dibalik
+        if ($jurnalAsal->status !== 'POSTED') {
+            throw new \InvalidArgumentException(
+                "Jurnal #{$idJurnal} berstatus [{$jurnalAsal->status}], bukan POSTED."
+            );
+        }
+
         // Bangun baris pembalik: balik posisi debet ↔ kredit
         $barisPembalik = $jurnalAsal->detail->map(function ($d, int $idx): array {
             return [
                 'urutan'    => $idx + 1,
                 'kode_anak' => $d->kode_anak,
-                'debet'     => $d->kredit,   // ← dibalik
-                'kredit'    => $d->debet,    // ← dibalik
+                'debet'     => (float) $d->kredit,   // ← dibalik
+                'kredit'    => (float) $d->debet,    // ← dibalik
                 'id_pihak'  => $d->id_pihak,
                 'keterangan'=> $d->keterangan,
             ];
@@ -244,18 +245,18 @@ class JurnalService
             'keterangan'     => "PEMBALIK jurnal #{$idJurnal}: {$alasan}",
         ], $barisPembalik);
 
-        // Jalankan dalam 1 transaksi: posting pembalik + tandai asal REVERSED
-        DB::transaction(function () use ($jsonPayload, $idJurnal, &$jurnalPembalik) {
-            $jurnalPembalik = $this->panggilStoredProcedure($jsonPayload, null, null, 'PEMBALIK');
+        // Posting pembalik via SP (SP sudah memiliki transaksi mandiri)
+        $jurnalPembalik = $this->panggilStoredProcedure($jsonPayload, null, null, 'PEMBALIK');
 
-            // Update jurnal asal: REVERSED + catat id_jurnal pembaliknya
-            DB::table('jurnal_header')
-                ->where('id_jurnal', $idJurnal)
-                ->update([
-                    'status'         => 'REVERSED',
-                    'id_jurnal_asal' => $jurnalPembalik->id_jurnal,
-                ]);
-        });
+        // Set id_jurnal_asal di jurnal pembalik menunjuk ke jurnal original
+        $jurnalPembalik->update(['id_jurnal_asal' => $idJurnal]);
+
+        // Update jurnal asal: REVERSED
+        JurnalHeader::where('id_jurnal', $idJurnal)->update([
+            'status'         => 'REVERSED',
+            'posted_by'      => auth()->id() ?? null,
+            'posted_at'      => now(),
+        ]);
 
         return $jurnalPembalik;
     }
@@ -446,10 +447,12 @@ class JurnalService
     }
 
     /** Validasi bahwa periode akuntansi masih OPEN */
-    private function pastikanPeriodeTerbuka(int $tahun, int $bulan): void
+    private function pastikanPeriodeTerbuka(int $tahun, int $bulan, ?int $koperasiId = null): void
     {
+        $koperasiId ??= app('koperasi_aktif');
+
         $status = DB::table('periode_akuntansi')
-            ->where('id_koperasi', app('koperasi_aktif'))
+            ->where('id_koperasi', $koperasiId)
             ->where('tahun', $tahun)
             ->where('bulan', $bulan)
             ->value('status');
@@ -476,13 +479,14 @@ class JurnalService
      * Format: JRN-{tahun}-{bulan_2digit}-{sequence_4digit}
      * Contoh: JRN-2026-08-0042
      */
-    private function generateNomorJurnal(int $tahun, int $bulan): string
+    private function generateNomorJurnal(int $tahun, int $bulan, ?int $koperasiId = null): string
     {
+        $koperasiId ??= app('koperasi_aktif');
         $prefix = sprintf('JRN-%d-%02d-', $tahun, $bulan);
 
         // Ambil nomor urut terakhir untuk periode ini dari koperasi aktif
         $terakhir = DB::table('jurnal_header')
-            ->where('id_koperasi', app('koperasi_aktif'))
+            ->where('id_koperasi', $koperasiId)
             ->where('periode_tahun', $tahun)
             ->where('periode_bulan', $bulan)
             ->where('no_jurnal', 'like', $prefix . '%')
@@ -511,16 +515,19 @@ class JurnalService
         string  $jsonPayload,
         ?string $sourceType,
         ?int    $sourceId,
-        string  $jenisJurnal
+        string  $jenisJurnal,
+        ?int    $koperasiId = null,
     ): JurnalHeader {
+        $koperasiId ??= app('koperasi_aktif');
+
         try {
-            if (DB::getDriverName() === 'sqlite') {
-                return $this->postingSqlite($jsonPayload);
-            }
+            // Pastikan string JSON dan variabel teks di stored procedure memakai
+            // collation yang sama dengan kolom kode akun jurnal.
+            DB::statement("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
             // CALL SP — mengembalikan satu baris dengan kolom id_jurnal
             $hasil = DB::select('CALL sp_post_jurnal(?, ?, ?)', [
-                app('koperasi_aktif'),
+                $koperasiId,
                 Auth::id(),
                 $jsonPayload,
             ]);
@@ -537,6 +544,7 @@ class JurnalService
                 $existing = JurnalHeader::where('source_type', $sourceType)
                     ->where('source_id', $sourceId)
                     ->where('jenis_jurnal', $jenisJurnal)
+                    ->where('id_koperasi', $koperasiId)
                     ->first();
 
                 if ($existing) {
