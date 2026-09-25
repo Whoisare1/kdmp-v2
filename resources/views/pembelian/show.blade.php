@@ -1,10 +1,10 @@
 <x-layouts.app :title="$title" eyebrow="Detail Pembelian">
 
 ```
-<div class="grid gap-6 lg:grid-cols-3">
+<div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
     {{-- Informasi Utama --}}
-    <div class="lg:col-span-2">
+    <div class="md:col-span-2 xl:col-span-2">
 
         @if (session('success'))
             <div class="mb-4 rounded-sm border border-paper-300 bg-paper-100 p-4 text-sm text-ink-800">
@@ -133,10 +133,18 @@
 
                     <thead class="bg-paper-100 text-left text-ink-700">
                         <tr>
-                            <th class="px-3 py-2">Barang</th>
+                            <th class="px-3 py-2" rowspan="2">Barang</th>
+                            <th class="px-3 py-2 text-center" colspan="3">Sebelum Konversi</th>
+                            <th class="px-3 py-2 text-center" colspan="3">Setelah Konversi</th>
+                            <th class="px-3 py-2 text-right" rowspan="2">Subtotal</th>
+                        </tr>
+                        <tr>
                             <th class="px-3 py-2 text-right">Qty</th>
-                            <th class="px-3 py-2 text-right">Harga Satuan</th>
-                            <th class="px-3 py-2 text-right">Subtotal</th>
+                            <th class="px-3 py-2">Satuan</th>
+                            <th class="px-3 py-2 text-right">Harga</th>
+                            <th class="px-3 py-2 text-right">Qty Dasar</th>
+                            <th class="px-3 py-2">Satuan Dasar</th>
+                            <th class="px-3 py-2 text-right">Harga Dasar</th>
                         </tr>
                     </thead>
 
@@ -150,11 +158,27 @@
                                 </td>
 
                                 <td class="px-3 py-3 text-right text-ink-700">
-                                    {{ number_format($line->qty_dasar, 2, ',', '.') }}
+                                    {{ rtrim(rtrim(number_format((float) $line->qty_input, 2, ',', '.'), '0'), ',') }}
+                                </td>
+
+                                <td class="px-3 py-3 text-ink-700">
+                                    {{ $line->satuanInput?->kode_satuan ?? 'N/A' }}
                                 </td>
 
                                 <td class="px-3 py-3 text-right text-ink-700">
                                     Rp {{ number_format($line->harga_satuan_input, 2, ',', '.') }}
+                                </td>
+
+                                <td class="px-3 py-3 text-right text-ink-700">
+                                    {{ rtrim(rtrim(number_format((float) $line->qty_dasar, 2, ',', '.'), '0'), ',') }}
+                                </td>
+
+                                <td class="px-3 py-3 text-ink-700">
+                                    {{ $line->barang->satuanDasar?->kode_satuan ?? 'N/A' }}
+                                </td>
+
+                                <td class="px-3 py-3 text-right text-ink-700">
+                                    Rp {{ number_format($line->faktor_konversi > 0 ? $line->harga_satuan_input / $line->faktor_konversi : $line->harga_satuan_input, 2, ',', '.') }}
                                 </td>
 
                                 <td class="px-3 py-3 text-right font-medium text-ink-900">
@@ -166,7 +190,7 @@
                         @empty
 
                             <tr>
-                                <td colspan="4" class="px-3 py-6 text-center text-sm text-ink-500">
+                                <td colspan="8" class="px-3 py-6 text-center text-sm text-ink-500">
                                     Tidak ada detail pembelian.
                                 </td>
                             </tr>
@@ -221,7 +245,7 @@
     </div>
 
     {{-- Sidebar --}}
-    <div class="lg:col-span-1">
+    <div class="md:col-span-2 xl:col-span-1">
 
         {{-- Aksi --}}
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
@@ -234,7 +258,7 @@
 
                 @if ($item->status === 'draft')
                     <form
-                        action="{{ route("$routeBase.approve", $item) }}"
+                        action="{{ route('pembelian.approve', $item) }}"
                         method="POST"
                     >
                         @csrf
@@ -249,9 +273,19 @@
                     </form>
                 @endif
 
+                @if (in_array($item->status, ['draft', 'disetujui']))
+                    <form action="{{ route('pembelian.cancel', $item) }}" method="POST" onsubmit="return confirm('Batalkan pembelian ini?')">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit" class="w-full rounded-sm border border-merah-300 px-4 py-2 text-sm font-medium text-merah-700 hover:bg-merah-50">
+                            Batalkan Pembelian
+                        </button>
+                    </form>
+                @endif
+
                 @if ($item->status === 'disetujui')
                     <a
-                        href="{{ route("$routeBase.create-grn", $item) }}"
+                        href="{{ route('pembelian.create-grn', $item) }}"
                         class="block w-full rounded-sm bg-merah-500 px-4 py-2 text-center text-sm font-medium text-paper-50 hover:bg-merah-600"
                     >
                         📦 Buat GRN
@@ -260,11 +294,17 @@
 
                 @if (in_array($item->status, ['disetujui', 'diterima', 'selesai']))
                     <a
-                        href="{{ route("$routeBase.show-retur", $item) }}"
+                        href="{{ route('pembelian.show-retur', $item) }}"
                         class="block w-full rounded-sm border border-paper-300 px-4 py-2 text-center text-sm font-medium text-ink-700 hover:bg-paper-100"
                     >
                         ↩️ Lihat Retur
                     </a>
+                @endif
+
+                @if ($item->status === 'dibatalkan')
+                    <div class="rounded-sm border border-merah-300 bg-merah-50 p-3 text-sm text-merah-800">
+                        Pembelian ini sudah dibatalkan.
+                    </div>
                 @endif
 
                 <a

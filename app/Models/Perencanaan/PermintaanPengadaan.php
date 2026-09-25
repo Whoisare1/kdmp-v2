@@ -32,6 +32,16 @@ class PermintaanPengadaan extends Model
         return $this->belongsTo(Pihak::class, 'id_pihak', 'id_pihak');
     }
 
+    public function unitUsaha()
+    {
+        return $this->belongsTo(\App\Models\Master\UnitUsaha::class, 'id_unit_usaha', 'id_unit_usaha');
+    }
+
+    public function gudang()
+    {
+        return $this->belongsTo(\App\Models\Master\Gudang::class, 'id_gudang', 'id_gudang');
+    }
+
     public function detail()
     {
         return $this->hasMany(PermintaanPengadaanDetail::class, 'id_permintaan', 'id_permintaan');
