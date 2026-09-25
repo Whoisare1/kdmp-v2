@@ -1,10 +1,10 @@
 <x-layouts.app :title="$title" eyebrow="Penerimaan Barang">
 
 ```
-<div class="grid gap-6 lg:grid-cols-3">
+<div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
     {{-- Form Penerimaan --}}
-    <div class="lg:col-span-2">
+    <div class="md:col-span-2 xl:col-span-2">
 
         @if ($errors->any())
             <div class="mb-4 rounded-sm border border-merah-300 bg-merah-50 p-4">
@@ -72,7 +72,7 @@
                                         </td>
 
                                         <td class="px-3 py-3 text-right text-ink-700">
-                                            {{ number_format($line->qty_dasar, 2, ',', '.') }}
+                                            {{ rtrim(rtrim(number_format((float) $line->qty_dasar, 2, ',', '.'), '0'), ',') }}
                                         </td>
 
                                         <td class="px-3 py-3">
@@ -169,7 +169,7 @@
     </div>
 
     {{-- Informasi PO --}}
-    <div class="lg:col-span-1">
+    <div class="md:col-span-2 xl:col-span-1">
 
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
             <h3 class="mb-3 font-semibold text-ink-900">Informasi PO</h3>

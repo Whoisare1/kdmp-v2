@@ -1,6 +1,11 @@
 <x-layouts.app :title="$title" eyebrow="Tambah Data">
-    <div class="grid gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
+    @if (session('error'))
+        <div class="mb-4 rounded-sm border border-merah-300 bg-merah-50 p-4 text-sm text-merah-800">
+            {{ session('error') }}
+        </div>
+    @endif
+    <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div class="md:col-span-2 xl:col-span-2">
             @if ($errors->any())
                 <div class="mb-4 rounded-sm border border-merah-300 bg-merah-50 p-4">
                     <h4 class="font-medium text-merah-900">Validasi Gagal:</h4>
@@ -19,11 +24,11 @@
                 <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
                     <h3 class="mb-3 text-sm font-semibold text-ink-900">Pilih Sumber Pembelian</h3>
                     <label class="flex items-center gap-2 mb-2">
-                        <input type="radio" name="source" value="from_pr" checked onchange="toggleForm()" class="rounded">
+                        <input type="radio" name="source" value="from_pr" @checked(old('source', $prs->isNotEmpty() ? 'from_pr' : 'quick_purchase') === 'from_pr') onchange="toggleForm()" class="rounded">
                         Dari Permintaan Pengadaan (PR)
                     </label>
                     <label class="flex items-center gap-2">
-                        <input type="radio" name="source" value="quick_purchase" onchange="toggleForm()" class="rounded">
+                        <input type="radio" name="source" value="quick_purchase" @checked(old('source', $prs->isNotEmpty() ? 'from_pr' : 'quick_purchase') === 'quick_purchase') onchange="toggleForm()" class="rounded">
                         Nota Pembelian Petani (Quick Purchase)
                     </label>
                 </div>
@@ -33,7 +38,7 @@
                     <h3 class="mb-3 text-sm font-semibold text-ink-900">Data Pembelian dari PR</h3>
                     <label class="block text-sm">
                         <span class="text-ink-700 font-medium">Permintaan Pengadaan *</span>
-                        <select name="id_permintaan" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
+                        <select id="id_permintaan" name="id_permintaan" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                             <option value="">-- Pilih PR yang disetujui --</option>
                             @foreach ($prs as $pr)
                                 <option value="{{ $pr->id_permintaan }}">
@@ -47,7 +52,7 @@
                 <!-- Form Quick Purchase -->
                 <div id="quick_purchase_section" class="rounded-sm border border-paper-300 bg-paper-50 p-4" style="display: none;">
                     <h3 class="mb-3 text-sm font-semibold text-ink-900">Data Nota Pembelian Petani</h3>
-                    <div class="grid gap-4 grid-cols-2">
+                    <div class="grid gap-4 sm:grid-cols-2">
                         <label class="block text-sm">
                             <span class="text-ink-700 font-medium">Unit Usaha *</span>
                             <select name="id_unit_usaha" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
@@ -148,7 +153,9 @@
                                 <select name="id_kas_bank" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                                     <option value="">-- Pilih Kas/Bank --</option>
                                     @foreach ($kasbanks as $kb)
-                                        <option value="{{ $kb->id_kas_bank }}">{{ $kb->nama_kas_bank }}</option>
+                                        <option value="{{ $kb->id_kas_bank }}" @selected(old('id_kas_bank') == $kb->id_kas_bank)>
+                                            {{ $kb->nama }} ({{ strtoupper($kb->jenis) }})
+                                        </option>
                                     @endforeach
                                 </select>
                             </label>
@@ -156,7 +163,7 @@
                         <div id="jatuh_tempo_section" style="display: none;">
                             <label class="block text-sm">
                                 <span class="text-ink-700 font-medium">Tanggal Jatuh Tempo *</span>
-                                <input type="date" name="tgl_jatuh_tempo" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
+                                <input type="date" name="tgl_jatuh_tempo" min="{{ now()->format('Y-m-d') }}" value="{{ old('tgl_jatuh_tempo') }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                             </label>
                         </div>
                     </div>
@@ -173,7 +180,7 @@
             </form>
         </div>
 
-        <div class="lg:col-span-1">
+        <div class="md:col-span-2 xl:col-span-1">
             <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
                 <h3 class="mb-3 font-semibold text-ink-900">Alur Pembelian</h3>
                 <ol class="list-inside list-decimal space-y-1 text-sm text-ink-700">
@@ -191,12 +198,26 @@
             const source = document.querySelector('input[name="source"]:checked').value;
             document.getElementById('from_pr_section').style.display = source === 'from_pr' ? 'block' : 'none';
             document.getElementById('quick_purchase_section').style.display = source === 'quick_purchase' ? 'block' : 'none';
+            document.querySelectorAll('#from_pr_section select, #from_pr_section input').forEach((field) => field.disabled = source !== 'from_pr');
+            document.querySelectorAll('#quick_purchase_section select, #quick_purchase_section input').forEach((field) => field.disabled = source !== 'quick_purchase');
         }
 
         function togglePaymentFields() {
             const jenis = document.querySelector('select[name="jenis_pembayaran"]').value;
-            document.getElementById('kas_bank_section').style.display = jenis === 'kredit' ? 'none' : 'block';
-            document.getElementById('jatuh_tempo_section').style.display = jenis === 'kredit' ? 'block' : 'none';
+            const isCredit = jenis === 'kredit';
+            const kasBank = document.querySelector('select[name="id_kas_bank"]');
+            const jatuhTempo = document.querySelector('input[name="tgl_jatuh_tempo"]');
+
+            document.getElementById('kas_bank_section').style.display = isCredit ? 'none' : 'block';
+            document.getElementById('jatuh_tempo_section').style.display = isCredit ? 'block' : 'none';
+            kasBank.disabled = isCredit;
+            kasBank.required = !isCredit;
+            jatuhTempo.disabled = !isCredit;
+            jatuhTempo.required = isCredit;
+
+            if (!isCredit) {
+                jatuhTempo.value = '';
+            }
         }
 
         function addQuickPurchaseRow() {

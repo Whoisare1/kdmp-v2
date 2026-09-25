@@ -54,7 +54,9 @@ use Survei\Controllers\PublicSesi1Controller;
 use Survei\Controllers\PublicSesi2Controller;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', LandingController::class)->name('landing');
+Route::get('/', function () {
+    return redirect()->route('dashboard');
+})->middleware('auth')->name('landing');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
@@ -271,6 +273,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('pembelian/{pembelian}/approve', [PembelianController::class, 'approve'])
         ->name('approve');
 
+    Route::patch('pembelian/{pembelian}/cancel', [PembelianController::class, 'cancel'])
+        ->name('cancel');
+
     Route::get('pembelian/{pembelian}/grn/create', [PembelianController::class, 'createGrn'])
         ->name('create-grn');
 
@@ -281,6 +286,8 @@ Route::middleware('auth')->group(function () {
         ->name('show-retur');
 
     Route::resource('retur', ReturPembelianController::class);
+    Route::patch('retur/{retur}/approve', [ReturPembelianController::class, 'approve'])
+        ->name('retur.approve');
     });
 
     // ===== M6 — Penjualan =====

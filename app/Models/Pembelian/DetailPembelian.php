@@ -3,6 +3,7 @@
 namespace App\Models\Pembelian;
 
 use App\Models\Master\Barang;
+use App\Models\Master\Satuan;
 use Illuminate\Database\Eloquent\Model;
 
 class DetailPembelian extends Model
@@ -19,5 +20,10 @@ class DetailPembelian extends Model
     public function barang()
     {
         return $this->belongsTo(Barang::class, 'id_barang', 'id_barang');
+    }
+
+    public function satuanInput()
+    {
+        return $this->belongsTo(Satuan::class, 'id_satuan_input', 'id');
     }
 }

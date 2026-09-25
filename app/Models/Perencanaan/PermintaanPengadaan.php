@@ -14,7 +14,7 @@ class PermintaanPengadaan extends Model
     protected $primaryKey = 'id_permintaan';
 
     protected $fillable = [
-        'id_koperasi', 'kode_permintaan', 'id_pihak', 'tgl_pengajuan', 'total_nilai',
+        'id_koperasi', 'kode_permintaan', 'id_pihak', 'id_unit_usaha', 'id_gudang', 'tgl_pengajuan', 'total_nilai',
         'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
     ];
 
@@ -30,6 +30,16 @@ class PermintaanPengadaan extends Model
     public function pihak()
     {
         return $this->belongsTo(Pihak::class, 'id_pihak', 'id_pihak');
+    }
+
+    public function unitUsaha()
+    {
+        return $this->belongsTo(\App\Models\Master\UnitUsaha::class, 'id_unit_usaha', 'id_unit_usaha');
+    }
+
+    public function gudang()
+    {
+        return $this->belongsTo(\App\Models\Master\Gudang::class, 'id_gudang', 'id_gudang');
     }
 
     public function detail()

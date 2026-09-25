@@ -36,7 +36,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto px-6 py-6">
+            <main class="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 lg:px-8 xl:px-10">
                 @if (session('info'))
                     <div class="mb-4 rounded-sm border border-padi-500/40 bg-padi-100 px-4 py-3 text-sm text-ink-900">
                         {{ session('info') }}

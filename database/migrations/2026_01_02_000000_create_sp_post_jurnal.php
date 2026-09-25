@@ -29,6 +29,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Hapus dulu jika sudah ada (aman untuk migrate:fresh)
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_post_jurnal');
 
@@ -265,6 +269,10 @@ END
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_post_jurnal');
     }
 };

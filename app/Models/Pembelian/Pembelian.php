@@ -61,4 +61,14 @@ class Pembelian extends Model
     {
         return $this->hasMany(ReturPembelian::class, 'id_pembelian', 'id_pembelian');
     }
+
+    public function penerimaan()
+    {
+        return $this->hasMany(\App\Models\Gudang\PenerimaanBarang::class, 'id_pembelian', 'id_pembelian');
+    }
+
+    public function permintaan()
+    {
+        return $this->belongsTo(\App\Models\Perencanaan\PermintaanPengadaan::class, 'id_permintaan', 'id_permintaan');
+    }
 }
