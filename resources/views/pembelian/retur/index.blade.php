@@ -1,13 +1,13 @@
 <x-layouts.app :title="$title" eyebrow="Retur Pembelian">
     @if (session('success'))
-        <div class="mb-4 rounded-sm border border-paper-300 bg-paper-100 p-4 text-sm">{{ session('success') }}</div>
+        <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{{ session('success') }}</div>
     @endif
     @if (session('error'))
         <div class="mb-4 rounded-sm border border-merah-300 bg-merah-50 p-4 text-sm text-merah-800">{{ session('error') }}</div>
     @endif
 
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <a href="{{ route('pembelian.pembelian.show', $pembelian) }}" class="inline-flex items-center rounded-sm border border-paper-300 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-paper-100">
+        <a href="{{ route('pembelian.pembelian.show', $pembelian) }}" class="inline-flex items-center rounded-sm border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50">
             ← Kembali ke Pembelian
         </a>
         <a href="{{ route('pembelian.pembelian.index') }}" class="inline-flex items-center rounded-sm border border-paper-300 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-paper-100">
@@ -33,10 +33,7 @@
                                     @if ($retur->status === 'diajukan')
                                         <form method="POST" action="{{ route('pembelian.retur.approve', $retur) }}" class="flex gap-2">
                                             @csrf @method('PATCH')
-                                            @if ($retur->jenis_penyelesaian === 'uang')
-                                                <select name="id_kas_bank" required class="border border-paper-300 px-2 py-1"><option value="">Kas/Bank</option>@foreach (\App\Models\Master\KasBank::all() as $kas) <option value="{{ $kas->id_kas_bank }}">{{ $kas->nama_kas_bank }}</option>@endforeach</select>
-                                            @endif
-                                            <button class="text-xs font-medium text-merah-600">Setujui</button>
+                                            <button class="text-xs font-medium text-emerald-700 hover:text-emerald-800">Setujui</button>
                                         </form>
                                     @endif
                                 </td>
@@ -74,7 +71,7 @@
                     </div>
                 </div>
             @endforeach
-            <button class="w-full rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50">Ajukan Retur</button>
+            <button class="w-full rounded-sm bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">Ajukan Retur</button>
         </form>
     </div>
 </x-layouts.app>

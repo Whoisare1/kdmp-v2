@@ -7,9 +7,7 @@ use App\Models\Pembelian\Pembelian;
 use App\Models\Perencanaan\PermintaanPengadaan;
 use App\Models\Master\Barang;
 use App\Models\Master\Pihak;
-use App\Models\Master\Satuan;
 use App\Models\Master\UnitUsaha;
-use App\Models\Master\KasBank;
 use App\Services\PembelianService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -49,18 +47,17 @@ class PembelianController extends ModuleCrudController
     {
         $prs = PermintaanPengadaan::where('status', 'disetujui')->get();
         $pihaks = Pihak::all();
-        $kasbanks = KasBank::all();
-        $barangs = Barang::where('is_active', true)->orderBy('nama_barang')->get();
-        $satuans = Satuan::where('is_active', true)->orderBy('kode_satuan')->get();
+        $barangs = Barang::with(['unitUsaha', 'satuanDasar', 'konversiSatuan.satuan'])
+            ->where('is_active', true)
+            ->orderBy('nama_barang')
+            ->get();
 
         return view('pembelian.create', [
             'title' => 'Tambah Pembelian',
             'routeBase' => $this->routeBase,
             'prs' => $prs,
             'pihaks' => $pihaks,
-            'kasbanks' => $kasbanks,
             'barangs' => $barangs,
-            'satuans' => $satuans,
         ]);
     }
 
@@ -70,7 +67,12 @@ class PembelianController extends ModuleCrudController
     public function store(Request $request): RedirectResponse
     {
         try {
-            $koperasiId = auth()->user()->id_koperasi ?? app('koperasi_aktif');
+            $idEntitas = auth()->user()->id_entitas
+                ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+
+            if (!$idEntitas) {
+                throw new \RuntimeException('Entitas aktif tidak ditemukan. Masuk menggunakan akun koperasi yang terhubung ke entitas.');
+            }
 
             $validated = $request->validate([
                 'source' => 'required|in:from_pr,quick_purchase',
@@ -78,20 +80,11 @@ class PembelianController extends ModuleCrudController
                     'exclude_unless:source,from_pr',
                     'required',
                     Rule::exists('permintaan_pengadaan', 'id_permintaan')
-                        ->where('id_koperasi', $koperasiId)
+                        ->where('id_entitas', $idEntitas)
                         ->where('status', 'disetujui'),
                 ],
                 'id_pihak' => 'required|exists:master_pihak,id_pihak',
                 'jenis_pembayaran' => 'required|in:tunai,transfer,kredit',
-                'id_kas_bank' => [
-                    'required_if:jenis_pembayaran,tunai,transfer',
-                    'exists:master_kas_bank,id_kas_bank',
-                    function ($attribute, $value, $fail) use ($koperasiId) {
-                        if (! KasBank::where('id_kas_bank', $value)->where('id_koperasi', $koperasiId)->exists()) {
-                            $fail('Kas/Bank tidak tersedia untuk koperasi aktif.');
-                        }
-                    },
-                ],
                 'tgl_jatuh_tempo' => [
                     'nullable',
                     'date_format:Y-m-d',
@@ -112,7 +105,6 @@ class PembelianController extends ModuleCrudController
                     $pr,
                     $validated['id_pihak'],
                     $validated['jenis_pembayaran'],
-                    $validated['id_kas_bank'] ?? null,
                     $validated['tgl_jatuh_tempo'] ?? null,
                 );
             } else {
@@ -128,8 +120,6 @@ class PembelianController extends ModuleCrudController
                     ->values()
                     ->all();
 
-                $idEntitas = auth()->user()->id_entitas ?? app('entitas_aktif');
-
                 $pembelian = PembelianService::createQuickPurchase(
                     $idEntitas,
                     (int) $validated['id_pihak'],
@@ -137,20 +127,7 @@ class PembelianController extends ModuleCrudController
                     (int) $validated['id_gudang'],
                     $items,
                     $validated['jenis_pembayaran'],
-                    $validated['id_kas_bank'] ?? null,
-                );
-
-                PembelianService::approvePembelian($pembelian);
-                PembelianService::createGRN(
-                    $pembelian->fresh('detail'),
-                    $pembelian->detail->map(fn ($detail) => [
-                        'id_detail' => $detail->id_detail,
-                        'qty_layak' => $detail->qty_dasar,
-                        'qty_tidak_layak' => 0,
-                        'harga_satuan' => $detail->faktor_konversi > 0
-                            ? $detail->harga_satuan_input / $detail->faktor_konversi
-                            : $detail->harga_satuan_input,
-                    ])->all(),
+                    $validated['tgl_jatuh_tempo'] ?? null,
                 );
             }
 
@@ -167,15 +144,11 @@ class PembelianController extends ModuleCrudController
     public function show(int|string $id): View
     {
         $pembelian = Pembelian::with($this->withRelations)->findOrFail($id);
-        $pihaks = Pihak::all();
-        $kasbanks = KasBank::all();
 
         return view('pembelian.show', [
             'title' => "Pembelian {$pembelian->kode_pembelian}",
             'routeBase' => $this->routeBase,
             'item' => $pembelian,
-            'pihaks' => $pihaks,
-            'kasbanks' => $kasbanks,
         ]);
     }
 
@@ -208,17 +181,10 @@ class PembelianController extends ModuleCrudController
     /**
      * Tampilkan form GRN (penerimaan barang)
      */
-    public function createGrn(Pembelian $pembelian): View
+    public function createGrn(Pembelian $pembelian): RedirectResponse
     {
-        if ($pembelian->status !== 'disetujui') {
-            abort(403, 'Pembelian harus disetujui terlebih dahulu.');
-        }
-
-        return view('pembelian.grn', [
-            'title' => "GRN untuk {$pembelian->kode_pembelian}",
-            'routeBase' => $this->routeBase,
-            'pembelian' => $pembelian->load('detail.barang'),
-        ]);
+        return redirect()->route("{$this->routeBase}.show", $pembelian)
+            ->with('info', 'Penerimaan Gudang belum dihubungkan pada tahap ini. Pembelian tetap tersimpan di modul Pembelian.');
     }
 
     /**
@@ -226,41 +192,16 @@ class PembelianController extends ModuleCrudController
      */
     public function storeGrn(Request $request, Pembelian $pembelian): RedirectResponse
     {
-        try {
-            $validated = $request->validate([
-                'items' => 'required|array',
-                'items.*.id_detail' => 'required|integer',
-                'items.*.qty_layak' => 'required|numeric|min:0',
-                'items.*.qty_tidak_layak' => 'nullable|numeric|min:0',
-                'items.*.harga_satuan' => 'required|numeric|min:0',
-            ]);
-
-            if (count($validated['items']) !== count(array_unique(array_column($validated['items'], 'id_detail')))) {
-                throw new \Exception('Detail pembelian tidak boleh dikirim lebih dari satu kali.');
-            }
-
-            $penerimaan = PembelianService::createGRN($pembelian, $validated['items']);
-
-            return redirect()->route("{$this->routeBase}.show", $pembelian->id_pembelian)
-                ->with('success', "GRN {$penerimaan->kode_penerimaan} dibuat dan diposting.");
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', $e->getMessage());
-        }
+        return redirect()->route("{$this->routeBase}.show", $pembelian)
+            ->with('info', 'Penerimaan Gudang belum dihubungkan pada tahap ini.');
     }
 
     /**
      * Tampilkan retur pembelian
      */
-    public function showRetur(Pembelian $pembelian): View
+    public function showRetur(Pembelian $pembelian): RedirectResponse
     {
-        $returs = $pembelian->returs()->with('detail')->get();
-
-        return view('pembelian.retur.index', [
-            'title' => "Retur untuk {$pembelian->kode_pembelian}",
-            'routeBase' => $this->routeBase,
-            'pembelian' => $pembelian,
-            'returs' => $returs,
-        ]);
+        return redirect()->route('pembelian.retur.index');
     }
 }
 

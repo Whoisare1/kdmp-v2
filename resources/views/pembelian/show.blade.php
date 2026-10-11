@@ -1,13 +1,12 @@
 <x-layouts.app :title="$title" eyebrow="Detail Pembelian">
 
-```
 <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
     {{-- Informasi Utama --}}
     <div class="md:col-span-2 xl:col-span-2">
 
         @if (session('success'))
-            <div class="mb-4 rounded-sm border border-paper-300 bg-paper-100 p-4 text-sm text-ink-800">
+                <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                 {{ session('success') }}
             </div>
         @endif
@@ -34,12 +33,6 @@
                 <div class="flex flex-wrap gap-2">
                     <span class="rounded-sm bg-paper-200 px-2 py-1 text-xs font-medium text-ink-800">
                         {{ ucfirst($item->status) }}
-                    </span>
-
-                    <span class="rounded-sm px-2 py-1 text-xs font-medium {{ $item->status_posting === 'T'
-                        ? 'bg-paper-200 text-ink-800'
-                        : 'bg-merah-50 text-merah-800' }}">
-                        Posting: {{ $item->status_posting === 'T' ? 'Ya' : 'Belum' }}
                     </span>
                 </div>
             </div>
@@ -212,7 +205,7 @@
                 </h4>
 
                 <p class="mt-1 text-sm text-ink-700">
-                    Pembelian perlu disetujui terlebih dahulu sebelum barang dapat diterima.
+                    Pembelian belum disetujui.
                 </p>
             </div>
 
@@ -220,11 +213,11 @@
 
             <div class="rounded-sm border border-paper-300 bg-paper-100 p-4">
                 <h4 class="font-semibold text-ink-900">
-                    Pembelian Siap Diterima
+                    Pembelian Disetujui
                 </h4>
 
                 <p class="mt-1 text-sm text-ink-700">
-                    Pembelian sudah disetujui. Silakan buat GRN ketika barang telah diterima.
+                    Pembelian sudah tercatat dan disetujui di modul Pembelian.
                 </p>
             </div>
 
@@ -232,11 +225,11 @@
 
             <div class="rounded-sm border border-paper-300 bg-paper-100 p-4">
                 <h4 class="font-semibold text-ink-900">
-                    Barang Sudah Diterima
+                    Pembelian Selesai
                 </h4>
 
                 <p class="mt-1 text-sm text-ink-700">
-                    Penerimaan barang telah dicatat dan stok telah diperbarui.
+                    Status selesai tercatat pada modul Pembelian.
                 </p>
             </div>
 
@@ -266,7 +259,7 @@
 
                         <button
                             type="submit"
-                            class="w-full rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600"
+                            class="w-full rounded-sm bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
                         >
                             ✓ Setujui
                         </button>
@@ -281,24 +274,6 @@
                             Batalkan Pembelian
                         </button>
                     </form>
-                @endif
-
-                @if ($item->status === 'disetujui')
-                    <a
-                        href="{{ route('pembelian.create-grn', $item) }}"
-                        class="block w-full rounded-sm bg-merah-500 px-4 py-2 text-center text-sm font-medium text-paper-50 hover:bg-merah-600"
-                    >
-                        📦 Buat GRN
-                    </a>
-                @endif
-
-                @if (in_array($item->status, ['disetujui', 'diterima', 'selesai']))
-                    <a
-                        href="{{ route('pembelian.show-retur', $item) }}"
-                        class="block w-full rounded-sm border border-paper-300 px-4 py-2 text-center text-sm font-medium text-ink-700 hover:bg-paper-100"
-                    >
-                        ↩️ Lihat Retur
-                    </a>
                 @endif
 
                 @if ($item->status === 'dibatalkan')
@@ -324,54 +299,6 @@
             </div>
         </div>
 
-        {{-- Informasi Jurnal --}}
-        @if ($item->id_jurnal)
-
-            <div class="mt-4 rounded-sm border border-paper-300 bg-paper-50 p-4">
-
-                <h3 class="mb-3 font-semibold text-ink-900">
-                    Jurnal Pembelian
-                </h3>
-
-                <div class="space-y-3 text-sm">
-
-                    <div>
-                        <div class="font-medium text-ink-600">
-                            No Jurnal
-                        </div>
-
-                        <div class="mt-1 text-ink-900">
-                            {{ $item->jurnal->no_jurnal ?? 'N/A' }}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="font-medium text-ink-600">
-                            Status
-                        </div>
-
-                        <div class="mt-1 text-ink-900">
-                            {{ $item->jurnal->status ?? 'N/A' }}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="font-medium text-ink-600">
-                            Tanggal
-                        </div>
-
-                        <div class="mt-1 text-ink-900">
-                            {{ $item->jurnal?->tanggal_jurnal?->format('d M Y') ?? 'N/A' }}
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        @endif
-
     </div>
 </div>
-```
-
 </x-layouts.app>
