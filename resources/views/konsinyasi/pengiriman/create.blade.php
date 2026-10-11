@@ -107,8 +107,41 @@
 
     <script>
         let rowCount = 1;
-        const barangOptions = `@foreach ($barang as $item)<option value="{{ $item->id_barang }}">{{ $item->kode_barang }} - {{ $item->nama_barang }}</option>@endforeach`;
-        function tambahBaris() { document.getElementById('itemRows').insertAdjacentHTML('beforeend', `<tr class="barangRow border-b border-paper-200 last:border-0"><td class="px-3 py-2"><select name="items[${rowCount}][id_barang]" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"><option value="">Pilih barang</option>${barangOptions}</select></td><td class="px-3 py-2"><input type="number" name="items[${rowCount}][qty_dasar]" value="1" min="0.0001" step="0.0001" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"></td><td class="px-3 py-2"><input type="number" name="items[${rowCount}][harga_titip_satuan]" value="0" min="0" step="0.01" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"></td><td class="px-3 py-2"><input type="number" name="items[${rowCount}][harga_jual_saran]" value="0" min="0" step="0.01" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"></td><td class="px-3 py-2 text-center"><button type="button" onclick="hapusBaris(this)" class="text-xs text-merah-600 hover:text-merah-700">Hapus</button></td></tr>`); rowCount++; }
+        const barangData = @json($barang->map(fn ($item) => [
+            'id' => $item->id_barang,
+            'label' => $item->kode_barang . ' - ' . $item->nama_barang,
+        ])->all());
+
+        function buildBarangOptions(selectedId = '') {
+            const options = ['<option value="">Pilih barang</option>'];
+
+            barangData.forEach((item) => {
+                const selected = String(item.id) === String(selectedId) ? ' selected' : '';
+                options.push(`<option value="${item.id}"${selected}>${item.label}</option>`);
+            });
+
+            return options.join('');
+        }
+
+        function tambahBaris() {
+            const rowHtml = `
+                <tr class="barangRow border-b border-paper-200 last:border-0">
+                    <td class="px-3 py-2">
+                        <select name="items[${rowCount}][id_barang]" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs">
+                            ${buildBarangOptions()}
+                        </select>
+                    </td>
+                    <td class="px-3 py-2"><input type="number" name="items[${rowCount}][qty_dasar]" value="1" min="0.0001" step="0.0001" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"></td>
+                    <td class="px-3 py-2"><input type="number" name="items[${rowCount}][harga_titip_satuan]" value="0" min="0" step="0.01" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"></td>
+                    <td class="px-3 py-2"><input type="number" name="items[${rowCount}][harga_jual_saran]" value="0" min="0" step="0.01" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5 text-xs"></td>
+                    <td class="px-3 py-2 text-center"><button type="button" onclick="hapusBaris(this)" class="text-xs text-merah-600 hover:text-merah-700">Hapus</button></td>
+                </tr>
+            `;
+
+            document.getElementById('itemRows').insertAdjacentHTML('beforeend', rowHtml);
+            rowCount++;
+        }
+
         function hapusBaris(button) { const rows = document.querySelectorAll('.barangRow'); if (rows.length > 1) button.closest('tr').remove(); }
 
         const gudangData = @json($gudangData);

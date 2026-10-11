@@ -32,7 +32,7 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             ->get();
 
         return view('konsinyasi.pengiriman.create', [
-            'koperasi' => Entitas::query()->where('is_active', true)->orderBy('nama_entitas')->get(),
+            'entitas' => Entitas::query()->where('is_active', true)->orderBy('nama_entitas')->get(),
             'gudang' => $gudang,
             'gudangData' => $gudang->map(function ($item) {
                 return [
@@ -69,7 +69,6 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             'id_gudang_tujuan.different' => 'Gudang tujuan harus berbeda dari gudang asal.',
             'id_entitas_pemilik.different' => 'Desa pemilik dan desa penerima harus berbeda.',
         ]);
-
         $gudang = Gudang::query()
             ->withoutGlobalScopes()
             ->whereIn('id_gudang', [$data['id_gudang_asal'], $data['id_gudang_tujuan']])
@@ -159,4 +158,3 @@ class PengirimanKonsinyasiController extends ModuleCrudController
             ->with('warning', 'Halaman posting hanya diproses melalui tombol Posting Pengiriman.');
     }
 }
-
