@@ -76,7 +76,7 @@
                     <div class="mt-4 overflow-hidden rounded-sm border border-paper-300">
                         <div class="flex items-center justify-between bg-paper-100 px-3 py-2">
                             <h4 class="text-sm font-semibold text-ink-900">Daftar Barang</h4>
-                            <button type="button" onclick="addQuickPurchaseRow()" class="rounded-sm bg-merah-500 px-2 py-1 text-xs font-medium text-paper-50 hover:bg-merah-600">
+                            <button type="button" onclick="addQuickPurchaseRow()" class="rounded-sm bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700">
                                 + Tambah Baris
                             </button>
                         </div>
@@ -94,19 +94,16 @@
                                 <tbody id="quick_purchase_rows">
                                     <tr class="quick-purchase-row">
                                         <td class="px-3 py-2">
-                                            <select name="items[0][id_barang]" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
+                                            <select name="items[0][id_barang]" onchange="updateQuickPurchaseUnits(this)" class="quick-purchase-barang w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
                                                 <option value="">-- Pilih Barang --</option>
                                                 @foreach ($barangs as $barang)
-                                                    <option value="{{ $barang->id_barang }}">{{ $barang->nama_barang }}</option>
+                                                    <option value="{{ $barang->id_barang }}" data-base-unit="{{ $barang->id_satuan_dasar }}" data-base-code="{{ $barang->satuanDasar?->kode_satuan }}" data-conversions="{{ $barang->konversiSatuan->map(fn ($conversion) => ['id' => (int) $conversion->id_satuan, 'code' => $conversion->satuan?->kode_satuan, 'factor' => (float) $conversion->faktor_ke_dasar, 'default' => (bool) $conversion->is_default_beli])->values()->toJson() }}">{{ $barang->nama_barang }}</option>
                                                 @endforeach
                                             </select>
                                         </td>
                                         <td class="px-3 py-2">
-                                            <select name="items[0][id_satuan]" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
-                                                <option value="">-- Satuan --</option>
-                                                @foreach ($satuans as $satuan)
-                                                    <option value="{{ $satuan->id }}">{{ $satuan->kode_satuan }}</option>
-                                                @endforeach
+                                            <select name="items[0][id_satuan]" required disabled class="quick-purchase-unit w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
+                                                <option value="">-- Pilih Barang dahulu --</option>
                                             </select>
                                         </td>
                                         <td class="px-3 py-2">
@@ -147,19 +144,6 @@
                                 <option value="kredit">Kredit</option>
                             </select>
                         </label>
-                        <div id="kas_bank_section">
-                            <label class="block text-sm">
-                                <span class="text-ink-700 font-medium">Kas/Bank *</span>
-                                <select name="id_kas_bank" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
-                                    <option value="">-- Pilih Kas/Bank --</option>
-                                    @foreach ($kasbanks as $kb)
-                                        <option value="{{ $kb->id_kas_bank }}" @selected(old('id_kas_bank') == $kb->id_kas_bank)>
-                                            {{ $kb->nama }} ({{ strtoupper($kb->jenis) }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </label>
-                        </div>
                         <div id="jatuh_tempo_section" style="display: none;">
                             <label class="block text-sm">
                                 <span class="text-ink-700 font-medium">Tanggal Jatuh Tempo *</span>
@@ -170,7 +154,7 @@
                 </div>
 
                 <div class="flex gap-2">
-                    <button type="submit" class="rounded-sm bg-merah-500 px-4 py-2 font-medium text-paper-50 hover:bg-merah-600">
+                    <button type="submit" class="rounded-sm bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700">
                         Lanjutkan
                     </button>
                     <a href="{{ route("$routeBase.index") }}" class="rounded-sm border border-paper-300 px-4 py-2 text-ink-700 hover:bg-paper-100">
@@ -184,10 +168,9 @@
             <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
                 <h3 class="mb-3 font-semibold text-ink-900">Alur Pembelian</h3>
                 <ol class="list-inside list-decimal space-y-1 text-sm text-ink-700">
-                    <li><strong>Draft:</strong> Form dibuat</li>
-                    <li><strong>Disetujui:</strong> Manager approve</li>
-                    <li><strong>Diterima:</strong> Barang tiba (GRN)</li>
-                    <li><strong>Selesai:</strong> Pembayaran selesai</li>
+                    <li><strong>Draft:</strong> Pembelian dicatat</li>
+                    <li><strong>Disetujui:</strong> Status diperbarui di modul Pembelian</li>
+                    <li><strong>Retur:</strong> Dicatat terpisah di menu Retur Pembelian</li>
                 </ol>
             </div>
         </div>
@@ -205,19 +188,51 @@
         function togglePaymentFields() {
             const jenis = document.querySelector('select[name="jenis_pembayaran"]').value;
             const isCredit = jenis === 'kredit';
-            const kasBank = document.querySelector('select[name="id_kas_bank"]');
             const jatuhTempo = document.querySelector('input[name="tgl_jatuh_tempo"]');
 
-            document.getElementById('kas_bank_section').style.display = isCredit ? 'none' : 'block';
             document.getElementById('jatuh_tempo_section').style.display = isCredit ? 'block' : 'none';
-            kasBank.disabled = isCredit;
-            kasBank.required = !isCredit;
             jatuhTempo.disabled = !isCredit;
             jatuhTempo.required = isCredit;
 
             if (!isCredit) {
                 jatuhTempo.value = '';
             }
+        }
+
+        function updateQuickPurchaseUnits(barangSelect) {
+            const row = barangSelect.closest('.quick-purchase-row');
+            const unitSelect = row.querySelector('.quick-purchase-unit');
+            const selectedBarang = barangSelect.selectedOptions[0];
+            const placeholder = new Option('-- Pilih Satuan --', '');
+            unitSelect.replaceChildren(placeholder);
+
+            if (!barangSelect.value) {
+                unitSelect.disabled = true;
+                return;
+            }
+
+            let conversions = JSON.parse(selectedBarang.dataset.conversions || '[]');
+            const baseUnitId = Number(selectedBarang.dataset.baseUnit);
+            if (!conversions.some((conversion) => Number(conversion.id) === baseUnitId)) {
+                conversions.push({
+                    id: baseUnitId,
+                    code: selectedBarang.dataset.baseCode,
+                    factor: 1,
+                    default: true,
+                });
+            }
+
+            conversions.sort((left, right) => Number(right.default) - Number(left.default));
+            conversions.forEach((conversion) => {
+                unitSelect.add(new Option(conversion.code, String(conversion.id)));
+            });
+
+            const preferred = conversions.find((conversion) => conversion.default)
+                ?? conversions.find((conversion) => Number(conversion.id) === baseUnitId);
+            if (preferred) {
+                unitSelect.value = String(preferred.id);
+            }
+            unitSelect.disabled = document.querySelector('input[name="source"]:checked').value !== 'quick_purchase';
         }
 
         function addQuickPurchaseRow() {
@@ -229,19 +244,16 @@
             row.className = 'quick-purchase-row';
             row.innerHTML = `
                 <td class="px-3 py-2">
-                    <select name="items[${index}][id_barang]" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
+                    <select name="items[${index}][id_barang]" onchange="updateQuickPurchaseUnits(this)" class="quick-purchase-barang w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
                         <option value="">-- Pilih Barang --</option>
                         @foreach ($barangs as $barang)
-                            <option value="{{ $barang->id_barang }}">{{ $barang->nama_barang }}</option>
+                            <option value="{{ $barang->id_barang }}" data-base-unit="{{ $barang->id_satuan_dasar }}" data-base-code="{{ $barang->satuanDasar?->kode_satuan }}" data-conversions="{{ $barang->konversiSatuan->map(fn ($conversion) => ['id' => (int) $conversion->id_satuan, 'code' => $conversion->satuan?->kode_satuan, 'factor' => (float) $conversion->faktor_ke_dasar, 'default' => (bool) $conversion->is_default_beli])->values()->toJson() }}">{{ $barang->nama_barang }}</option>
                         @endforeach
                     </select>
                 </td>
                 <td class="px-3 py-2">
-                    <select name="items[${index}][id_satuan]" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
-                        <option value="">-- Satuan --</option>
-                        @foreach ($satuans as $satuan)
-                            <option value="{{ $satuan->id }}">{{ $satuan->kode_satuan }}</option>
-                        @endforeach
+                    <select name="items[${index}][id_satuan]" required disabled class="quick-purchase-unit w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
+                        <option value="">-- Pilih Barang dahulu --</option>
                     </select>
                 </td>
                 <td class="px-3 py-2">
@@ -267,6 +279,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             toggleForm();
             togglePaymentFields();
+            document.querySelectorAll('.quick-purchase-barang').forEach(updateQuickPurchaseUnits);
         });
     </script>
 </x-layouts.app>
