@@ -70,7 +70,7 @@
             </header>
 
             {{-- Main Content Container --}}
-            <main class="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
+            <main class="flex-1 overflow-y-auto overflow-x-hidden min-w-0 px-4 py-8 sm:px-6 lg:px-8">
                 @if (session('info'))
                     <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 shadow-sm">
                         {{ session('info') }}

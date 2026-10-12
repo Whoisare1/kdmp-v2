@@ -26,13 +26,40 @@ class PublicMasyarakatSesi3Controller extends Controller
             ->firstOrFail();
 
         // Ambil komoditas unik dari tabel ProduksiProdusen (Master Data Produsen) untuk sesi ini
-        $komoditasList = ProduksiProdusen::where('id_sesi', $sesi->id)
+        $produsenKomoditas = ProduksiProdusen::where('id_sesi', $sesi->id)
             ->select('nama_komoditas as nama', 'satuan')
             ->distinct()
             ->orderBy('nama')
             ->get();
 
-        // Jika kosong (misal produsen belum input apa-apa), kembalikan array kosong agar warga bisa bebas ngetik
+        // Daftar komoditas pokok pangan keluarga standar untuk akurasi rekomendasi suara
+        $defaultKomoditas = collect([
+            (object)['nama' => 'Beras', 'satuan' => 'kg'],
+            (object)['nama' => 'Minyak Goreng', 'satuan' => 'liter'],
+            (object)['nama' => 'Gula Pasir', 'satuan' => 'kg'],
+            (object)['nama' => 'Telur Ayam', 'satuan' => 'kg'],
+            (object)['nama' => 'Daging Ayam', 'satuan' => 'kg'],
+            (object)['nama' => 'Daging Sapi', 'satuan' => 'kg'],
+            (object)['nama' => 'Bawang Merah', 'satuan' => 'kg'],
+            (object)['nama' => 'Bawang Putih', 'satuan' => 'kg'],
+            (object)['nama' => 'Cabai Rawit', 'satuan' => 'kg'],
+            (object)['nama' => 'Cabai Merah', 'satuan' => 'kg'],
+            (object)['nama' => 'Garam', 'satuan' => 'bungkus'],
+            (object)['nama' => 'Tahu', 'satuan' => 'potong'],
+            (object)['nama' => 'Tempe', 'satuan' => 'papan'],
+            (object)['nama' => 'Ikan Segar', 'satuan' => 'kg'],
+            (object)['nama' => 'Sayur Mayur', 'satuan' => 'ikat'],
+            (object)['nama' => 'Sayur Bayam', 'satuan' => 'ikat'],
+            (object)['nama' => 'Sayur Kangkung', 'satuan' => 'ikat'],
+            (object)['nama' => 'Wortel', 'satuan' => 'kg'],
+            (object)['nama' => 'Kentang', 'satuan' => 'kg'],
+            (object)['nama' => 'Tepung Terigu', 'satuan' => 'kg'],
+            (object)['nama' => 'Gas LPG 3kg', 'satuan' => 'tabung'],
+            (object)['nama' => 'Susu', 'satuan' => 'kaleng'],
+            (object)['nama' => 'Kopi / Teh', 'satuan' => 'bungkus'],
+        ]);
+
+        $komoditasList = $produsenKomoditas->concat($defaultKomoditas)->unique('nama')->values();
         
         // Ambil data konsumsi yang sudah tersimpan (jika ada)
         $konsumsiTersimpan = KonsumsiKeluarga::where('id_masyarakat', $masyarakat->id)

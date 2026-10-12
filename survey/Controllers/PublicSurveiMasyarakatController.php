@@ -34,17 +34,67 @@ class PublicSurveiMasyarakatController extends Controller
             abort(403, "Tautan survei ini sudah kedaluwarsa. Survei ini ditutup karena hanya berlaku untuk periode bulan " . $sesi->bulan . " tahun " . $sesi->tahun . ".");
         }
 
-        // Ambil struktur wilayah Pati
+        // Ambil data Koperasi Desa (Master Entitas) untuk basis wilayah desa
+        $entitasSesi = \App\Models\Tenant\Entitas::with('wilayah')->where('id_wilayah', $sesi->id_wilayah)->first();
+        $daftarKoperasi = \App\Models\Tenant\Entitas::with('wilayah')->get();
+        $desaSesi = $sesi->wilayah?->nama ?? $entitasSesi?->wilayah?->nama ?? 'Desa Mekar Jaya';
+
+        // Ambil struktur wilayah Pati jika tersedia
         $wilayahTree = \App\Models\Tenant\Wilayah::where('tingkat', 'kab')
             ->with(['anak.anak']) // Load kecamatan dan desa
             ->get();
+
+        // Ambil semua daftar wilayah desa
+        $daftarWilayah = \App\Models\Tenant\Wilayah::where(function($q) {
+            $q->where('tingkat', 'desa')->orWhereNull('tingkat');
+        })->get();
 
         return view('survei.public.masyarakat', [
             'sesi'  => $sesi,
             'token' => $token,
             'wilayahTree' => $wilayahTree,
+            'entitasSesi' => $entitasSesi,
+            'daftarKoperasi' => $daftarKoperasi,
+            'daftarWilayah' => $daftarWilayah,
+            'desaSesi' => $desaSesi,
             'masyarakat' => $masyarakat,
         ]);
+    }
+
+    /**
+     * Cari wilayah desa yang cocok berdasarkan input nama desa dari responden.
+     */
+    private function resolveWilayahDesa(?string $inputDesa, int $defaultWilayahId): \App\Models\Tenant\Wilayah
+    {
+        if (empty($inputDesa)) {
+            return \App\Models\Tenant\Wilayah::find($defaultWilayahId) 
+                ?? \App\Models\Tenant\Wilayah::first();
+        }
+
+        $clean = trim(str_ireplace(['desa ', 'kelurahan '], '', $inputDesa));
+
+        // 1. Coba exact match nama desa
+        $match = \App\Models\Tenant\Wilayah::where(function($q) use ($inputDesa, $clean) {
+            $q->where('nama', $inputDesa)
+              ->orWhere('nama', 'like', "%{$clean}%")
+              ->orWhere('nama', 'like', "%{$inputDesa}%");
+        })->first();
+
+        if ($match) {
+            return $match;
+        }
+
+        // 2. Coba match dengan nama entitas koperasi jika desa dinamai koperasi
+        $entitas = \App\Models\Tenant\Entitas::with('wilayah')
+            ->where('nama_entitas', 'like', "%{$clean}%")
+            ->first();
+
+        if ($entitas && $entitas->wilayah) {
+            return $entitas->wilayah;
+        }
+
+        return \App\Models\Tenant\Wilayah::find($defaultWilayahId) 
+            ?? \App\Models\Tenant\Wilayah::first();
     }
 
     /**
@@ -77,30 +127,52 @@ class PublicSurveiMasyarakatController extends Controller
             'longitude' => 'nullable|numeric',
         ]);
 
+        // Resolusi desa target berdasarkan input desa dari masyarakat
+        $targetWilayah = $this->resolveWilayahDesa($validated['desa'] ?? null, $sesi->id_wilayah);
+
+        // Cari atau buatkan sesi survei di desa target tersebut untuk periode bulan & tahun yang sama
+        $targetSesi = SesiSurvei::where('id_wilayah', $targetWilayah->id)
+            ->where('bulan', $sesi->bulan)
+            ->where('tahun', $sesi->tahun)
+            ->first();
+
+        if (!$targetSesi) {
+            $targetSesi = SesiSurvei::create([
+                'id_wilayah' => $targetWilayah->id,
+                'id_petugas' => $sesi->id_petugas ?? 1,
+                'tahun' => $sesi->tahun,
+                'bulan' => $sesi->bulan,
+                'tanggal_survei' => $sesi->tanggal_survei ?? now()->toDateString(),
+                'status' => 'DRAFT',
+                'token_rt' => \Illuminate\Support\Str::random(32),
+                'token_masyarakat' => \Illuminate\Support\Str::random(32),
+                'token_produsen' => \Illuminate\Support\Str::random(32),
+            ]);
+        }
+
         $dataToSave = [
-            'id_sesi' => $sesi->id,
-            'id_wilayah' => $sesi->id_wilayah,
+            'id_sesi' => $targetSesi->id,
+            'id_wilayah' => $targetWilayah->id,
             'nama_kepala_keluarga' => $validated['nama'],
-            'nomor_hp' => $validated['nomor_hp'],
+            'nomor_hp' => $validated['nomor_hp'] ?? null,
             'umur' => $validated['umur'],
             'jenis_kelamin' => $validated['jenis_kelamin'],
-            'provinsi' => $validated['provinsi'],
-            'kabupaten' => $validated['kabupaten'],
-            'kecamatan' => $validated['kecamatan'],
-            'desa' => $validated['desa'],
-            'dusun' => $validated['dusun'],
-            'rt' => $validated['rt'],
-            'rw' => $validated['rw'],
-            'nama_jalan' => $validated['nama_jalan'],
-            'nomor_rumah' => $validated['nomor_rumah'],
-            'detail_alamat' => $validated['detail_alamat'],
-            'latitude' => $validated['latitude'],
-            'longitude' => $validated['longitude'],
+            'provinsi' => $validated['provinsi'] ?? 'Jawa Tengah',
+            'kabupaten' => $validated['kabupaten'] ?? 'Pati',
+            'kecamatan' => $validated['kecamatan'] ?? null,
+            'desa' => $targetWilayah->nama ?? ($validated['desa'] ?? null),
+            'dusun' => $validated['dusun'] ?? null,
+            'rt' => $validated['rt'] ?? null,
+            'rw' => $validated['rw'] ?? null,
+            'nama_jalan' => $validated['nama_jalan'] ?? null,
+            'nomor_rumah' => $validated['nomor_rumah'] ?? null,
+            'detail_alamat' => $validated['detail_alamat'] ?? null,
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
         ];
 
         if ($request->has('id_masyarakat')) {
             $masyarakat = MasyarakatDesa::where('id', $request->input('id_masyarakat'))
-                ->where('id_sesi', $sesi->id)
                 ->firstOrFail();
             $masyarakat->update($dataToSave);
         } else {
@@ -108,20 +180,20 @@ class PublicSurveiMasyarakatController extends Controller
         }
 
         $redirectUrl = route('survei.public.masyarakat.anggota.show', [
-            'token' => $token,
+            'token' => $targetSesi->token_masyarakat,
             'id_masyarakat' => $masyarakat->id
         ]);
 
         if ($request->query('redirect') === 'review') {
             $redirectUrl = route('survei.public.masyarakat.review.show', [
-                'token' => $token,
+                'token' => $targetSesi->token_masyarakat,
                 'id_masyarakat' => $masyarakat->id
             ]);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Data lokasi berhasil dicatat',
+            'message' => 'Data lokasi berhasil dicatat untuk ' . ($targetWilayah->nama ?? 'desa'),
             'redirect_url' => $redirectUrl
         ]);
     }

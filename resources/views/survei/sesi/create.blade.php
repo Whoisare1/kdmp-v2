@@ -30,13 +30,13 @@
                 @enderror
             </div>
 
-            {{-- Petugas Survei --}}
+            {{-- Penanggung Jawab --}}
             <div class="mb-5">
-                <label for="id_petugas" class="mb-1 block text-sm font-medium text-ink-800">Petugas Survei / Penanggung Jawab</label>
+                <label for="id_petugas" class="mb-1 block text-sm font-medium text-ink-800">Penanggung Jawab</label>
                 @if($wilayahs->count() === 1)
                     {{-- Otomatis gunakan akun manajer desa yang sedang login --}}
                     <input type="hidden" name="id_petugas" value="{{ auth()->id() }}">
-                    <input type="text" value="{{ auth()->user()->nama ?? 'Petugas Survei' }}" readonly class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-700 cursor-not-allowed font-medium">
+                    <input type="text" value="{{ auth()->user()->nama ?? 'Penanggung Jawab' }}" readonly class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-700 cursor-not-allowed font-medium">
                 @else
                     <select name="id_petugas" id="id_petugas" required class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
                         @foreach($petugasList as $petugas)
@@ -87,11 +87,10 @@
 
             {{-- Opsi Salin Data --}}
             <div class="mb-8 rounded-sm border border-sawah-200 bg-sawah-50 p-4">
-                <label class="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" name="salin_data" value="1" checked class="mt-0.5 h-4 w-4 rounded border-paper-300 text-merah-600 focus:ring-merah-500">
-                    <span class="text-xs text-sawah-900 leading-relaxed">
-                        <strong>Otomatis Salin Data Periode Sebelumnya</strong><br>
-                        Salin narasumber & demografi dari survei sebelumnya di desa yang sama sebagai acuan. Petugas cukup memperbarui perubahan jika ada.
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="salin_data" value="1" checked class="h-4 w-4 rounded border-paper-300 text-merah-600 focus:ring-merah-500">
+                    <span class="text-xs font-semibold text-sawah-900">
+                        Otomatis Salin Data Periode Sebelumnya
                     </span>
                 </label>
             </div>

@@ -173,12 +173,17 @@
                     @if($konsumsi->harga)
                         <p class="text-sm font-medium text-slate-500 mb-1">
                             @if($konsumsi->tipe_harga == 'Satuan')
-                                Harga {{ $konsumsi->satuan }}
+                                Harga / {{ $konsumsi->satuan }}
                             @else
-                                Total Harga
+                                Total Harga / Bulan
                             @endif
                         </p>
                         <p class="font-bold text-slate-800">Rp {{ number_format($konsumsi->harga, 0, ',', '.') }}</p>
+                        @if($konsumsi->tipe_harga == 'Satuan' && $konsumsi->jumlah)
+                            <p class="text-xs text-emerald-600 font-semibold mt-1">
+                                Total: Rp {{ number_format($konsumsi->harga * $konsumsi->jumlah, 0, ',', '.') }} / bln
+                            </p>
+                        @endif
                     @endif
                     @if($konsumsi->lokasi_pemenuhan)
                         <p class="text-xs text-slate-500 mt-1">
