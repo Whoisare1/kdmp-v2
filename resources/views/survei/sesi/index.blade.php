@@ -79,7 +79,6 @@
                         <th class="px-4 py-3 font-semibold">Tahun</th>
                         <th class="px-4 py-3 font-semibold">Bulan</th>
                         <th class="px-4 py-3 font-semibold">Tanggal Pelaksanaan</th>
-                        <th class="px-4 py-3 font-semibold">Status Sesi</th>
                         <th class="px-4 py-3 text-right font-semibold">Aksi</th>
                     </tr>
                 </thead>
@@ -92,14 +91,6 @@
                                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
                             ];
                             $namaBulan = $bulans[$item->bulan] ?? $item->bulan;
-
-                            $progressText = $item->progress_sesi_text;
-                            $countDone = (int) explode('/', $progressText)[0];
-                            $statusCls = match(true) {
-                                $countDone >= 4 => 'bg-emerald-100 text-emerald-800 border-emerald-300',
-                                $countDone > 0  => 'bg-amber-100 text-amber-800 border-amber-300',
-                                default         => 'bg-paper-200 text-ink-600 border-paper-300',
-                            };
                         @endphp
                         <tr class="hover:bg-paper-100/70 transition-colors">
                             <td class="px-4 py-3 text-ink-900 font-medium text-xs">
@@ -117,11 +108,6 @@
                             <td class="px-4 py-3 text-ink-600 text-xs font-mono">
                                 {{ $item->tanggal_survei ? $item->tanggal_survei->format('d M Y') : '-' }}
                             </td>
-                            <td class="px-4 py-3">
-                                <span class="inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ $statusCls }}">
-                                    {{ $progressText }} Sesi
-                                </span>
-                            </td>
                             <td class="px-4 py-3 text-right whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="{{ route($routeBase . '.show', $item->id) }}"
@@ -138,7 +124,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-12 text-center text-sm text-ink-400">
+                            <td colspan="6" class="px-4 py-12 text-center text-sm text-ink-400">
                                 Tidak ada sesi survei yang cocok dengan kata kunci pencarian.
                             </td>
                         </tr>

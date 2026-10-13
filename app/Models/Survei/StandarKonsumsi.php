@@ -1,6 +1,6 @@
 <?php
 
-namespace Survei\Models;
+namespace App\Models\Survei;
 
 use App\Models\Master\Komoditas;
 use Illuminate\Database\Eloquent\Model;
@@ -100,7 +100,7 @@ class StandarKonsumsi extends Model
             'mingguan' => $nilai * 52,
             'bulanan'  => $nilai * 12,
             'tahunan'  => $nilai,
-            default    => $nilai * 12,
+            default    => $nilai,
         };
     }
 }

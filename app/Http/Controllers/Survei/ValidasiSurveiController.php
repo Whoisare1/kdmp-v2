@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Survei\RtDesa;
 use App\Models\Survei\MasyarakatDesa;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\SesiSurvei;
 
 class ValidasiSurveiController extends Controller
 {

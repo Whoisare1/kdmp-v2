@@ -1,6 +1,6 @@
 <?php
 
-namespace Survei\Models;
+namespace App\Models\Survei;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;

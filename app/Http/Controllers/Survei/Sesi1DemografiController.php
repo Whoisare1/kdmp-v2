@@ -1,11 +1,11 @@
 <?php
 
-namespace Survei\Controllers;
+namespace App\Http\Controllers\Survei;
 
 use App\Http\Controllers\Controller;
-use Survei\Models\SesiSurvei;
-use Survei\Models\NarasumberSesi;
-use Survei\Models\DemografiNarasumber;
+use App\Models\Survei\SesiSurvei;
+use App\Models\Survei\NarasumberSesi;
+use App\Models\Survei\DemografiNarasumber;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;

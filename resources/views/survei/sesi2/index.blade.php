@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="Manajemen Survei">
+﻿<x-layouts.app :title="$title" eyebrow="Manajemen Survei">
     @php
         $st2 = $sesi->status_sesi2 ?? 'belum_diisi';
         $st2Cls = match($st2) {
@@ -150,7 +150,7 @@
                                             <div class="flex flex-wrap gap-1.5">
                                                 @foreach($prodNs as $pItem)
                                                     @php
-                                                        $pItemKg = $pItem->jumlah_produksi_kg ?: \Survei\Models\ProduksiNarasumber::konversiKeKg($pItem->jumlah_produksi, $pItem->satuan);
+                                                        $pItemKg = $pItem->jumlah_produksi_kg ?: \App\Models\Survei\ProduksiNarasumber::konversiKeKg($pItem->jumlah_produksi, $pItem->satuan);
                                                         $isMass = in_array(strtolower(trim($pItem->satuan)), ['kg', 'ton', 'kuintal']);
                                                     @endphp
                                                     <span class="inline-flex items-center gap-1 rounded bg-sawah-100 text-sawah-900 border border-sawah-300 px-2 py-0.5 text-[11px] font-medium">
@@ -215,10 +215,10 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     @foreach($produksis as $prod)
                         @php
-                            $prodKg = $prod->jumlah_produksi_kg ?: \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->jumlah_produksi, $prod->satuan);
-                            $dijualKg = \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->jumlah_dijual, $prod->satuan);
-                            $konsumsiKg = \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->jumlah_dikonsumsi_sendiri, $prod->satuan);
-                            $sisaKg = \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->sisa_produksi, $prod->satuan);
+                            $prodKg = $prod->jumlah_produksi_kg ?: \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->jumlah_produksi, $prod->satuan);
+                            $dijualKg = \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->jumlah_dijual, $prod->satuan);
+                            $konsumsiKg = \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->jumlah_dikonsumsi_sendiri, $prod->satuan);
+                            $sisaKg = \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->sisa_produksi, $prod->satuan);
                             $isMass = in_array(strtolower(trim($prod->satuan)), ['kg', 'ton', 'kuintal']);
 
                             $bJson = $prod->bulan_panen_json;
@@ -327,7 +327,7 @@
                         <tbody class="divide-y divide-paper-200">
                             @foreach($produksis as $prod)
                                 @php
-                                    $prodKg = $prod->jumlah_produksi_kg ?: \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->jumlah_produksi, $prod->satuan);
+                                    $prodKg = $prod->jumlah_produksi_kg ?: \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->jumlah_produksi, $prod->satuan);
                                     $isMass = in_array(strtolower(trim($prod->satuan)), ['kg', 'ton', 'kuintal']);
                                     $bJson = $prod->bulan_panen_json;
                                     $mList = is_array($bJson) ? (isset($bJson['months']) ? $bJson['months'] : array_filter($bJson, fn($v)=>is_string($v))) : [];

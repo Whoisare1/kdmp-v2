@@ -1,13 +1,13 @@
 <?php
 
-namespace Survei\Controllers;
+namespace App\Http\Controllers\Survei;
 
 use App\Http\Controllers\Controller;
 use App\Models\Master\Komoditas;
 use App\Models\Survei\KonsumsiKeluarga;
 use App\Models\Survei\MasyarakatDesa;
 use App\Models\Survei\ProduksiProdusen;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\SesiSurvei;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;

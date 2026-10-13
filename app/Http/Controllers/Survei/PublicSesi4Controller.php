@@ -1,6 +1,6 @@
 <?php
 
-namespace Survei\Controllers;
+namespace App\Http\Controllers\Survei;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -8,28 +8,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Models\Master\Komoditas;
-use Survei\Models\PemenuhanKomoditas;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\PemenuhanKomoditas;
+use App\Models\Survei\SesiSurvei;
 
-class Sesi4PemenuhanController extends Controller
+class PublicSesi4Controller extends Controller
 {
-    private function checkHakAksesWilayah(SesiSurvei $sesi): void
-    {
-        $user = auth()->user();
-        if ($user && $user->id_koperasi) {
-            $userWilayahId = $user->koperasi?->id_wilayah;
-            if ($userWilayahId && (int) $sesi->id_wilayah !== (int) $userWilayahId) {
-                abort(403, 'Anda tidak memiliki hak akses untuk mengelola sesi survei desa ini.');
-            }
-        }
-    }
-
     // ─── Tampilkan Halaman Utama Sesi 4 ──────────────────────────────────────
 
-    public function show(SesiSurvei $sesi): View
+    public function show(string $token): View
     {
-        $this->checkHakAksesWilayah($sesi);
-        $sesi->load(['wilayah', 'petugas']);
+        $sesi = SesiSurvei::where('token_masyarakat', $token)
+            ->with(['wilayah', 'petugas'])
+            ->firstOrFail();
 
         // Data pemenuhan yang sudah diinput untuk sesi ini
         $pemenuhanList = PemenuhanKomoditas::with('komoditas')
@@ -62,14 +52,14 @@ class Sesi4PemenuhanController extends Controller
             'Lainnya'
         ];
 
-        return view('survei.sesi4.index', compact('sesi', 'pemenuhanList', 'komoditasList', 'SUMBER_PEMENUHAN'));
+        return view('survei.public.sesi4.index', compact('token', 'sesi', 'pemenuhanList', 'komoditasList', 'SUMBER_PEMENUHAN'));
     }
 
     // ─── Simpan Data Pemenuhan Komoditas ─────────────────────────────────────
 
-    public function store(Request $request, SesiSurvei $sesi): RedirectResponse
+    public function store(Request $request, string $token): RedirectResponse
     {
-        $this->checkHakAksesWilayah($sesi);
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         $validated = $request->validate([
             'id_komoditas'     => 'required|exists:komoditas,id',
@@ -114,15 +104,15 @@ class Sesi4PemenuhanController extends Controller
         });
 
         return redirect()
-            ->route('survei.sesi4.show', $sesi->id)
+            ->route('survei.public.sesi4.show', $token)
             ->with('success', 'Data harga dan pemenuhan komoditas berhasil disimpan.');
     }
 
     // ─── Hapus Data Pemenuhan Komoditas ──────────────────────────────────────
 
-    public function destroy(SesiSurvei $sesi, PemenuhanKomoditas $pemenuhan): RedirectResponse
+    public function destroy(string $token, PemenuhanKomoditas $pemenuhan): RedirectResponse
     {
-        $this->checkHakAksesWilayah($sesi);
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         if ((int) $pemenuhan->id_sesi !== (int) $sesi->id) {
             abort(404, 'Data tidak ditemukan di sesi ini.');
@@ -131,43 +121,42 @@ class Sesi4PemenuhanController extends Controller
         $pemenuhan->delete();
 
         return redirect()
-            ->route('survei.sesi4.show', $sesi->id)
+            ->route('survei.public.sesi4.show', $token)
             ->with('success', 'Data pemenuhan komoditas berhasil dihapus.');
     }
 
     // ─── Simpan Draft ────────────────────────────────────────────────────────
 
-    public function simpanDraft(SesiSurvei $sesi): RedirectResponse
+    public function simpanDraft(string $token): RedirectResponse
     {
-        $this->checkHakAksesWilayah($sesi);
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
         
         $sesi->update(['status_sesi4' => 'sedang_diisi']);
 
         return redirect()
-            ->route('survei.sesi4.show', $sesi->id)
+            ->route('survei.public.sesi4.show', $token)
             ->with('success', 'Sesi 4 berhasil disimpan sebagai Draft.');
     }
 
     // ─── Selesaikan Sesi 4 ───────────────────────────────────────────────────
 
-    public function selesaikan(SesiSurvei $sesi): RedirectResponse
+    public function selesaikan(string $token): RedirectResponse
     {
-        $this->checkHakAksesWilayah($sesi);
+        $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         if (!$sesi->pemenuhan()->exists()) {
             return redirect()
-                ->route('survei.sesi4.show', $sesi->id)
+                ->route('survei.public.sesi4.show', $token)
                 ->with('error', 'Tidak dapat menyelesaikan Sesi 4 karena belum ada data pemenuhan komoditas yang diinput.');
         }
 
         $sesi->update([
             'status_sesi4'            => 'selesai',
             'selesai_sesi4_at'        => now(),
-            'diselesaikan_sesi4_oleh' => auth()->id(),
         ]);
 
         return redirect()
-            ->route('survei.sesi.show', $sesi->id)
+            ->route('survei.public.show', $token)
             ->with('success', 'Sesi 4 berhasil diselesaikan!');
     }
 }

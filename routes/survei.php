@@ -13,10 +13,8 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Namespace controller fallback helper jika menggunakan namespace App\Http\Controllers\Survei
-$cSurvei = class_exists(\Survei\Controllers\SesiSurveiController::class)
-    ? '\Survei\Controllers\\'
-    : '\App\Http\Controllers\Survei\\';
+// Namespace controller survei terpusat di App\Http\Controllers\Survei
+$cSurvei = '\App\Http\Controllers\Survei\\';
 
 // =========================================================================
 // 1. RUTE PUBLIK (Tanpa Login / Berbasis Token Unik)
@@ -125,10 +123,7 @@ Route::middleware('auth')->group(function () use ($cSurvei) {
 
         // Hapus entri komoditas produksi dari halaman admin
         Route::delete('produksi/{id}', function (int $id) {
-            $modelClass = class_exists(\App\Models\Survei\ProduksiProdusen::class)
-                ? \App\Models\Survei\ProduksiProdusen::class
-                : '\Survei\Models\ProduksiProdusen';
-            $item = $modelClass::findOrFail($id);
+            $item = \App\Models\Survei\ProduksiProdusen::findOrFail($id);
             $item->delete();
             return redirect()->route('survei.produsen.index')->with('success', 'Data komoditas berhasil dihapus.');
         })->name('produksi.destroy');
