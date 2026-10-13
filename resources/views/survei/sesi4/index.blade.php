@@ -1,4 +1,4 @@
-<x-layouts.app title="Sesi 4: Pemenuhan & Harga Komoditas — KDMP" eyebrow="Manajemen Survei">
+﻿<x-layouts.app title="Sesi 4: Pemenuhan & Harga Komoditas — KDMP" eyebrow="Manajemen Survei">
 <div class="min-h-screen bg-paper-50 pb-20">
     <!-- Header Minimalis -->
     <div class="bg-white border-b border-paper-200 sticky top-0 z-30 shadow-sm">
@@ -77,7 +77,7 @@
                     @if($sesi->status_sesi4 == 'belum_diisi') bg-paper-100 text-ink-600
                     @elseif($sesi->status_sesi4 == 'sedang_diisi') bg-kuning-100 text-kuning-800
                     @else bg-hijau-100 text-hijau-800 @endif">
-                    {{ \Survei\Models\SesiSurvei::LABEL_STATUS_SESI4[$sesi->status_sesi4 ?? 'belum_diisi'] }}
+                    {{ \App\Models\Survei\SesiSurvei::LABEL_STATUS_SESI4[$sesi->status_sesi4 ?? 'belum_diisi'] }}
                 </span>
             </div>
         </div>

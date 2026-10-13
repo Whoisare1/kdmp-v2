@@ -4,7 +4,12 @@ namespace App\Http\Controllers\Survei;
 
 use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Models\Survei\SesiSurvei;
+use App\Models\Survei\NarasumberSesi;
+use App\Models\Survei\DemografiNarasumber;
+use App\Models\Survei\Jawaban;
+use App\Models\Survei\RekamanSuara;
 use App\Models\Tenant\Wilayah;
+use App\Models\Pengguna;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -18,9 +23,62 @@ class SesiSurveiController extends ModuleCrudController
     protected string $routeBase = 'survei.sesi';
     protected array $withRelations = ['wilayah', 'petugas'];
 
+    /**
+     * Mengambil ID wilayah milik desa pengguna yang sedang login.
+     * Return null jika pengguna adalah level Pusat / Super Admin (akses semua wilayah).
+     */
+    private function getUserWilayahId(): ?int
+    {
+        $user = auth()->user();
+        if (!$user || !$user->id_koperasi) {
+            return null;
+        }
+
+        return $user->koperasi?->id_wilayah;
+    }
+
+    private function checkHakAksesSesi(SesiSurvei $sesi): void
+    {
+        $userWilayahId = $this->getUserWilayahId();
+        if ($userWilayahId && (int) $sesi->id_wilayah !== (int) $userWilayahId) {
+            abort(403, 'Anda tidak memiliki hak akses untuk mengelola sesi survei desa ini.');
+        }
+    }
+
+    public function index(Request $request): View
+    {
+        $query = SesiSurvei::with(['wilayah', 'petugas', 'narasumber']);
+
+        if ($userWilayahId = $this->getUserWilayahId()) {
+            $query->where('id_wilayah', $userWilayahId);
+        }
+
+        if ($search = $request->query('q')) {
+            $query->whereHas('wilayah', function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%");
+            });
+        }
+
+        $items = $query->latest('id')->paginate(15)->withQueryString();
+
+        return view('survei.sesi.index', [
+            'items'     => $items,
+            'title'     => 'Daftar Sesi Survei',
+            'routeBase' => $this->routeBase,
+        ]);
+    }
+
     public function create(): View
     {
-        $wilayahs = Wilayah::all();
+        $userWilayahId = $this->getUserWilayahId();
+        if ($userWilayahId) {
+            $wilayahs = Wilayah::where('id', $userWilayahId)->get();
+        } else {
+            $wilayahs = Wilayah::all();
+        }
+
+        $petugasList = Pengguna::where('is_active', true)->get();
+
         $bulans = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
             5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
@@ -30,6 +88,7 @@ class SesiSurveiController extends ModuleCrudController
         return view('survei.sesi.create', [
             'title' => 'Buat Sesi Survei Baru',
             'wilayahs' => $wilayahs,
+            'petugasList' => $petugasList,
             'bulans' => $bulans,
             'routeBase' => $this->routeBase
         ]);
@@ -38,34 +97,59 @@ class SesiSurveiController extends ModuleCrudController
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'id_wilayah' => 'required|exists:wilayah,id',
-            'tahun' => 'required|integer|min:2000|max:2100',
-            'bulan' => 'required|integer|min:1|max:12',
+            'id_wilayah'     => 'required|exists:wilayah,id',
+            'id_petugas'     => 'nullable|exists:pengguna,id',
             'tanggal_survei' => 'required|date',
+            'tahun'          => 'nullable|integer|min:2000|max:2100',
+            'bulan'          => 'nullable|integer|min:1|max:12',
+            'salin_data'     => 'nullable|boolean',
         ]);
 
-        $validated['status'] = 'DRAFT';
-        $validated['token_rt'] = Str::random(32);
+        $userWilayahId = $this->getUserWilayahId();
+        if ($userWilayahId) {
+            $validated['id_wilayah'] = $userWilayahId;
+        }
+
+        if (empty($validated['tahun']) || empty($validated['bulan'])) {
+            $dt = \Illuminate\Support\Carbon::parse($validated['tanggal_survei']);
+            $validated['tahun'] = $validated['tahun'] ?? (int) $dt->format('Y');
+            $validated['bulan'] = $validated['bulan'] ?? (int) $dt->format('n');
+        }
+
+        $validated['status']           = 'DRAFT';
+        $validated['token_rt']         = Str::random(32);
         $validated['token_masyarakat'] = Str::random(32);
-        $validated['token_produsen'] = Str::random(32);
-        $validated['id_petugas'] = auth()->id();
+        $validated['token_produsen']   = Str::random(32);
+        $validated['id_petugas']       = $validated['id_petugas'] ?? auth()->id();
 
         $sesi = SesiSurvei::create($validated);
 
+        // Salin data narasumber & demografi dari periode sebelumnya secara otomatis jika opsi diaktifkan
+        $salin = $request->has('salin_data') ? $request->boolean('salin_data') : true;
+        $pesanSalin = '';
+        if ($salin) {
+            $disalin = $sesi->salinDataDariPeriodeSebelumnya();
+            if ($disalin) {
+                $pesanSalin = ' Data narasumber & demografi dari periode sebelumnya otomatis disalin sebagai acuan.';
+            }
+        }
+
         return redirect()->route('survei.sesi.show', $sesi->id)
-            ->with('success', 'Sesi survei berhasil dibuat. Silakan bagikan tautan ke petugas lapangan.');
+            ->with('success', 'Sesi survei berhasil dibuat.' . $pesanSalin);
+    }
+
+    /**
+     * Helper untuk menyalin data narasumber & demografi dari sesi survei sebelumnya di desa yang sama.
+     */
+    public function salinDataNarasumberSesiSebelumnya(SesiSurvei $targetSesi): bool
+    {
+        return $targetSesi->salinDataDariPeriodeSebelumnya();
     }
     
     public function show(int|string $id): View
     {
-        $item = SesiSurvei::with(['wilayah', 'petugas'])->findOrFail($id);
-        
-        // Auto-update status sesi 1 jika data RT sudah ada
-        $rtCount = \App\Models\Survei\RtDesa::where('id_sesi', $item->id)->count();
-        if ($rtCount > 0 && in_array($item->status_sesi1, ['belum_diisi', null])) {
-            $item->status_sesi1 = 'sedang_diisi'; // Mengubah status menjadi sedang diisi
-            $item->save();
-        }
+        $item = SesiSurvei::with(['wilayah.parent.parent.parent', 'petugas'])->findOrFail($id);
+        $this->checkHakAksesSesi($item);
         
         return view('survei.sesi.show', [
             'title' => 'Detail Sesi Survei',
@@ -77,8 +161,17 @@ class SesiSurveiController extends ModuleCrudController
     public function edit(int|string $id): View
     {
         $item = SesiSurvei::findOrFail($id);
+        $this->checkHakAksesSesi($item);
         
-        $wilayahs = Wilayah::all();
+        $userWilayahId = $this->getUserWilayahId();
+        if ($userWilayahId) {
+            $wilayahs = Wilayah::where('id', $userWilayahId)->get();
+        } else {
+            $wilayahs = Wilayah::all();
+        }
+
+        $petugasList = Pengguna::where('is_active', true)->get();
+
         $bulans = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
             5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
@@ -89,6 +182,7 @@ class SesiSurveiController extends ModuleCrudController
             'title' => 'Ubah Sesi Survei',
             'item' => $item,
             'wilayahs' => $wilayahs,
+            'petugasList' => $petugasList,
             'bulans' => $bulans,
             'routeBase' => $this->routeBase
         ]);
@@ -97,13 +191,26 @@ class SesiSurveiController extends ModuleCrudController
     public function update(Request $request, int|string $id): RedirectResponse
     {
         $sesi = SesiSurvei::findOrFail($id);
+        $this->checkHakAksesSesi($sesi);
 
         $validated = $request->validate([
-            'id_wilayah' => 'required|exists:wilayah,id',
-            'tahun' => 'required|integer|min:2000|max:2100',
-            'bulan' => 'required|integer|min:1|max:12',
+            'id_wilayah'     => 'required|exists:wilayah,id',
+            'id_petugas'     => 'nullable|exists:pengguna,id',
             'tanggal_survei' => 'required|date',
+            'tahun'          => 'nullable|integer|min:2000|max:2100',
+            'bulan'          => 'nullable|integer|min:1|max:12',
         ]);
+
+        $userWilayahId = $this->getUserWilayahId();
+        if ($userWilayahId) {
+            $validated['id_wilayah'] = $userWilayahId;
+        }
+
+        if (empty($validated['tahun']) || empty($validated['bulan'])) {
+            $dt = \Illuminate\Support\Carbon::parse($validated['tanggal_survei']);
+            $validated['tahun'] = $validated['tahun'] ?? (int) $dt->format('Y');
+            $validated['bulan'] = $validated['bulan'] ?? (int) $dt->format('n');
+        }
 
         $sesi->update($validated);
 
@@ -114,7 +221,24 @@ class SesiSurveiController extends ModuleCrudController
     public function destroy(int|string $id): RedirectResponse
     {
         $sesi = SesiSurvei::findOrFail($id);
-        $sesi->delete();
+        $this->checkHakAksesSesi($sesi);
+        
+        \Illuminate\Support\Facades\DB::transaction(function () use ($sesi) {
+            \Illuminate\Support\Facades\DB::table('demografi_desa')
+                ->where('id_sesi_survei', $sesi->id)
+                ->update(['id_sesi_survei' => null]);
+
+            \Illuminate\Support\Facades\DB::table('ketersediaan_komoditas')
+                ->where('id_sesi_survei', $sesi->id)
+                ->update(['id_sesi_survei' => null]);
+
+            DemografiNarasumber::where('id_sesi', $sesi->id)->delete();
+            NarasumberSesi::where('id_sesi', $sesi->id)->delete();
+            Jawaban::where('id_sesi', $sesi->id)->delete();
+            RekamanSuara::where('id_sesi', $sesi->id)->delete();
+
+            $sesi->delete();
+        });
 
         return back()->with('success', 'Sesi survei berhasil dihapus.');
     }

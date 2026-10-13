@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Survei\ProdusenDesa;
 use App\Models\Survei\ProduksiProdusen;
 use App\Models\Tenant\Wilayah;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\SesiSurvei;
 use Illuminate\Http\Request;
 
 class ProdusenDesaController extends Controller

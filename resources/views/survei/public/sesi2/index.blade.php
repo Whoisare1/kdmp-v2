@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="utf-8">
@@ -100,7 +100,7 @@
                                 <div class="mt-2 flex flex-wrap gap-1 border-t border-paper-200/60 pt-1.5">
                                     @foreach($prodNs as $pItem)
                                         @php
-                                            $pItemKg = $pItem->jumlah_produksi_kg ?: \Survei\Models\ProduksiNarasumber::konversiKeKg($pItem->jumlah_produksi, $pItem->satuan);
+                                            $pItemKg = $pItem->jumlah_produksi_kg ?: \App\Models\Survei\ProduksiNarasumber::konversiKeKg($pItem->jumlah_produksi, $pItem->satuan);
                                             $isMass = in_array(strtolower(trim($pItem->satuan)), ['kg', 'ton', 'kuintal']);
                                         @endphp
                                         <span class="inline-block rounded bg-sawah-100 text-sawah-800 border border-sawah-300 px-2 py-0.5 text-[10px] font-medium">
@@ -127,9 +127,9 @@
                 <div class="space-y-3">
                     @foreach($produksis as $prod)
                         @php
-                            $prodKg = $prod->jumlah_produksi_kg ?: \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->jumlah_produksi, $prod->satuan);
-                            $dijualKg = \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->jumlah_dijual, $prod->satuan);
-                            $sisaKg = \Survei\Models\ProduksiNarasumber::konversiKeKg($prod->sisa_produksi, $prod->satuan);
+                            $prodKg = $prod->jumlah_produksi_kg ?: \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->jumlah_produksi, $prod->satuan);
+                            $dijualKg = \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->jumlah_dijual, $prod->satuan);
+                            $sisaKg = \App\Models\Survei\ProduksiNarasumber::konversiKeKg($prod->sisa_produksi, $prod->satuan);
                             $isMass = in_array(strtolower(trim($prod->satuan)), ['kg', 'ton', 'kuintal']);
 
                             $bJson = $prod->bulan_panen_json;

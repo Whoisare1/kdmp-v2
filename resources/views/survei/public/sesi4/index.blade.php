@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="utf-8">
@@ -86,7 +86,7 @@
                     @if($sesi->status_sesi4 == 'belum_diisi') bg-paper-100 text-ink-600
                     @elseif($sesi->status_sesi4 == 'sedang_diisi') bg-kuning-100 text-kuning-800
                     @else bg-hijau-100 text-hijau-800 @endif">
-                    {{ \Survei\Models\SesiSurvei::LABEL_STATUS_SESI4[$sesi->status_sesi4 ?? 'belum_diisi'] }}
+                    {{ \App\Models\Survei\SesiSurvei::LABEL_STATUS_SESI4[$sesi->status_sesi4 ?? 'belum_diisi'] }}
                 </span>
             </div>
         </div>

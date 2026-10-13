@@ -498,7 +498,7 @@
             </div>
             <div class="card-body">
                 {{-- Nama --}}
-                <div class="field" x-data="micInput(() => namaResponden, v => namaResponden = v)">
+                <div class="field" x-data="micInput(() => namaResponden, v => namaResponden = v, 'name')">
                     <label class="field-label">Nama Lengkap Anda <span class="required">*</span></label>
                     <div class="input-wrap">
                         <input type="text" x-ref="el"
@@ -573,7 +573,7 @@
                 </div>
 
                 {{-- Nama komoditas --}}
-                <div class="field" x-data="micInput(() => namaKmd, v => namaKmd = v)">
+                <div class="field" x-data="micInput(() => namaKmd, v => namaKmd = v, 'komoditas', (qty, unit) => { if(qty) jumlah = qty; if(unit) satuan = unit; })">
                     <label class="field-label">Nama Komoditas / Produk <span class="required">*</span></label>
                     <div class="input-wrap">
                         <input type="text" x-ref="el"
@@ -591,7 +591,7 @@
 
                 {{-- Jumlah + Satuan --}}
                 <div class="grid-2">
-                    <div class="field" x-data="micInput(() => jumlah, v => jumlah = v, true)">
+                    <div class="field" x-data="micInput(() => jumlah, v => jumlah = v, 'number', (unit) => { if(unit) satuan = unit; })">
                         <label class="field-label">Jumlah Produksi</label>
                         <div class="input-wrap">
                             <input type="number" x-ref="el"
@@ -634,7 +634,7 @@
                 </div>
 
                 {{-- Keterangan --}}
-                <div class="field" x-data="micInput(() => ket, v => ket = v)">
+                <div class="field" x-data="micInput(() => ket, v => ket = v, 'text')">
                     <label class="field-label">Keterangan (Opsional)</label>
                     <div class="input-wrap textarea-wrap">
                         <textarea x-ref="el"
@@ -738,11 +738,16 @@
             </div>
             <div class="modal-body" style="display:flex;flex-direction:column;gap:0.875rem;">
                 {{-- Nama Komoditas --}}
-                <div class="field" style="margin-bottom:0;">
+                <div class="field" style="margin-bottom:0;" x-data="micInput(() => editForm.nama_komoditas, v => editForm.nama_komoditas = v, 'komoditas')">
                     <label class="field-label">Nama Komoditas <span class="required">*</span></label>
-                    <div class="input-wrap no-mic">
-                        <input type="text" x-model="editForm.nama_komoditas" placeholder="Nama komoditas..."
-                               style="padding-right:0.875rem;">
+                    <div class="input-wrap">
+                        <input type="text" x-ref="el" x-model="editForm.nama_komoditas" placeholder="Nama komoditas...">
+                        <button type="button" class="mic-btn" :class="{ listening: isListening }" @click="toggle()" title="Suara">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 {{-- Kategori + Sub --}}
@@ -782,11 +787,17 @@
                 </div>
                 {{-- Jumlah + Satuan --}}
                 <div class="grid-2">
-                    <div class="field" style="margin-bottom:0;">
+                    <div class="field" style="margin-bottom:0;" x-data="micInput(() => editForm.jumlah_produksi, v => editForm.jumlah_produksi = v, 'number', (unit) => { if(unit) editForm.satuan = unit; })">
                         <label class="field-label">Jumlah Produksi</label>
-                        <div class="input-wrap no-mic">
-                            <input type="number" x-model="editForm.jumlah_produksi"
-                                   min="0" step="0.01" placeholder="0" style="padding-right:0.875rem;font-weight:700;">
+                        <div class="input-wrap">
+                            <input type="number" x-ref="el" x-model="editForm.jumlah_produksi"
+                                   min="0" step="0.01" placeholder="0">
+                            <button type="button" class="mic-btn" :class="{ listening: isListening }" @click="toggle()" title="Suara">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <div class="field" style="margin-bottom:0;">
@@ -814,12 +825,17 @@
                     </div>
                 </div>
                 {{-- Keterangan --}}
-                <div class="field" style="margin-bottom:0;">
+                <div class="field" style="margin-bottom:0;" x-data="micInput(() => editForm.keterangan, v => editForm.keterangan = v, 'text')">
                     <label class="field-label">Keterangan</label>
-                    <div class="input-wrap no-mic textarea-wrap">
-                        <textarea x-model="editForm.keterangan"
-                                  rows="2" placeholder="Catatan tambahan..."
-                                  style="padding-right:0.875rem;"></textarea>
+                    <div class="input-wrap textarea-wrap">
+                        <textarea x-ref="el" x-model="editForm.keterangan"
+                                  rows="2" placeholder="Catatan tambahan..."></textarea>
+                        <button type="button" class="mic-btn" :class="{ listening: isListening }" @click="toggle()" title="Suara">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -915,44 +931,352 @@
 
         function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-        // Mic component — getter/setter pattern supaya bisa bind ke parent scope
-        function micInput(getter, setter, isNumber = false) {
+        // ========================================================
+        // ENGINE REKOGNISI SUARA TINGGI AKURASI (WEB SPEECH API)
+        // Multi-Hypothesis + Kamus Komoditas Pangan/Ekraf + Parser Angka
+        // ========================================================
+
+        // Kamus kanonikal komoditas pangan, pertanian, perkebunan, peternakan, perikanan & ekraf
+        const MASTER_KOMODITAS_DICT = [
+            'Beras', 'Padi', 'Jagung', 'Kedelai', 'Kacang Tanah', 'Kacang Hijau', 'Singkong', 'Ubi Jalar', 'Ubi Kayu',
+            'Kelapa', 'Kelapa Sawit', 'Kopi', 'Kopi Robusta', 'Kopi Arabika', 'Kakao', 'Cengkeh', 'Tebu', 'Tembakau', 'Karet',
+            'Sapi Potong', 'Sapi Perah', 'Sapi', 'Kambing', 'Domba', 'Ayam Broiler', 'Ayam Kampung', 'Ayam Petelur', 'Ayam',
+            'Bebek', 'Itik', 'Telur Ayam', 'Telur Bebek', 'Telur',
+            'Ikan Lele', 'Ikan Nila', 'Ikan Gurame', 'Ikan Bandeng', 'Ikan Patin', 'Ikan Mas', 'Udang', 'Garam', 'Gula Pasir', 'Gula', 'Gula Merah', 'Gula Jawa',
+            'Cabai Rawit', 'Cabai Merah', 'Cabai', 'Bawang Merah', 'Bawang Putih', 'Tomat', 'Wortel', 'Kentang', 'Kubis', 'Kol', 'Terong', 'Bayam', 'Kangkung',
+            'Semangka', 'Melon', 'Pisang', 'Mangga', 'Jeruk', 'Pepaya', 'Alpukat',
+            'Keripik Singkong', 'Keripik Tempe', 'Keripik Pisang', 'Keripik', 'Anyaman Bambu', 'Anyaman', 'Batik', 'Jamu Tradisional', 'Jamu', 'Madu'
+        ];
+
+        // Normalisasi kata & bobot kemiripan Levenshtein
+        function calcSimilarity(s1, s2) {
+            s1 = (s1 || '').toLowerCase().trim();
+            s2 = (s2 || '').toLowerCase().trim();
+            if (s1 === s2) return 1.0;
+            if (!s1 || !s2) return 0.0;
+
+            const c1 = s1.replace(/[^a-z0-9]/gi, '');
+            const c2 = s2.replace(/[^a-z0-9]/gi, '');
+            if (c1 === c2 && c1.length > 0) return 1.0;
+            if (c1.includes(c2) || c2.includes(c1)) return 0.95;
+
+            // Penyetaraan fonetik bilabial/labiodental (B <-> W <-> V <-> P, D <-> T)
+            const p1 = c1.replace(/[bwvp]/g, 'b').replace(/[dt]/g, 'd');
+            const p2 = c2.replace(/[bwvp]/g, 'b').replace(/[dt]/g, 'd');
+            if (p1 === p2 && p1.length > 0) return 0.98;
+
+            const m = c1.length, n = c2.length;
+            const d = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+            for (let i = 0; i <= m; i++) d[i][0] = i;
+            for (let j = 0; j <= n; j++) d[0][j] = j;
+
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    const ch1 = c1[i - 1], ch2 = c2[j - 1];
+                    let cost = 0;
+                    if (ch1 === ch2) {
+                        cost = 0;
+                    } else if ((/[bwvp]/.test(ch1) && /[bwvp]/.test(ch2)) || (/[dt]/.test(ch1) && /[dt]/.test(ch2))) {
+                        cost = 0.1;
+                    } else if ((ch1 === 'a' && ch2 === 'o') || (ch1 === 'o' && ch2 === 'a')) {
+                        cost = 0.15;
+                    } else {
+                        cost = 1.0;
+                    }
+                    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+                }
+            }
+            return Math.max(0, (Math.max(m, n) - d[m][n]) / Math.max(m, n));
+        }
+
+        // Deteksi Satuan dalam ucapan bahasa Indonesia
+        function detectUnit(str) {
+            const lower = (str || '').toLowerCase();
+            const unitPatterns = [
+                { regex: /\b(kilogram|kilo|kg)\b/i, unit: 'kg' },
+                { regex: /\b(ton)\b/i, unit: 'ton' },
+                { regex: /\b(kwintal|kuintal)\b/i, unit: 'kwintal' },
+                { regex: /\b(gram|gr)\b/i, unit: 'gram' },
+                { regex: /\b(liter|ltr)\b/i, unit: 'liter' },
+                { regex: /\b(buah|biji|butir|butir telur)\b/i, unit: 'buah' },
+                { regex: /\b(ikat)\b/i, unit: 'ikat' },
+                { regex: /\b(pack|pak|bungkus|bks)\b/i, unit: 'pack' },
+                { regex: /\b(karung|sak)\b/i, unit: 'karung' },
+                { regex: /\b(lusin)\b/i, unit: 'lusin' }
+            ];
+            for (const item of unitPatterns) {
+                if (item.regex.test(lower)) {
+                    return {
+                        unit: item.unit,
+                        cleaned: lower.replace(item.regex, '').trim()
+                    };
+                }
+            }
+            return { unit: null, cleaned: str };
+        }
+
+        // Konversi kata angka bahasa Indonesia ke angka desimal
+        function parseIndoNumber(text) {
+            if (!text) return '';
+            let s = text.toLowerCase().trim();
+
+            // Desimal & pecahan umum
+            s = s.replace(/,/g, '.');
+            s = s.replace(/(\d+)\s*koma\s*(\d+)/g, '$1.$2');
+            s = s.replace(/\bseperempat\b/g, '0.25');
+            s = s.replace(/\bsetengah\b/g, '0.5');
+            s = s.replace(/\btiga perempat\b/g, '0.75');
+            s = s.replace(/\bdua setengah\b/g, '2.5');
+            s = s.replace(/\bsatu setengah\b/g, '1.5');
+
+            const digitsOnly = s.match(/^\d+(\.\d+)?$/);
+            if (digitsOnly) return digitsOnly[0];
+
+            const numMap = {
+                'nol': 0, 'kosong': 0, 'satu': 1, 'dua': 2, 'tiga': 3, 'empat': 4,
+                'lima': 5, 'enam': 6, 'tujuh': 7, 'delapan': 8, 'sembilan': 9
+            };
+
+            s = s.replace(/\bkoma\s+([a-z]+)\b/g, (m, d) => {
+                return '.' + (numMap[d] !== undefined ? numMap[d] : d);
+            });
+
+            const words = s.split(/\s+/);
+            let total = 0;
+            let current = 0;
+            let hasNumberWord = false;
+
+            for (let i = 0; i < words.length; i++) {
+                const w = words[i];
+                if (numMap[w] !== undefined) {
+                    current += numMap[w];
+                    hasNumberWord = true;
+                } else if (w === 'sepuluh') {
+                    current += 10;
+                    hasNumberWord = true;
+                } else if (w === 'sebelas') {
+                    current += 11;
+                    hasNumberWord = true;
+                } else if (w === 'belas') {
+                    if (current === 0) current = 1;
+                    current += 10;
+                    hasNumberWord = true;
+                } else if (w === 'puluh') {
+                    if (current === 0) current = 1;
+                    current *= 10;
+                    hasNumberWord = true;
+                } else if (w === 'seratus') {
+                    current += 100;
+                    hasNumberWord = true;
+                } else if (w === 'ratus') {
+                    if (current === 0) current = 1;
+                    current *= 100;
+                    hasNumberWord = true;
+                } else if (w === 'seribu') {
+                    if (current === 0) current = 1;
+                    total += (current || 1) * 1000;
+                    current = 0;
+                    hasNumberWord = true;
+                } else if (w === 'ribu') {
+                    if (current === 0) current = 1;
+                    total += current * 1000;
+                    current = 0;
+                    hasNumberWord = true;
+                } else if (w === 'juta') {
+                    if (current === 0) current = 1;
+                    total += current * 1000000;
+                    current = 0;
+                    hasNumberWord = true;
+                } else if (!isNaN(parseFloat(w))) {
+                    current += parseFloat(w);
+                    hasNumberWord = true;
+                }
+            }
+            total += current;
+
+            if (hasNumberWord && total > 0) return String(total);
+            const rawMatch = s.match(/\d+(\.\d+)?/);
+            return rawMatch ? rawMatch[0] : '';
+        }
+
+        // Parsing Komoditas dengan pencocokan kamus kanonikal
+        function parseKomoditas(text) {
+            if (!text) return '';
+            let raw = text.trim();
+            // Bersihkan imbuhan ucapan awal
+            raw = raw.replace(/^(komoditas|komoditi|produk|tanaman|ternak|hasil panen|panen|usaha)\s+/i, '');
+
+            // Kumpulkan seluruh kamus kandidat (saran kategori aktif + saran umum + master)
+            const activeCategorySaran = (typeof SARAN === 'object' && SARAN) 
+                ? Object.values(SARAN).flat() 
+                : [];
+            const candidates = Array.from(new Set([...activeCategorySaran, ...MASTER_KOMODITAS_DICT]));
+
+            let bestMatch = null;
+            let highestScore = 0;
+
+            for (const item of candidates) {
+                const score = calcSimilarity(raw, item);
+                if (score > highestScore) {
+                    highestScore = score;
+                    bestMatch = item;
+                }
+            }
+
+            // Ambang batas akurasi fuzzy match 0.72
+            if (highestScore >= 0.72 && bestMatch) {
+                return bestMatch;
+            }
+
+            // Jika tidak ada di kamus, rapikan format kata (Title Case)
+            return raw.split(/\s+/).map(w => cap(w.toLowerCase())).join(' ');
+        }
+
+        // Mic component — Web Speech API tingkat akurasi tinggi
+        function micInput(getter, setter, type = 'text', extraCallback = null) {
             return {
-                isListening: false, rec: null,
+                isListening: false,
+                rec: null,
+                originalPlaceholder: '',
+                interimText: '',
+
                 init() {
                     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                     if (!SR) return;
+
                     this.rec = new SR();
                     this.rec.lang = 'id-ID';
                     this.rec.continuous = false;
-                    this.rec.interimResults = false;
-                    this.rec.onstart = () => this.isListening = true;
-                    this.rec.onend   = () => this.isListening = false;
-                    this.rec.onerror = () => this.isListening = false;
+                    this.rec.interimResults = true;
+                    this.rec.maxAlternatives = 10;
+
+                    this.rec.onstart = () => {
+                        this.isListening = true;
+                        this.interimText = '';
+                        if (this.$refs.el) {
+                            this.originalPlaceholder = this.$refs.el.placeholder || '';
+                            this.$refs.el.placeholder = '🎙️ Mendengarkan suara Anda...';
+                        }
+                    };
+
+                    this.rec.onend = () => {
+                        this.isListening = false;
+                        if (this.$refs.el && this.originalPlaceholder) {
+                            this.$refs.el.placeholder = this.originalPlaceholder;
+                        }
+                    };
+
+                    this.rec.onerror = (e) => {
+                        this.isListening = false;
+                        if (this.$refs.el && this.originalPlaceholder) {
+                            this.$refs.el.placeholder = this.originalPlaceholder;
+                        }
+                    };
+
                     this.rec.onresult = (e) => {
-                        let t = e.results[0][0].transcript;
-                        t = this.w2n(t).replace(/\./g,'');
-                        if (isNumber) {
-                            const n = t.replace(/[^0-9.]/g,'');
-                            setter(n || '');
-                            if (this.$refs.el) { this.$refs.el.value = n || ''; }
+                        let finalAlts = [];
+                        let interim = '';
+
+                        for (let i = e.resultIndex; i < e.results.length; ++i) {
+                            if (e.results[i].isFinal) {
+                                for (let j = 0; j < e.results[i].length; j++) {
+                                    finalAlts.push(e.results[i][j].transcript.trim());
+                                }
+                            } else {
+                                interim += e.results[i][0].transcript;
+                            }
+                        }
+
+                        // Tampilkan live transcript real-time pada placeholder
+                        if (interim && this.$refs.el) {
+                            this.$refs.el.placeholder = 'Mendengar: "' + interim + '"...';
+                            this.interimText = interim;
+                        }
+
+                        const candidateList = finalAlts.length > 0 ? finalAlts : (this.interimText ? [this.interimText] : []);
+                        if (!candidateList.length) return;
+
+                        if (type === 'number') {
+                            let parsedNumber = '';
+                            let detectedUnit = null;
+
+                            // Cek seluruh alternatif untuk menemukan angka & satuan terbaik
+                            for (const alt of candidateList) {
+                                const unitCheck = detectUnit(alt);
+                                if (!detectedUnit && unitCheck.unit) detectedUnit = unitCheck.unit;
+                                const num = parseIndoNumber(unitCheck.cleaned);
+                                if (num) {
+                                    parsedNumber = num;
+                                    break;
+                                }
+                            }
+
+                            if (parsedNumber) {
+                                setter(parsedNumber);
+                                if (this.$refs.el) this.$refs.el.value = parsedNumber;
+                                if (detectedUnit && typeof extraCallback === 'function') {
+                                    extraCallback(detectedUnit);
+                                }
+                            }
+                        } else if (type === 'komoditas') {
+                            // Cek jika pengguna menyebut nama komoditas sekaligus jumlah / satuan
+                            let bestKomoditas = '';
+                            let detectedUnit = null;
+                            let detectedQty = null;
+
+                            for (const alt of candidateList) {
+                                const unitCheck = detectUnit(alt);
+                                if (unitCheck.unit) detectedUnit = unitCheck.unit;
+
+                                // Cek apakah ada angka di ucapan (misal "Beras 50 kg")
+                                const numCandidate = parseIndoNumber(unitCheck.cleaned);
+                                if (numCandidate && !detectedQty) {
+                                    detectedQty = numCandidate;
+                                }
+
+                                const kmd = parseKomoditas(unitCheck.cleaned);
+                                if (kmd) {
+                                    bestKomoditas = kmd;
+                                    break;
+                                }
+                            }
+
+                            if (!bestKomoditas) bestKomoditas = parseKomoditas(candidateList[0]);
+                            setter(bestKomoditas);
+                            if (this.$refs.el) this.$refs.el.value = bestKomoditas;
+
+                            if (typeof extraCallback === 'function') {
+                                extraCallback(detectedQty, detectedUnit);
+                            }
+                        } else if (type === 'name') {
+                            let nameText = candidateList[0].replace(/[.,]$/g, '').trim();
+                            nameText = nameText.replace(/^(nama saya|nama|atas nama)\s+/i, '');
+                            const formattedName = nameText.split(/\s+/).map(w => cap(w)).join(' ');
+                            setter(formattedName);
+                            if (this.$refs.el) this.$refs.el.value = formattedName;
                         } else {
-                            const v = cap(t);
-                            setter(v);
-                            if (this.$refs.el) { this.$refs.el.value = v; }
+                            // Text / Keterangan
+                            let textVal = cap(candidateList[0].replace(/[.]*$/g, '').trim());
+                            setter(textVal);
+                            if (this.$refs.el) this.$refs.el.value = textVal;
                         }
                     };
                 },
-                w2n(text) {
-                    const m = {'nol':0,'kosong':0,'satu':1,'dua':2,'tiga':3,'empat':4,'lima':5,'enam':6,'tujuh':7,'delapan':8,'sembilan':9,'sepuluh':10,'sebelas':11};
-                    text = text.replace(/([a-z]+)\s+belas/gi,(x,p)=>m[p.toLowerCase()]?(m[p.toLowerCase()]+10).toString():x);
-                    text = text.replace(/([a-z]+)\s+puluh(?:\s+([a-z]+))?/gi,(x,p1,p2)=>{let v=(m[p1.toLowerCase()]||0)*10;if(p2)v+=(m[p2.toLowerCase()]||0);return v>0?v.toString():x;});
-                    for(let w in m)text=text.replace(new RegExp('\\b'+w+'\\b','gi'),m[w]);
-                    return text;
-                },
+
                 toggle() {
-                    if (!this.rec) { alert('Browser Anda tidak mendukung fitur Suara. Gunakan Google Chrome.'); return; }
-                    this.isListening ? this.rec.stop() : this.rec.start();
+                    if (!this.rec) {
+                        alert('Browser Anda tidak mendukung Web Speech API. Silakan gunakan Google Chrome di Laptop / Android.');
+                        return;
+                    }
+                    if (this.isListening) {
+                        this.rec.stop();
+                    } else {
+                        try {
+                            this.rec.start();
+                        } catch (err) {
+                            console.warn('Speech recognition start error:', err);
+                        }
+                    }
                 }
             };
         }
