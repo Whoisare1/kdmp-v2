@@ -23,9 +23,10 @@ class KonsinyasiService
      */
     public function kirim(int $idKiriman): bool
     {
-        // sp_post_jurnal mengelola transaksi database sendiri, sehingga proses
-        // ini tidak dibungkus DB::transaction kedua yang akan bentrok saat COMMIT.
-        return (function () use ($idKiriman): bool {
+        // Sejak revisi 2026-10-11 sp_post_jurnal tidak lagi COMMIT sendiri, sehingga
+        // seluruh proses (stok keluar, stok konsinyasi, jurnal KTK, status kiriman)
+        // dibungkus SATU transaksi: berhasil semua atau batal semua.
+        return DB::transaction(function () use ($idKiriman): bool {
             $kiriman = DB::table('pengiriman_konsinyasi')
                 ->where('id_kiriman', $idKiriman)
                 ->lockForUpdate()

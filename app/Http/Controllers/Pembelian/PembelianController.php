@@ -70,7 +70,7 @@ class PembelianController extends ModuleCrudController
     public function store(Request $request): RedirectResponse
     {
         try {
-            $koperasiId = auth()->user()->id_koperasi ?? app('koperasi_aktif');
+            $entitasId = app('entitas_aktif');
 
             $validated = $request->validate([
                 'source' => 'required|in:from_pr,quick_purchase',
@@ -78,7 +78,7 @@ class PembelianController extends ModuleCrudController
                     'exclude_unless:source,from_pr',
                     'required',
                     Rule::exists('permintaan_pengadaan', 'id_permintaan')
-                        ->where('id_koperasi', $koperasiId)
+                        ->where('id_entitas', $entitasId)
                         ->where('status', 'disetujui'),
                 ],
                 'id_pihak' => 'required|exists:master_pihak,id_pihak',
@@ -86,9 +86,9 @@ class PembelianController extends ModuleCrudController
                 'id_kas_bank' => [
                     'required_if:jenis_pembayaran,tunai,transfer',
                     'exists:master_kas_bank,id_kas_bank',
-                    function ($attribute, $value, $fail) use ($koperasiId) {
-                        if (! KasBank::where('id_kas_bank', $value)->where('id_koperasi', $koperasiId)->exists()) {
-                            $fail('Kas/Bank tidak tersedia untuk koperasi aktif.');
+                    function ($attribute, $value, $fail) use ($entitasId) {
+                        if (! KasBank::where('id_kas_bank', $value)->where('id_entitas', $entitasId)->exists()) {
+                            $fail('Kas/Bank tidak tersedia untuk entitas aktif.');
                         }
                     },
                 ],

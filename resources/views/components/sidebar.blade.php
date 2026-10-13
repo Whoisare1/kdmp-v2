@@ -10,6 +10,7 @@
                 ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
                 ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
                 ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
+                ['label' => 'Chart of Accounts', 'route' => 'master.coa.index', 'match' => 'master.coa.*'],
             ]
         ],
         [
@@ -87,6 +88,7 @@
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
             'match' => 'akuntansi.*',
             'items' => [
+                ['label' => 'Saldo Awal', 'route' => 'akuntansi.saldo-awal.index', 'match' => 'akuntansi.saldo-awal.*'],
                 ['label' => 'Jurnal', 'route' => 'akuntansi.jurnal.index', 'match' => 'akuntansi.jurnal.*'],
                 ['label' => 'Aset Tetap', 'route' => 'akuntansi.aset-tetap.index', 'match' => 'akuntansi.aset-tetap.*'],
                 ['label' => 'Tutup Bulan', 'route' => 'akuntansi.tutup-bulan.index', 'match' => 'akuntansi.tutup-bulan.*'],
@@ -95,7 +97,6 @@
                 ['label' => 'Buku Besar', 'route' => 'akuntansi.laporan.buku-besar', 'match' => 'akuntansi.laporan.buku-besar'],
                 ['label' => 'Neraca', 'route' => 'akuntansi.laporan.neraca', 'match' => 'akuntansi.laporan.neraca'],
                 ['label' => 'Laba Rugi', 'route' => 'akuntansi.laporan.laba-rugi', 'match' => 'akuntansi.laporan.laba-rugi'],
-                ['label' => 'Arus Kas', 'route' => 'akuntansi.laporan.arus-kas', 'match' => 'akuntansi.laporan.arus-kas'],
             ]
         ]
     ];

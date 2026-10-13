@@ -62,12 +62,23 @@ class LaporanController extends Controller
         $idEntitas = app('entitas_aktif');
         [$tahun, $bulan] = $this->parsePeriode($request);
 
-        // Ambil semua akun yang punya data di periode ini
+        // Cari bulan terakhir (<= bulan yang dipilih) yang ada datanya untuk tiap akun
+        $latestPeriode = DB::table('buku_besar_periode as b2')
+            ->select('b2.kode_anak', DB::raw('MAX(b2.periode_bulan) as max_bulan'))
+            ->when($idEntitas, fn($q) => $q->where('b2.id_entitas', $idEntitas))
+            ->where('b2.periode_tahun', $tahun)
+            ->where('b2.periode_bulan', '<=', $bulan)
+            ->groupBy('b2.kode_anak');
+
+        // Ambil semua akun yang punya data di periode ini atau sebelumnya
         $rows = DB::table('buku_besar_periode as bbp')
+            ->joinSub($latestPeriode, 'latest', function ($join) {
+                $join->on('bbp.kode_anak', '=', 'latest.kode_anak')
+                     ->on('bbp.periode_bulan', '=', 'latest.max_bulan');
+            })
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
             ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
             ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
             ->orderBy('c.urutan_laporan')
             ->orderBy('c.kode_anak')
             ->select([
@@ -283,14 +294,27 @@ class LaporanController extends Controller
         [$tahun, $bulan] = $this->parsePeriode($request);
 
         $kelompokNeraca = ['Aktiva', 'Kewajiban', 'Modal'];
+        $kelompokLR     = ['Pendapatan', 'HPP', 'Biaya', 'Non-Operasional'];
+        $allGroups      = array_merge($kelompokNeraca, $kelompokLR);
 
-        // Ambil saldo_akhir per akun untuk bulan yang dipilih
+        // Cari bulan terakhir (<= bulan yang dipilih) yang ada datanya untuk tiap akun
+        $latestPeriode = DB::table('buku_besar_periode as b2')
+            ->select('b2.kode_anak', DB::raw('MAX(b2.periode_bulan) as max_bulan'))
+            ->when($idEntitas, fn($q) => $q->where('b2.id_entitas', $idEntitas))
+            ->where('b2.periode_tahun', $tahun)
+            ->where('b2.periode_bulan', '<=', $bulan)
+            ->groupBy('b2.kode_anak');
+
+        // Ambil saldo_akhir dari bulan terakhir tersebut
         $rows = DB::table('buku_besar_periode as bbp')
+            ->joinSub($latestPeriode, 'latest', function ($join) {
+                $join->on('bbp.kode_anak', '=', 'latest.kode_anak')
+                     ->on('bbp.periode_bulan', '=', 'latest.max_bulan');
+            })
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
             ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
             ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
-            ->whereIn('c.kelompok', $kelompokNeraca)
+            ->whereIn('c.kelompok', $allGroups)
             ->orderBy('c.urutan_laporan')
             ->select([
                 'bbp.kode_anak',
@@ -313,7 +337,30 @@ class LaporanController extends Controller
 
         $aktiva    = $rows->where('kelompok', 'Aktiva');
         $kewajiban = $rows->where('kelompok', 'Kewajiban');
-        $modal     = $rows->where('kelompok', 'Modal');
+        
+        // Modal Dasar dari COA
+        $modal     = clone $rows->where('kelompok', 'Modal');
+
+        // Hitung Laba/Rugi Tahun Berjalan untuk disuntikkan ke Modal
+        $pendapatan = $rows->where('kelompok', 'Pendapatan')->sum('saldo');
+        $hpp        = $rows->where('kelompok', 'HPP')->sum('saldo');
+        $biaya      = $rows->where('kelompok', 'Biaya')->sum('saldo');
+        $nonOp      = $rows->where('kelompok', 'Non-Operasional')->sum('saldo');
+        
+        $labaBersih = $pendapatan - $hpp - $biaya + $nonOp;
+
+        if ($labaBersih != 0) {
+            $modal->push((object)[
+                'kode_anak'          => '341',
+                'kode_induk'         => '34',
+                'nama_rekening'      => 'Laba / Rugi Tahun Berjalan',
+                'kelompok'           => 'Modal',
+                'posisi_normal'      => 'K',
+                'level'              => 3,
+                'urutan_laporan'     => 9999, // Taruh di paling bawah Modal
+                'saldo'              => $labaBersih
+            ]);
+        }
 
         $totalAktiva    = $aktiva->sum('saldo');
         $totalKewajiban = $kewajiban->sum('saldo');
@@ -332,12 +379,130 @@ class LaporanController extends Controller
     // 5. ARUS KAS Ã¢â‚¬â€ Belum Diimplementasi (butuh klasifikasi tambahan di COA)
     // =========================================================================
 
-    public function arusKas(): View
+    public function arusKas(Request $request): View
     {
-        return view('akuntansi.laporan.placeholder', [
-            'judul' => 'Laporan Arus Kas',
-            'pesan' => 'Laporan Arus Kas memerlukan klasifikasi tambahan di master_coa (operasi/investasi/pendanaan). Akan diimplementasi setelah struktur COA diperluas.',
-        ]);
+        $idEntitas = app('entitas_aktif');
+        [$tahun, $bulan] = $this->parsePeriode($request);
+
+        // 1. Dapatkan Laba Bersih Bulan Ini
+        // Sama dengan logika di labaRugi(), tapi hanya untuk 1 bulan terpilih
+        $kelompokLR = ['Pendapatan', 'HPP', 'Biaya', 'Non-Operasional'];
+        
+        $mutasiLR = DB::table('buku_besar_periode as bbp')
+            ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
+            ->where('bbp.periode_tahun', $tahun)
+            ->where('bbp.periode_bulan', $bulan)
+            ->whereIn('c.kelompok', $kelompokLR)
+            ->select([
+                'c.posisi_normal',
+                DB::raw('SUM(bbp.mutasi_debet) as m_debet'),
+                DB::raw('SUM(bbp.mutasi_kredit) as m_kredit'),
+            ])
+            ->groupBy('c.posisi_normal')
+            ->get();
+
+        $labaBersih = 0;
+        foreach ($mutasiLR as $row) {
+            if ($row->posisi_normal === 'K') { // Pendapatan
+                $labaBersih += ($row->m_kredit - $row->m_debet);
+            } else { // Biaya & HPP
+                $labaBersih -= ($row->m_debet - $row->m_kredit);
+            }
+        }
+
+        // 2. Bandingkan Saldo Bulan Ini vs Bulan Lalu untuk pos Neraca
+        $prevTahun = ($bulan === 1) ? $tahun - 1 : $tahun;
+        $prevBulan = ($bulan === 1) ? 12 : $bulan - 1;
+
+        $saldoSekarang = DB::table('buku_besar_periode as bbp')
+            ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
+            ->where('bbp.periode_tahun', $tahun)
+            ->where('bbp.periode_bulan', $bulan)
+            ->select('bbp.kode_anak', 'c.posisi_normal', 'bbp.saldo_akhir_debet as sd', 'bbp.saldo_akhir_kredit as sk')
+            ->get()->keyBy('kode_anak');
+
+        $saldoLalu = DB::table('buku_besar_periode as bbp')
+            ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
+            ->where('bbp.periode_tahun', $prevTahun)
+            ->where('bbp.periode_bulan', $prevBulan)
+            ->select('bbp.kode_anak', 'c.posisi_normal', 'bbp.saldo_akhir_debet as sd', 'bbp.saldo_akhir_kredit as sk')
+            ->get()->keyBy('kode_anak');
+
+        $delta = function ($kodeAnakList) use ($saldoSekarang, $saldoLalu) {
+            $selisih = 0;
+            foreach ($kodeAnakList as $kode) {
+                $now = $saldoSekarang->get($kode);
+                $past = $saldoLalu->get($kode);
+                
+                $valNow = 0;
+                if ($now) {
+                    $valNow = $now->posisi_normal === 'D' ? ($now->sd - $now->sk) : ($now->sk - $now->sd);
+                }
+                
+                $valPast = 0;
+                if ($past) {
+                    $valPast = $past->posisi_normal === 'D' ? ($past->sd - $past->sk) : ($past->sk - $past->sd);
+                }
+                
+                $selisih += ($valNow - $valPast);
+            }
+            return $selisih;
+        };
+
+        // Kumpulkan semua COA yang relevan
+        $semuaCoa = Coa::all();
+        
+        $akunKas        = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '111'))->pluck('kode_anak');
+        $akunPiutang    = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '113'))->pluck('kode_anak');
+        $akunPersediaan = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '112'))->pluck('kode_anak');
+        $akunAsetTetap  = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '12') && $c->posisi_normal === 'D')->pluck('kode_anak');
+        $akunAkumPenyusutan = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '12') && $c->posisi_normal === 'K')->pluck('kode_anak');
+        
+        $akunHutangLancar = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '21'))->pluck('kode_anak');
+        $akunHutangPanjang = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '22'))->pluck('kode_anak');
+        $akunModal      = $semuaCoa->filter(fn($c) => str_starts_with($c->kode_anak, '3') && !str_contains(strtolower($c->nama_rekening), 'laba'))->pluck('kode_anak');
+
+        // --- ARUS KAS OPERASI ---
+        $penyusutan = $delta($akunAkumPenyusutan); // Akumulasi bertambah = kas tidak keluar
+        $perubahanPiutang = -$delta($akunPiutang); // Piutang naik = minus kas
+        $perubahanPersediaan = -$delta($akunPersediaan);
+        $perubahanHutangLancar = $delta($akunHutangLancar); // Hutang naik = plus kas
+
+        $arusKasOperasi = $labaBersih + $penyusutan + $perubahanPiutang + $perubahanPersediaan + $perubahanHutangLancar;
+
+        // --- ARUS KAS INVESTASI ---
+        $perubahanAsetTetap = -$delta($akunAsetTetap); // Beli aset (aset naik) = minus kas
+        $arusKasInvestasi = $perubahanAsetTetap;
+
+        // --- ARUS KAS PENDANAAN ---
+        $perubahanHutangPanjang = $delta($akunHutangPanjang);
+        $perubahanModal = $delta($akunModal);
+        $arusKasPendanaan = $perubahanHutangPanjang + $perubahanModal;
+
+        // --- TOTAL KENAIKAN / PENURUNAN KAS ---
+        $netCashFlow = $arusKasOperasi + $arusKasInvestasi + $arusKasPendanaan;
+
+        // --- SALDO KAS ---
+        $kasAwal = 0;
+        foreach ($akunKas as $kode) {
+            $past = $saldoLalu->get($kode);
+            if ($past) {
+                $kasAwal += ($past->posisi_normal === 'D' ? ($past->sd - $past->sk) : ($past->sk - $past->sd));
+            }
+        }
+        $kasAkhir = $kasAwal + $netCashFlow;
+
+        return view('akuntansi.laporan.arus-kas', compact(
+            'tahun', 'bulan',
+            'labaBersih', 'penyusutan', 'perubahanPiutang', 'perubahanPersediaan', 'perubahanHutangLancar',
+            'arusKasOperasi',
+            'perubahanAsetTetap', 'arusKasInvestasi',
+            'perubahanHutangPanjang', 'perubahanModal', 'arusKasPendanaan',
+            'netCashFlow', 'kasAwal', 'kasAkhir'
+        ));
     }
 }
 

@@ -45,8 +45,26 @@ Ketika di akhir Maret 2027, Akuntan menekan tombol **"Finalisasi Tutup Tahun 202
    Sistem membuat Jurnal otomatis tertanggal `2026-12-31`:
    - `[D]` Semua Akun Pendapatan (Untuk meng-NOL-kan saldonya)
    - `[K]` Semua Akun Biaya & HPP (Untuk meng-NOL-kan saldonya)
-   - `[K]` Akun Modal / SHU Ditahan (Keuntungannya dipindah menjadi Modal).
+   - `[K]` Akun Ekuitas Hasil Usaha sesuai jenis entitas (lihat bagian 4). Jika rugi, sisinya dibalik (`[D]` ekuitas).
 3. **Penguncian:** Status `periode_akuntansi` tahun 2026 diubah menjadi `CLOSED` (Tutup). Jika Akuntan mencoba backdate lagi ke 2026, `PeriodeTutupException` akan dilempar menolak transaksi.
+
+---
+
+## 4. Tutup Buku untuk Entitas Non-Koperasi (BUMDes, Kelompok Tani, UMKM)
+
+Tutup buku **tidak memerlukan SHU**. SHU hanyalah mekanisme pembagian hasil khusus koperasi.
+Sistem memisahkan (A) penutupan akun nominal ke ekuitas (semua entitas) dan (B) pembagian SHU (opsional, koperasi).
+
+| `jenis_entitas` | Mode | Akun tujuan | Label |
+|---|---|---|---|
+| Koperasi Desa | DISTRIBUSI (`config_shu` wajib 100%) | sesuai config (mis. 341) | SHU |
+| BUMDes / Lainnya | OTOMATIS | 344 Laba Ditahan | Laba Ditahan |
+| Kelompok Tani / Gapoktan | OTOMATIS | 345 Saldo Kas Kelompok | Surplus |
+| Perorangan (UMKM) | OTOMATIS | 346 Modal Pemilik | Laba Usaha |
+
+- Mode OTOMATIS: `TutupTahunService` membuat 1 baris `config_shu` 100% ke akun default (`ProfilPenutupan`).
+- Rugi tetap bisa ditutup (mengurangi akun ekuitas tujuan). Laba nol atau tanpa transaksi tidak membuat jurnal alokasi.
+- Halaman Konfigurasi SHU hanya dapat diakses entitas Koperasi.
 
 ---
 

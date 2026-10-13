@@ -448,7 +448,7 @@ class PembelianService
             Hutang::updateOrCreate(
                 ['sumber_tipe' => 'PEMBELIAN', 'sumber_id' => $pembelian->id_pembelian],
                 [
-                    'id_koperasi' => $pembelian->id_koperasi,
+                    'id_entitas' => $pembelian->id_entitas,
                     'id_pihak' => $pembelian->id_pihak,
                     'kode_akun' => '2111',
                     'tanggal' => $pembelian->tanggal_transaksi,
@@ -639,14 +639,14 @@ class PembelianService
             if ($retur->jenis_penyelesaian === 'ganti_barang') {
                 foreach ($retur->detail as $detail) {
                     StokService::keluarBarang(
-                        $pembelian->id_koperasi,
+                        $pembelian->id_entitas,
                         $pembelian->id_gudang,
                         $detail->id_barang,
                         (float) $detail->qty_dasar,
                         (int) $retur->id_retur,
                     );
                     StokService::masukBarang(
-                        $pembelian->id_koperasi,
+                        $pembelian->id_entitas,
                         $pembelian->id_gudang,
                         $detail->id_barang,
                         (float) $detail->qty_dasar,

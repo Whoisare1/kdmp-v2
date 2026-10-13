@@ -82,7 +82,7 @@ class PelunasanController extends Controller
         // Semua pihak: anggota + supplier (form akan filter via JS sesuai jenis)
         $pihaks = Pihak::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))
             ->orderBy('nama')
-            ->get(['id_pihak', 'nama', 'tipe']);
+            ->get(['id_pihak', 'nama', 'jenis_pihak']);
 
         return view('keuangan.pelunasan.create', compact('kasBanks', 'pihaks'));
     }
@@ -375,7 +375,7 @@ class PelunasanController extends Controller
 
         // Guard tenant (hanya jika entitas aktif dipilih)
         if ($idEntitas) {
-            abort_if($pelunasan->id_entitas !== $idEntitas, 403);
+            abort_if($pelunasan->id_entitas != $idEntitas, 403);
         }
 
         $pelunasan->load([

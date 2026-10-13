@@ -47,9 +47,10 @@ class TutupTahunController extends Controller
         $praKondisi   = $this->service->cekPraKondisi($tahun);
         $semuaLulus   = collect($praKondisi)->every(fn($v) => $v['lulus']);
         $ringkasan    = $this->service->ringkasanLabaRugi($tahun);
+        $profil       = $this->service->profil();
 
         return view('akuntansi.tutup-tahun', compact(
-            'tahun', 'praKondisi', 'semuaLulus', 'ringkasan'
+            'tahun', 'praKondisi', 'semuaLulus', 'ringkasan', 'profil'
         ));
     }
 

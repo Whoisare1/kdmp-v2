@@ -205,7 +205,7 @@ class StokService
      * @throws \Exception
      */
     public static function masukBarang(
-        int $kooperasiId,
+        int $entitasId,
         int $idGudang,
         int $idBarang,
         float $qtyMasuk,
@@ -254,7 +254,7 @@ class StokService
 
             // 4. Create kartu stok (detail mutasi)
             KartuStok::create([
-                'id_koperasi' => $kooperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $idGudang,
                 'id_barang' => $idBarang,
                 'tanggal' => now()->toDateString(),
@@ -292,7 +292,7 @@ class StokService
      * @throws \Exception
      */
     public static function keluarBarang(
-        int $kooperasiId,
+        int $entitasId,
         int $idGudang,
         int $idBarang,
         float $qtyKeluar,
@@ -329,7 +329,7 @@ class StokService
 
             // 4. Create kartu stok
             KartuStok::create([
-                'id_koperasi' => $kooperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $idGudang,
                 'id_barang' => $idBarang,
                 'tanggal' => now()->toDateString(),
@@ -462,7 +462,7 @@ class StokService
                 $nilaiMutasi = bcmul($absDiff, $hppPakai, 2);
 
                 KartuStok::create([
-                    'id_entitas' => 1,
+                    'id_entitas' => app('entitas_aktif') ?: 1,
                     'id_gudang' => $idGudang,
                     'id_barang' => $adj['id_barang'],
                     'tanggal' => now()->toDateString(),

@@ -4,7 +4,7 @@
         <h1 class="font-display text-xl font-semibold text-ink-900">Tutup Bulan</h1>
         <p class="mt-1 text-sm text-ink-600">
             Mengunci periode bulan agar tidak ada input jurnal baru yang masuk ke periode tersebut.
-            Pastikan semua 8 validasi di bawah ini berstatus <span class="font-semibold text-emerald-600">Lulus</span> sebelum menekan tombol Tutup Bulan.
+            Pastikan semua 8 validasi di bawah ini berstatus <span class="font-semibold text-sawah-600">Lulus</span> sebelum menekan tombol Tutup Bulan.
         </p>
     </div>
 
@@ -14,11 +14,11 @@
         <div>
             <label class="block text-xs font-medium text-ink-700 mb-1">Tahun</label>
             <input type="number" name="tahun" value="{{ $tahun }}" min="2000" max="2099"
-                   class="rounded border border-paper-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 w-24">
+                   class="rounded border border-paper-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400 w-24">
         </div>
         <div>
             <label class="block text-xs font-medium text-ink-700 mb-1">Bulan</label>
-            <select name="bulan" class="rounded border border-paper-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+            <select name="bulan" class="rounded border border-paper-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
                 @foreach(range(1,12) as $b)
                     <option value="{{ $b }}" @selected($b === $bulan)>
                         {{ \Carbon\Carbon::create()->month($b)->translatedFormat('F') }}
@@ -26,19 +26,19 @@
                 @endforeach
             </select>
         </div>
-        <button type="submit" class="rounded bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700 transition">
+        <button type="submit" class="rounded bg-merah-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-merah-600 transition">
             Cek Validasi
         </button>
     </form>
 
     {{-- ===== Notifikasi ===== --}}
     @if(session('success'))
-        <div class="mb-4 rounded border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div class="mb-4 rounded border border-sawah-300 bg-sawah-50 px-4 py-3 text-sm text-sawah-800">
             {{ session('success') }}
         </div>
     @endif
     @if(session('error'))
-        <div class="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div class="mb-4 rounded border border-merah-300 bg-merah-50 px-4 py-3 text-sm text-merah-800">
             {{ session('error') }}
         </div>
     @endif
@@ -61,17 +61,17 @@
             </thead>
             <tbody class="divide-y divide-paper-100">
                 @foreach($validasi as $v)
-                    <tr class="{{ $v['lulus'] ? '' : 'bg-red-50' }}">
+                    <tr class="{{ $v['lulus'] ? '' : 'bg-merah-50' }}">
                         <td class="px-4 py-3 text-ink-500">{{ $v['no'] }}</td>
                         <td class="px-4 py-3 font-medium text-ink-800">{{ $v['label'] }}</td>
                         <td class="px-4 py-3 text-center">
                             @if($v['lulus'])
-                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-sawah-100 px-2.5 py-0.5 text-xs font-medium text-sawah-700">
                                     <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                                     Lulus
                                 </span>
                             @else
-                                <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-merah-100 px-2.5 py-0.5 text-xs font-medium text-merah-700">
                                     <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                                     Gagal
                                 </span>
@@ -88,31 +88,51 @@
 
     {{-- ===== Form Eksekusi Tutup Bulan ===== --}}
     <div class="mt-6">
-        @if($semuaLulus)
-            <div class="mb-4 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                <strong>⚠️ Perhatian:</strong>
-                Setelah periode ini ditutup, semua input jurnal dengan tanggal di bulan
-                <strong>{{ \Carbon\Carbon::createFromDate($tahun, $bulan, 1)->translatedFormat('F Y') }}</strong>
-                akan ditolak secara otomatis oleh sistem.
-                Koreksi hanya bisa dilakukan melalui <strong>Jurnal Pembalik</strong> di bulan berjalan.
+        @php $namaBulan = \Carbon\Carbon::createFromDate($tahun, $bulan, 1)->translatedFormat('F Y'); @endphp
+        
+        @if(isset($isClosed) && $isClosed)
+            <div class="mb-4 flex items-start gap-3 rounded border border-sawah-300 bg-sawah-50 px-4 py-3 text-sm text-sawah-800">
+                <svg class="mt-0.5 h-5 w-5 shrink-0 text-sawah-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <p class="font-semibold text-sawah-900">Periode {{ $namaBulan }} Sudah Ditutup</p>
+                    <p class="mt-1 text-sawah-700">Tombol tutup bulan dinonaktifkan karena periode ini telah berhasil dikunci. Semua input jurnal baru untuk bulan ini tidak diizinkan.</p>
+                </div>
             </div>
+        @elseif($semuaLulus)
+            @php
+                $isCurrentOrFuture = \Carbon\Carbon::createFromDate($tahun, $bulan, 1)->startOfMonth()->gte(now()->startOfMonth());
+            @endphp
+            
+            @if($isCurrentOrFuture)
+                <p class="rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    ℹ️ Tombol Tutup Bulan akan terbuka setelah bulan <strong>{{ $namaBulan }}</strong> selesai (berganti bulan). Saat ini bulan tersebut belum berakhir.
+                </p>
+            @else
+                <div class="mb-4 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <strong>⚠️ Perhatian:</strong>
+                    Setelah periode ini ditutup, semua input jurnal dengan tanggal di bulan
+                    <strong>{{ $namaBulan }}</strong>
+                    akan ditolak secara otomatis oleh sistem.
+                    Koreksi hanya bisa dilakukan melalui <strong>Jurnal Pembalik</strong> di bulan berjalan.
+                </div>
 
-            @php $namaBulan = \Carbon\Carbon::createFromDate($tahun, $bulan, 1)->translatedFormat('F Y'); @endphp
-
-            <form method="POST" action="{{ route('akuntansi.tutup-bulan.store') }}"
-                  onsubmit="return confirm('Anda yakin ingin menutup periode {{ $namaBulan }}? Tindakan ini tidak bisa dibatalkan.')">
-                @csrf
-                <input type="hidden" name="tahun" value="{{ $tahun }}">
-                <input type="hidden" name="bulan" value="{{ $bulan }}">
-                <button type="submit"
-                        class="inline-flex items-center gap-2 rounded bg-red-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-red-700 transition">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                    Tutup Periode {{ \Carbon\Carbon::createFromDate($tahun, $bulan, 1)->translatedFormat('F Y') }}
-                </button>
-            </form>
+                <form method="POST" action="{{ route('akuntansi.tutup-bulan.store') }}"
+                      onsubmit="return confirm('Anda yakin ingin menutup periode {{ $namaBulan }}? Tindakan ini tidak bisa dibatalkan.')">
+                    @csrf
+                    <input type="hidden" name="tahun" value="{{ $tahun }}">
+                    <input type="hidden" name="bulan" value="{{ $bulan }}">
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 rounded bg-red-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-red-700 transition">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        Tutup Periode {{ $namaBulan }}
+                    </button>
+                </form>
+            @endif
         @else
             <p class="rounded border border-paper-200 bg-paper-50 px-4 py-3 text-sm text-ink-600">
                 🔒 Tombol Tutup Bulan akan muncul setelah semua validasi di atas berstatus <strong>Lulus</strong>.

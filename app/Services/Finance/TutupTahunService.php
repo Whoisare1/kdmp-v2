@@ -51,10 +51,18 @@ class TutupTahunService
         $idEntitas = app('entitas_aktif');
 
         return [
-            $this->cekTotalPersentaseShu($idEntitas, $tahun),
+            $this->cekAlokasiHasilUsaha($idEntitas, $tahun),
             $this->cekBulan1Sampai11Closed($idEntitas, $tahun),
             $this->cekBulan12BelumLocked($idEntitas, $tahun),
         ];
+    }
+
+    /**
+     * Profil penutupan (mode, label, akun default) untuk entitas aktif.
+     */
+    public function profil(): ProfilPenutupan
+    {
+        return ProfilPenutupan::untuk((int) app('entitas_aktif'));
     }
 
     // =========================================================================
@@ -95,6 +103,10 @@ class TutupTahunService
         }
 
         DB::transaction(function () use ($idEntitas, $tahun) {
+            // --- Langkah 0: Entitas non-koperasi tanpa config_shu -> alokasikan
+            // 100% hasil usaha ke akun ekuitas default (laba maupun rugi). ---
+            $this->pastikanAlokasiDefault($idEntitas, $tahun);
+
             // --- Langkah 1: Panggil SP untuk membuat Jurnal Penutup ---
             // SP akan:
             //   a. Hitung total Pendapatan (kredit kelompok 4xx)
@@ -183,25 +195,73 @@ class TutupTahunService
     // VALIDASI PRA-KONDISI TUTUP TAHUN
     // =========================================================================
 
-    /** Pra-kondisi 1: Total persentase config_shu = 100% */
-    private function cekTotalPersentaseShu(int $idEntitas, int $tahun): array
+    /**
+     * Pra-kondisi 1: Alokasi hasil usaha valid.
+     *  - Jika config_shu sudah ada: total persentase wajib 100% (semua entitas).
+     *  - Jika belum ada: Koperasi wajib mengisi; entitas lain otomatis 100% ke akun default.
+     */
+    private function cekAlokasiHasilUsaha(int $idEntitas, int $tahun): array
     {
-        $total = DB::table('config_shu')
-            ->where('id_entitas', $idEntitas)
-            ->where('tahun', $tahun)
-            ->sum('persentase');
+        $profil = ProfilPenutupan::untuk($idEntitas);
+        $label  = $profil->labelHasil();
 
-        // Toleransi floating: 99.99 ~ 100.01
-        $lulus = abs((float) $total - 100.0) < 0.02;
+        $query  = DB::table('config_shu')
+            ->where('id_entitas', $idEntitas)
+            ->where('tahun', $tahun);
+        $adaConfig = (clone $query)->exists();
+        $total     = (clone $query)->sum('persentase');
+
+        if ($adaConfig || $profil->isDistribusi()) {
+            // Toleransi floating: 99.99 ~ 100.01
+            $lulus = abs((float) $total - 100.0) < 0.02;
+
+            return [
+                'no'     => 1,
+                'label'  => "Konfigurasi {$label}: total persentase = 100%",
+                'lulus'  => $lulus,
+                'detail' => !$lulus
+                    ? "Total persentase {$label} saat ini: {$total}%. Harus tepat 100%."
+                    : null,
+            ];
+        }
+
+        // Mode OTOMATIS tanpa config: pastikan akun default tersedia di COA.
+        $akun  = $profil->akunDefault();
+        $ada   = DB::table('master_coa')->where('kode_anak', $akun)->exists();
 
         return [
             'no'     => 1,
-            'label'  => 'Konfigurasi SHU: total persentase = 100%',
-            'lulus'  => $lulus,
-            'detail' => !$lulus
-                ? "Total persentase SHU saat ini: {$total}%. Harus tepat 100%."
-                : null,
+            'label'  => "Alokasi {$label}: otomatis 100% ke akun {$akun}",
+            'lulus'  => $ada,
+            'detail' => $ada
+                ? "Hasil usaha (laba/rugi) dipindahkan ke akun {$akun}."
+                : "Akun {$akun} belum ada di COA. Jalankan migrasi/seeder COA.",
         ];
+    }
+
+    /**
+     * Untuk mode OTOMATIS yang belum punya config_shu tahun ini, buat 1 baris 100%.
+     */
+    private function pastikanAlokasiDefault(int $idEntitas, int $tahun): void
+    {
+        $profil = ProfilPenutupan::untuk($idEntitas);
+
+        $sudahAda = DB::table('config_shu')
+            ->where('id_entitas', $idEntitas)
+            ->where('tahun', $tahun)
+            ->exists();
+
+        if ($sudahAda || $profil->isDistribusi()) {
+            return;
+        }
+
+        DB::table('config_shu')->insert([
+            'id_entitas' => $idEntitas,
+            'tahun'      => $tahun,
+            'pos'        => $profil->namaPos(),
+            'persentase' => 100,
+            'kode_akun'  => $profil->akunDefault(),
+        ]);
     }
 
     /** Pra-kondisi 2: Bulan 1 s/d 11 semua sudah CLOSED atau LOCKED */

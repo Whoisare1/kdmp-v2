@@ -28,6 +28,16 @@ use Illuminate\Support\Facades\DB;
  *
  * Satu method tambahan untuk maintenance:
  *   4. bangunBukuBesar() Ã¢â‚¬â€ rebuild ringkasan saldo dari jurnal (idempoten)
+ *
+ * ATURAN TRANSAKSI (revisi 2026-10-11):
+ *   Stored procedure TIDAK lagi membuka/menutup transaksi sendiri. Setiap
+ *   method penulis di service ini membungkus pekerjaannya dengan DB::transaction():
+ *     - Pemanggil SUDAH punya transaksi  -> service ikut transaksi itu
+ *       (SAVEPOINT). Data pemanggil + jurnal = satu kesatuan.
+ *     - Pemanggil BELUM punya transaksi -> service membuat transaksi sendiri,
+ *       sehingga jurnal tetap atomik (header, detail, buku besar, nomor).
+ *   Jika pemanggil juga menulis data lain (kas, stok, pelunasan), bungkus
+ *   semuanya dalam satu DB::transaction agar ikut batal bersama jurnal.
  */
 class JurnalService
 {
@@ -96,12 +106,8 @@ class JurnalService
         [$tahun, $bulan] = $this->parsePeriode($tanggal);
         $this->pastikanPeriodeTerbuka($tahun, $bulan, $entitasId);
 
-        // --- LANGKAH 6: Generate nomor jurnal ---
-        $noJurnal = $this->generateNomorJurnal($tahun, $bulan, $entitasId);
-
-        // --- LANGKAH 7: Susun JSON & panggil SP ---
-        $jsonPayload = $this->susunJsonPayload([
-            'no_jurnal'      => $noJurnal,
+        // --- LANGKAH 6 & 7: Nomor jurnal + panggil SP (dalam 1 transaksi) ---
+        return $this->tulisJurnal($tahun, $bulan, [
             'nomor_nota'     => $payload['nomor_nota'] ?? null,
             'tanggal_jurnal' => $tanggal,
             'periode_tahun'  => $tahun,
@@ -111,9 +117,7 @@ class JurnalService
             'source_type'    => $sourceType,
             'source_id'      => $sourceId,
             'keterangan'     => $keterangan,
-        ], $baris);
-
-        return $this->panggilStoredProcedure($jsonPayload, $sourceType, $sourceId, 'OTOMATIS', $entitasId);
+        ], $baris, $sourceType, $sourceId, 'OTOMATIS', $entitasId);
     }
 
     // =========================================================================
@@ -162,10 +166,7 @@ class JurnalService
         [$tahun, $bulan] = $this->parsePeriode($tanggal);
         $this->pastikanPeriodeTerbuka($tahun, $bulan);
 
-        $noJurnal = $this->generateNomorJurnal($tahun, $bulan);
-
-        $jsonPayload = $this->susunJsonPayload([
-            'no_jurnal'      => $noJurnal,
+        return $this->tulisJurnal($tahun, $bulan, [
             'nomor_nota'     => $header['nomor_nota'] ?? null,
             'tanggal_jurnal' => $tanggal,
             'periode_tahun'  => $tahun,
@@ -175,9 +176,7 @@ class JurnalService
             'source_type'    => $header['source_type'] ?? null,
             'source_id'      => $header['source_id'] ?? null,
             'keterangan'     => $header['keterangan'],
-        ], $barisInternal);
-
-        return $this->panggilStoredProcedure($jsonPayload, null, null, $header['jenis_jurnal']);
+        ], $barisInternal, $header['source_type'] ?? null, isset($header['source_id']) ? (int) $header['source_id'] : null, $header['jenis_jurnal']);
     }
 
     // =========================================================================
@@ -194,71 +193,35 @@ class JurnalService
      */
     public function balik(int $idJurnal, string $alasan): JurnalHeader
     {
-        // Ambil jurnal asal beserta detailnya
-        // withoutGlobalScope: kita akses by ID langsung, scope sudah dijaga
-        // karena id_entitas ada di WHERE selanjutnya lewat findOrFail
-        $jurnalAsal = JurnalHeader::with('detail')->findOrFail($idJurnal);
+        return DB::transaction(function () use ($idJurnal, $alasan) {
+            // 1. Validasi awal di level PHP. lockForUpdate: dua user yang
+            //    menekan "Balik" bersamaan akan antre, yang kedua pasti gagal.
+            $jurnalAsal = JurnalHeader::lockForUpdate()->findOrFail($idJurnal);
 
-        // Validasi: belum pernah dibalik
-        // Cek apakah ada jurnal pembalik yang menunjuk ke jurnal ini
-        $sudahDibalik = JurnalHeader::where('id_jurnal_asal', $idJurnal)->first();
-        if ($sudahDibalik) {
-            throw new JurnalSudahDibalikException($idJurnal, $sudahDibalik->id_jurnal);
-        }
+            $sudahDibalik = JurnalHeader::where('id_jurnal_asal', $idJurnal)->first();
+            if ($sudahDibalik) {
+                throw new JurnalSudahDibalikException($idJurnal, $sudahDibalik->id_jurnal);
+            }
 
-        // Validasi: hanya jurnal POSTED yang bisa dibalik
-        if ($jurnalAsal->status !== 'POSTED') {
-            throw new \InvalidArgumentException(
-                "Jurnal #{$idJurnal} berstatus [{$jurnalAsal->status}], bukan POSTED."
-            );
-        }
+            if ($jurnalAsal->status !== 'POSTED') {
+                throw new \InvalidArgumentException(
+                    "Jurnal #{$idJurnal} berstatus [{$jurnalAsal->status}], bukan POSTED."
+                );
+            }
 
-        // Bangun baris pembalik: balik posisi debet Ã¢â€ â€ kredit
-        $barisPembalik = $jurnalAsal->detail->map(function ($d, int $idx): array {
-            return [
-                'urutan'    => $idx + 1,
-                'kode_anak' => $d->kode_anak,
-                'debet'     => (float) $d->kredit,   // Ã¢â€ Â dibalik
-                'kredit'    => (float) $d->debet,    // Ã¢â€ Â dibalik
-                'id_pihak'  => $d->id_pihak,
-                'keterangan'=> $d->keterangan,
-            ];
-        })->toArray();
+            $tanggalPembalik = now()->toDateString();
+            [$tahun, $bulan] = $this->parsePeriode($tanggalPembalik);
+            $this->pastikanPeriodeTerbuka($tahun, $bulan);
 
-        // Periode pembalik = hari ini (bukan tanggal jurnal asal)
-        $tanggalPembalik = now()->toDateString();
-        [$tahun, $bulan] = $this->parsePeriode($tanggalPembalik);
-        $this->pastikanPeriodeTerbuka($tahun, $bulan);
+            // 2. Eksekusi Stored Procedure (ikut transaksi ini, tanpa COMMIT sendiri)
+            $result = DB::select('CALL sp_jurnal_pembalik(?, ?, ?)', [
+                $idJurnal,
+                Auth::id() ?? 1,
+                $alasan,
+            ]);
 
-        $noJurnal = $this->generateNomorJurnal($tahun, $bulan);
-
-        $jsonPayload = $this->susunJsonPayload([
-            'no_jurnal'      => $noJurnal,
-            'nomor_nota'     => null,
-            'tanggal_jurnal' => $tanggalPembalik,
-            'periode_tahun'  => $tahun,
-            'periode_bulan'  => $bulan,
-            'kode_transaksi' => $jurnalAsal->kode_transaksi,
-            'jenis_jurnal'   => 'PEMBALIK',
-            'source_type'    => null,
-            'source_id'      => null,
-            'keterangan'     => "PEMBALIK jurnal #{$idJurnal}: {$alasan}",
-        ], $barisPembalik);
-
-        // Posting pembalik via SP (SP sudah memiliki transaksi mandiri)
-        $jurnalPembalik = $this->panggilStoredProcedure($jsonPayload, null, null, 'PEMBALIK');
-
-        // Set id_jurnal_asal di jurnal pembalik menunjuk ke jurnal original
-        $jurnalPembalik->update(['id_jurnal_asal' => $idJurnal]);
-
-        // Update jurnal asal: REVERSED
-        JurnalHeader::where('id_jurnal', $idJurnal)->update([
-            'status'         => 'REVERSED',
-            'posted_by'      => auth()->id() ?? null,
-            'posted_at'      => now(),
-        ]);
-
-        return $jurnalPembalik;
+            return JurnalHeader::findOrFail($result[0]->id_jurnal);
+        }, 3);
     }
 
     // =========================================================================
@@ -275,6 +238,13 @@ class JurnalService
      *   - Saat data buku besar dicurigai tidak konsisten
      */
     public function bangunBukuBesar(int $tahun, int $bulan): void
+    {
+        // DELETE + INSERT harus atomik: jika proses terhenti di tengah,
+        // buku besar bulan ini tidak boleh tertinggal dalam keadaan kosong.
+        DB::transaction(fn () => $this->bangunBukuBesarInternal($tahun, $bulan), 3);
+    }
+
+    private function bangunBukuBesarInternal(int $tahun, int $bulan): void
     {
         $idEntitas = app('entitas_aktif');
 
@@ -487,22 +457,36 @@ class JurnalService
      * Generate nomor jurnal unik untuk periode ini.
      * Format: JRN-{tahun}-{bulan_2digit}-{sequence_4digit}
      * Contoh: JRN-2026-08-0042
+     *
+     * Memakai counter di tabel penomoran_jurnal dengan SATU statement atomik:
+     *   INSERT ... ON DUPLICATE KEY UPDATE nomor = LAST_INSERT_ID(nomor + 1)
+     * - Dua posting bersamaan antre di satu baris counter -> nomor tidak kembar.
+     * - Tidak memakai gap lock -> tidak ada deadlock antar posting.
+     * - Wajib dipanggil di dalam transaksi: jika posting gagal, kenaikan
+     *   counter ikut di-rollback sehingga nomor tidak loncat.
      */
     private function generateNomorJurnal(int $tahun, int $bulan, ?int $entitasId = null): string
     {
         $entitasId ??= app('entitas_aktif');
         $prefix = sprintf('JRN-%d-%02d-', $tahun, $bulan);
 
-        // Ambil nomor urut terakhir untuk periode ini dari koperasi aktif
-        $terakhir = DB::table('jurnal_header')
+        // Nilai awal jika counter prefix ini belum ada: lanjutkan dari nomor
+        // tertinggi yang sudah ada (data lama sebelum tabel counter dibuat).
+        $nomorAwal = (int) DB::table('jurnal_header')
             ->where('id_entitas', $entitasId)
-            ->where('periode_tahun', $tahun)
-            ->where('periode_bulan', $bulan)
             ->where('no_jurnal', 'like', $prefix . '%')
-            ->lockForUpdate()   // Ã¢â€ Â penting: mencegah race condition
-            ->count();
+            ->max(DB::raw('CAST(SUBSTRING(no_jurnal, ' . (strlen($prefix) + 1) . ') AS UNSIGNED)')) + 1;
 
-        return $prefix . sprintf('%04d', $terakhir + 1);
+        DB::statement(
+            'INSERT INTO penomoran_jurnal (id_entitas, prefix, nomor_terakhir)
+             VALUES (?, ?, LAST_INSERT_ID(?))
+             ON DUPLICATE KEY UPDATE nomor_terakhir = LAST_INSERT_ID(nomor_terakhir + 1)',
+            [$entitasId, $prefix, $nomorAwal]
+        );
+
+        $nomor = (int) DB::selectOne('SELECT LAST_INSERT_ID() AS n')->n;
+
+        return $prefix . sprintf('%04d', $nomor);
     }
 
     /** Gabungkan header dan baris menjadi JSON string untuk dikirim ke SP */
@@ -512,16 +496,26 @@ class JurnalService
     }
 
     /**
-     * Memanggil Stored Procedure sp_post_jurnal dan mengembalikan JurnalHeader.
+     * Generate nomor + CALL sp_post_jurnal di dalam SATU transaksi, lalu
+     * kembalikan JurnalHeader.
      *
      * Menangani dua kasus:
-     *   a. INSERT baru berhasil Ã¢â€ â€™ kembalikan jurnal yang baru dibuat
-     *   b. UniqueConstraintViolation pada jurnal_idempoten Ã¢â€ â€™
+     *   a. INSERT baru berhasil -> kembalikan jurnal yang baru dibuat
+     *   b. UniqueConstraintViolation pada jurnal_idempoten ->
      *      berarti jurnal sumber ini sudah pernah diposting.
-     *      Kembalikan jurnal yang sudah ada (idempoten Ã¢â‚¬â€ aman diulang).
+     *      Kembalikan jurnal yang sudah ada (idempoten, aman diulang).
+     *
+     * DB::transaction(..., 3):
+     *   - Pemanggil sudah punya transaksi -> ikut (SAVEPOINT); gagal = rollback
+     *     ke savepoint, lalu error diteruskan ke pemanggil.
+     *   - Tidak ada transaksi -> transaksi baru; deadlock/lock timeout diulang
+     *     otomatis hingga 3x oleh Laravel.
      */
-    private function panggilStoredProcedure(
-        string  $jsonPayload,
+    private function tulisJurnal(
+        int     $tahun,
+        int     $bulan,
+        array   $header,
+        array   $baris,
         ?string $sourceType,
         ?int    $sourceId,
         string  $jenisJurnal,
@@ -530,21 +524,25 @@ class JurnalService
         $entitasId ??= app('entitas_aktif');
 
         try {
-            // Pastikan string JSON dan variabel teks di stored procedure memakai
-            // collation yang sama dengan kolom kode akun jurnal.
-            DB::statement("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+            return DB::transaction(function () use ($tahun, $bulan, $header, $baris, $entitasId) {
+                $noJurnal    = $this->generateNomorJurnal($tahun, $bulan, $entitasId);
+                $jsonPayload = $this->susunJsonPayload(['no_jurnal' => $noJurnal, ...$header], $baris);
 
-            // CALL SP Ã¢â‚¬â€ mengembalikan satu baris dengan kolom id_jurnal
-            $hasil = DB::select('CALL sp_post_jurnal(?, ?, ?)', [
-                $entitasId,
-                Auth::id(),
-                $jsonPayload,
-            ]);
+                // Pastikan string JSON dan variabel teks di stored procedure memakai
+                // collation yang sama dengan kolom kode akun jurnal.
+                DB::statement("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-            $idJurnal = $hasil[0]->id_jurnal;
+                // CALL SP -> mengembalikan satu baris dengan kolom id_jurnal.
+                // SP tidak COMMIT sendiri; ia ikut transaksi ini.
+                $hasil = DB::select('CALL sp_post_jurnal(?, ?, ?)', [
+                    $entitasId,
+                    Auth::id(),
+                    $jsonPayload,
+                ]);
 
-            // Ambil JurnalHeader yang baru dibuat
-            return JurnalHeader::findOrFail($idJurnal);
+                return JurnalHeader::findOrFail($hasil[0]->id_jurnal);
+            }, 3);
+
 
         } catch (UniqueConstraintViolationException $e) {
             // Idempotency guard: jurnal untuk source ini sudah ada.
@@ -570,11 +568,11 @@ class JurnalService
     {
         $payload = json_decode($jsonPayload, true, 512, JSON_THROW_ON_ERROR);
         $baris = $payload['baris'] ?? [];
-        $idKoperasi = (int) ($payload['id_koperasi'] ?? app('koperasi_aktif'));
+        $idEntitas = (int) ($payload['id_entitas'] ?? app('entitas_aktif'));
 
-        return DB::transaction(function () use ($payload, $baris, $idKoperasi) {
+        return DB::transaction(function () use ($payload, $baris, $idEntitas) {
             $header = JurnalHeader::create([
-                'id_koperasi' => $idKoperasi,
+                'id_entitas' => $idEntitas,
                 'no_jurnal' => $payload['no_jurnal'],
                 'nomor_nota' => $payload['nomor_nota'] ?? null,
                 'tanggal_jurnal' => $payload['tanggal_jurnal'],
