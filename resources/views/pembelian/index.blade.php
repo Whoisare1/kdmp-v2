@@ -8,9 +8,9 @@
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <form method="GET" class="flex w-full gap-2 sm:max-w-md">
             <input name="q" value="{{ request('q') }}" placeholder="Cari kode atau supplier..." class="min-w-0 flex-1 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
-            <button class="rounded-sm border border-paper-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">Cari</button>
+            <button class="rounded-sm border border-paper-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-emerald-500">Cari</button>
         </form>
-        <a href="{{ route("$routeBase.create") }}" class="inline-flex items-center justify-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600">+ Tambah Pembelian</a>
+        <a href="{{ route("$routeBase.create") }}" class="inline-flex items-center justify-center rounded-sm bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">+ Tambah Pembelian</a>
     </div>
 
     <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
@@ -30,7 +30,7 @@
                             <td class="px-4 py-3 capitalize">{{ $item->jenis_pembayaran }}</td>
                             <td class="whitespace-nowrap px-4 py-3 text-right">Rp {{ number_format($item->total_pembelian, 2, ',', '.') }}</td>
                             <td class="px-4 py-3 capitalize">{{ $item->status }}</td>
-                            <td class="px-4 py-3 text-right"><a href="{{ route("$routeBase.show", $item) }}" class="font-medium text-merah-600 hover:text-merah-700">Lihat</a></td>
+                            <td class="px-4 py-3 text-right"><a href="{{ route("$routeBase.show", $item) }}" class="font-medium text-emerald-700 hover:text-emerald-800">Lihat</a></td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="px-4 py-12 text-center text-ink-600">Belum ada pembelian. Gunakan tombol Tambah Pembelian untuk membuat transaksi.</td></tr>

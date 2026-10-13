@@ -18,7 +18,7 @@
         @endif
 
         @if (session('success'))
-            <div class="mb-4 rounded-sm border border-hijau-300 bg-hijau-50 p-4 text-sm text-hijau-800">
+                <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                 {{ session('success') }}
             </div>
         @endif
@@ -45,7 +45,7 @@
 
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm">
-                            <thead class="bg-paper-100 text-left text-ink-700">
+                            <thead class="bg-emerald-50 text-left text-emerald-950">
                                 <tr>
                                     <th class="px-3 py-2">Barang</th>
                                     <th class="px-3 py-2 text-right">Qty Dipesan</th>
@@ -149,7 +149,7 @@
                     <div class="mt-4 flex gap-2">
                         <button
                             type="submit"
-                            class="rounded-sm bg-merah-500 px-4 py-2 font-medium text-paper-50 hover:bg-merah-600"
+                            class="rounded-sm bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700"
                         >
                             ✓ Terima Barang
                         </button>

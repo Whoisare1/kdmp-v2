@@ -1,6 +1,6 @@
 <?php
 
-namespace Survei\Models;
+namespace App\Models\Survei;
 
 use App\Models\Master\Komoditas;
 use Illuminate\Database\Eloquent\Model;
@@ -98,50 +98,6 @@ class ProduksiNarasumber extends Model
         'Tidak ada kendala',
     ];
 
-    const PERIODE_LIST = [
-        'Mingguan',
-        'Bulanan',
-        'Musiman',
-        'Tahunan',
-        'Lainnya',
-    ];
-
-    const SUMBER_DATA_LIST = [
-        'Wawancara Narasumber / Pelaku Produksi',
-        'Data Kelompok Tani / Nelayan',
-        'Pendataan Petugas Lapangan',
-        'Data Pengepul / Koperasi',
-        'Data Penyuluh / Perangkat Desa',
-        'Lainnya',
-    ];
-
-    /** Helper Konversi ke Satuan Dasar (kg / unit standar) */
-    public static function konversiKeKg(float $jumlah, string $satuan): float
-    {
-        $s = strtolower(trim($satuan));
-        return match($s) {
-            'ton'     => $jumlah * 1000,
-            'kuintal' => $jumlah * 100,
-            default   => $jumlah,
-        };
-    }
-
-    /** Mapping rekomendasi kategori komoditas berdasarkan kategori narasumber */
-    public static function getSuggestedKategoriForNarasumber(string $kategoriNs): array
-    {
-        $k = strtolower(trim($kategoriNs));
-        if (str_contains($k, 'ternak')) {
-            return ['Peternakan'];
-        }
-        if (str_contains($k, 'tani') || str_contains($k, 'petani') || str_contains($k, 'penyuluh')) {
-            return ['Pertanian', 'Perkebunan'];
-        }
-        if (str_contains($k, 'nelayan') || str_contains($k, 'budidaya') || str_contains($k, 'tambak')) {
-            return ['Perikanan'];
-        }
-        return self::KATEGORI_KOMODITAS_LIST;
-    }
-
     // ─── Relasi ──────────────────────────────────────────────────────────────
 
     public function sesi(): BelongsTo
@@ -159,23 +115,60 @@ class ProduksiNarasumber extends Model
         return $this->belongsTo(Komoditas::class, 'id_komoditas');
     }
 
-    // ─── Accessor ────────────────────────────────────────────────────────────
+    // ─── Helper ──────────────────────────────────────────────────────────────
 
-    /** Kalkulasi Sisa Produksi = Jumlah Produksi - (Jumlah Dijual + Jumlah Dikonsumsi) */
+    /**
+     * Hitung sisa produksi: Jumlah Produksi - Jumlah Dijual - Jumlah Dikonsumsi
+     */
     public function getSisaProduksiAttribute(): float
     {
-        $sisa = $this->jumlah_produksi - ($this->jumlah_dijual + $this->jumlah_dikonsumsi_sendiri);
-        return max(0, $sisa);
+        return max(0, $this->jumlah_produksi - ($this->jumlah_dijual ?? 0) - ($this->jumlah_dikonsumsi_sendiri ?? 0));
     }
 
-    /** Kalkulasi Sisa Produksi Satuan Dasar (kg) */
-    public function getSisaProduksiKgAttribute(): float
+    /**
+     * Konversi jumlah produksi dari berbagai satuan ke Kg (perkiraan standar).
+     */
+    public static function konversiKeKg(?float $jumlah, ?string $satuan): float
     {
-        $prodKg = $this->jumlah_produksi_kg ?: self::konversiKeKg($this->jumlah_produksi, $this->satuan);
-        $dijualKg = self::konversiKeKg($this->jumlah_dijual, $this->satuan);
-        $konsumsiKg = self::konversiKeKg($this->jumlah_dikonsumsi_sendiri, $this->satuan);
+        if (!$jumlah) {
+            return 0.0;
+        }
 
-        $sisaKg = $prodKg - ($dijualKg + $konsumsiKg);
-        return max(0, $sisaKg);
+        return match (strtolower($satuan ?? 'kg')) {
+            'ton'     => $jumlah * 1000.0,
+            'kuintal' => $jumlah * 100.0,
+            'kg'      => $jumlah,
+            'liter'   => $jumlah * 1.0,   // Perkiraan 1L ≈ 1Kg
+            default   => $jumlah,
+        };
+    }
+
+    /**
+     * Format array bulan panen menjadi string yang mudah dibaca.
+     */
+    public function getBulanPanenFormatAttribute(): string
+    {
+        if (empty($this->bulan_panen_json)) {
+            return '-';
+        }
+
+        $bulanList = [];
+        foreach ($this->bulan_panen_json as $b) {
+            $bulanList[] = self::BULAN_PANEN_LIST[$b] ?? $b;
+        }
+
+        return implode(', ', $bulanList);
+    }
+
+    /**
+     * Format kendala menjadi string.
+     */
+    public function getKendalaFormatAttribute(): string
+    {
+        if (!empty($this->kendala_json)) {
+            return implode(', ', $this->kendala_json);
+        }
+
+        return $this->kendala_produksi ?: '-';
     }
 }

@@ -1,12 +1,12 @@
 <?php
 
-namespace Survei\Controllers;
+namespace App\Http\Controllers\Survei;
 
 use App\Http\Controllers\Controller;
 use App\Models\Master\Komoditas;
-use Survei\Models\SesiSurvei;
-use Survei\Models\StandarKonsumsi;
-use Survei\Models\DemografiNarasumber;
+use App\Models\Survei\SesiSurvei;
+use App\Models\Survei\StandarKonsumsi;
+use App\Models\Survei\DemografiNarasumber;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -159,7 +159,7 @@ class PublicSesi3Controller extends Controller
         $sesi = SesiSurvei::where('token_masyarakat', $token)->firstOrFail();
 
         // Ambil komoditas unik dari Sesi 2 (Produksi)
-        $komoditasSesi2 = \Survei\Models\ProduksiNarasumber::where('id_sesi', $sesi->id)
+        $komoditasSesi2 = \App\Models\Survei\ProduksiNarasumber::where('id_sesi', $sesi->id)
             ->distinct()
             ->pluck('id_komoditas');
 

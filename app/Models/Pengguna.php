@@ -33,6 +33,17 @@ class Pengguna extends Authenticatable
         return $this->belongsTo(Entitas::class, 'id_entitas', 'id_entitas');
     }
 
+    /** Alias untuk kompatibilitas modul survei */
+    public function koperasi()
+    {
+        return $this->entitas();
+    }
+
+    public function getIdKoperasiAttribute()
+    {
+        return $this->id_entitas;
+    }
+
     public function peran()
     {
         return $this->belongsToMany(Peran::class, 'pengguna_peran', 'id_pengguna', 'id_peran');

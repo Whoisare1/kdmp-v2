@@ -1,10 +1,10 @@
 <?php
 
-namespace Survei\Controllers;
+namespace App\Http\Controllers\Survei;
 
 use App\Http\Controllers\Controller;
 use App\Models\Survei\MasyarakatDesa;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\SesiSurvei;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 

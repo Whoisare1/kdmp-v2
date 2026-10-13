@@ -8,11 +8,6 @@ use App\Models\Pembelian\ReturPembelian;
 use App\Models\Pembelian\ReturPembelianDetail;
 use App\Models\Perencanaan\PermintaanPengadaan;
 use App\Models\Master\Barang;
-use App\Models\Master\KasBank;
-use App\Models\Keuangan\Hutang;
-use App\Models\Gudang\PenerimaanBarang;
-use App\Models\Gudang\PenerimaanBarangDetail;
-use App\Services\Finance\JurnalService;
 use Illuminate\Support\Facades\DB;
 
 class PembelianService
@@ -23,7 +18,6 @@ class PembelianService
      * @param PermintaanPengadaan $pr Approved PR
      * @param int $idPihak Supplier ID
      * @param string $jenisPembayaran 'tunai', 'transfer', or 'kredit'
-     * @param int|null $idKasBank For tunai/transfer
      * @param string|null $tglJatuhTempo For kredit
      * @return Pembelian
      * @throws \Exception
@@ -32,7 +26,6 @@ class PembelianService
         PermintaanPengadaan $pr,
         int $idPihak,
         string $jenisPembayaran,
-        ?int $idKasBank = null,
         ?string $tglJatuhTempo = null,
     ): Pembelian {
         if ($pr->status !== 'disetujui') {
@@ -47,16 +40,12 @@ class PembelianService
             throw new \Exception('Jatuh tempo harus diisi untuk pembayaran kredit.');
         }
 
-        if (in_array($jenisPembayaran, ['tunai', 'transfer'], true) && !$idKasBank) {
-            throw new \Exception('Kas/Bank harus dipilih untuk pembayaran tunai/transfer.');
-        }
-
         DB::beginTransaction();
 
         try {
             $kodePembelian = self::generatePurchaseCode(
                 $pr->id_entitas,
-                $pr->tanggal_permintaan,
+                $pr->tgl_pengajuan->toDateString(),
             );
 
             $totalPembelian = 0;
@@ -74,7 +63,7 @@ class PembelianService
                 'id_gudang' => $pr->id_gudang,
                 'tanggal_transaksi' => now()->toDateString(),
                 'jenis_pembayaran' => $jenisPembayaran,
-                'id_kas_bank' => $idKasBank,
+                'id_kas_bank' => null,
                 'tgl_jatuh_tempo' => $tglJatuhTempo,
                 'total_pembelian' => $totalPembelian,
                 'status' => 'draft',
@@ -91,7 +80,7 @@ class PembelianService
                 DetailPembelian::create([
                     'id_pembelian' => $pembelian->id_pembelian,
                     'id_barang' => $prDetail->id_barang,
-                    'id_satuan_input' => $prDetail->id_satuan_dasar,
+                    'id_satuan_input' => $prDetail->barang->id_satuan_dasar,
                     'qty_input' => $prDetail->jumlah_diminta,
                     'faktor_konversi' => $faktorKonversi,
                     'qty_dasar' => $prDetail->jumlah_diminta * $faktorKonversi,
@@ -99,10 +88,6 @@ class PembelianService
                     'subtotal' => $prDetail->subtotal ?? 0,
                 ]);
             }
-
-            $pr->update([
-                'status' => 'jadi_pembelian',
-            ]);
 
             DB::commit();
 
@@ -116,16 +101,15 @@ class PembelianService
     /**
      * Create quick purchase.
      *
-     * Tunai  -> BPT
-     * Transfer -> BTF
+    * Payment terms are recorded locally without Finance posting.
      *
      * @param int $idEntitas
      * @param int $idPihak Farmer ID
      * @param int $idUnitUsaha
      * @param int $idGudang
      * @param array $items
-     * @param string $jenisPembayaran 'tunai' or 'transfer'
-     * @param int $idKasBank
+    * @param string $jenisPembayaran 'tunai', 'transfer', or 'kredit'
+    * @param string|null $tglJatuhTempo
      * @return Pembelian
      * @throws \Exception
      */
@@ -136,18 +120,18 @@ class PembelianService
         int $idGudang,
         array $items,
         string $jenisPembayaran,
-        int $idKasBank,
+        ?string $tglJatuhTempo = null,
     ): Pembelian {
-        if (!in_array($jenisPembayaran, ['tunai', 'transfer'], true)) {
-            throw new \Exception('Pembelian cepat hanya support tunai atau transfer.');
+        if (!in_array($jenisPembayaran, ['tunai', 'transfer', 'kredit'], true)) {
+            throw new \Exception('Jenis pembayaran pembelian tidak valid.');
+        }
+
+        if ($jenisPembayaran === 'kredit' && !$tglJatuhTempo) {
+            throw new \Exception('Tanggal jatuh tempo wajib diisi untuk pembayaran kredit.');
         }
 
         if (empty($items)) {
             throw new \Exception('Minimal satu item harus ditambahkan.');
-        }
-
-        if (!$idKasBank) {
-            throw new \Exception('Kas/Bank harus dipilih untuk pembelian cepat.');
         }
 
         DB::beginTransaction();
@@ -175,8 +159,8 @@ class PembelianService
                 'id_gudang' => $idGudang,
                 'tanggal_transaksi' => now()->toDateString(),
                 'jenis_pembayaran' => $jenisPembayaran,
-                'id_kas_bank' => $idKasBank,
-                'tgl_jatuh_tempo' => null,
+                'id_kas_bank' => null,
+                'tgl_jatuh_tempo' => $tglJatuhTempo,
                 'total_pembelian' => $totalPembelian,
                 'status' => 'draft',
                 'status_posting' => 'F',
@@ -211,22 +195,7 @@ class PembelianService
         }
     }
 
-    /**
-     * Approve pembelian tanpa posting jurnal.
-     *
-     * PR:
-     * - tunai    -> BTU
-     * - transfer -> BTF
-     * - kredit   -> BKR
-     *
-     * Quick Purchase:
-     * - tunai    -> BPT
-     * - transfer -> BTF
-     *
-     * @param Pembelian $pembelian
-     * @return Pembelian
-     * @throws \Exception
-     */
+    /** Approve a purchase locally without posting to other modules. */
     public static function approvePembelian(Pembelian $pembelian): Pembelian
     {
         if ($pembelian->status !== 'draft') {
@@ -250,8 +219,8 @@ class PembelianService
             throw new \Exception('Hanya pembelian draft atau disetujui yang bisa dibatalkan.');
         }
 
-        if ($pembelian->penerimaan()->exists()) {
-            throw new \Exception('Pembelian yang sudah memiliki GRN tidak bisa dibatalkan. Proses retur atau koreksi stok terlebih dahulu.');
+        if ($pembelian->returs()->exists()) {
+            throw new \Exception('Pembelian yang sudah memiliki catatan retur tidak bisa dibatalkan.');
         }
 
         DB::beginTransaction();
@@ -259,205 +228,12 @@ class PembelianService
         try {
             $pembelian->update(['status' => 'dibatalkan']);
 
-            if ($pembelian->id_permintaan) {
-                $pembelian->permintaan()->update(['status' => 'disetujui']);
-            }
-
             DB::commit();
 
             return $pembelian->fresh();
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
-        }
-    }
-
-    /**
-     * Create GRN (Goods Receipt Note) dan update stok.
-     *
-    * GRN memperbarui stok dan menjadi titik posting jurnal pembelian.
-     *
-     * @param Pembelian $pembelian
-     * @param array $items
-     * @return PenerimaanBarang
-     * @throws \Exception
-     */
-    public static function createGRN(
-        Pembelian $pembelian,
-        array $items,
-    ): PenerimaanBarang {
-        if ($pembelian->status !== 'disetujui') {
-            throw new \Exception('Pembelian harus disetujui terlebih dahulu.');
-        }
-
-        if (empty($items)) {
-            throw new \Exception('Minimal satu item harus diterima.');
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $kodePenerimaan = self::generateReceiptCode(
-                $pembelian->id_entitas,
-                now()->toDateString(),
-            );
-
-            $penerimaan = PenerimaanBarang::create([
-                'id_entitas' => $pembelian->id_entitas,
-                'kode_penerimaan' => $kodePenerimaan,
-                'id_pembelian' => $pembelian->id_pembelian,
-                'id_pihak' => $pembelian->id_pihak,
-                'id_gudang' => $pembelian->id_gudang,
-                'tanggal_terima' => now()->toDateString(),
-                'status' => 'diposting',
-                'catatan' => "GRN untuk {$pembelian->kode_pembelian}",
-                'created_by' => auth()->id(),
-            ]);
-
-            foreach ($items as $item) {
-                $detailPembelian = $pembelian
-                    ->detail()
-                    ->find($item['id_detail']);
-
-                if (!$detailPembelian) {
-                    throw new \Exception(
-                        "Detail pembelian {$item['id_detail']} tidak ditemukan."
-                    );
-                }
-
-                $qtyLayak = (float) ($item['qty_layak'] ?? 0);
-                $qtyTidakLayak = (float) ($item['qty_tidak_layak'] ?? 0);
-                $qtyTotalDiterima = $qtyLayak + $qtyTidakLayak;
-                $hargaSatuan = (float) ($item['harga_satuan'] ?? 0);
-
-                if ($qtyTotalDiterima <= 0) {
-                    throw new \Exception(
-                        "Qty diterima untuk detail {$detailPembelian->id_detail} harus lebih dari 0."
-                    );
-                }
-
-                if ($qtyTotalDiterima > $detailPembelian->qty_dasar) {
-                    throw new \Exception(
-                        "Qty diterima untuk detail {$detailPembelian->id_detail} melebihi qty pesanan."
-                    );
-                }
-
-                PenerimaanBarangDetail::create([
-                    'id_penerimaan' => $penerimaan->id_penerimaan,
-                    'id_barang' => $detailPembelian->id_barang,
-                    'id_satuan_input' => $detailPembelian->id_satuan_input,
-                    'qty_input' => $qtyTotalDiterima,
-                    'faktor_konversi' => $detailPembelian->faktor_konversi,
-                    'qty_dasar' => $qtyTotalDiterima,
-                    'qty_layak' => $qtyLayak,
-                    'qty_tidak_layak' => $qtyTidakLayak,
-                    'harga_satuan_dasar' => $hargaSatuan,
-                    'subtotal' => $qtyLayak * $hargaSatuan,
-                    'alasan_tidak_layak' =>
-                        $qtyTidakLayak > 0
-                            ? 'Barang tidak layak'
-                            : null,
-                ]);
-
-                if ($qtyLayak > 0) {
-                    StokService::masukBarang(
-                        $pembelian->id_entitas,
-                        $pembelian->id_gudang,
-                        $detailPembelian->id_barang,
-                        $qtyLayak,
-                        $hargaSatuan,
-                        $penerimaan->id_penerimaan,
-                        'PENERIMAAN',
-                    );
-                }
-
-                if ($qtyTidakLayak > 0) {
-                    $retur = self::createRetur(
-                        pembelian: $pembelian,
-                        items: [[
-                            'id_barang' => $detailPembelian->id_barang,
-                            'qty_dasar' => $qtyTidakLayak,
-                            'hpp_rata2' => $hargaSatuan,
-                        ]],
-                        jenisPenyelesaian: 'potong_hutang',
-                        alasan: 'Barang tidak layak setelah sortir gudang.',
-                    );
-
-                    $retur->update([
-                        'id_penerimaan' => $penerimaan->id_penerimaan,
-                    ]);
-                }
-            }
-
-            $pembelian->update([
-                'status' => 'diterima',
-            ]);
-
-            self::postPurchaseJournal($pembelian);
-
-            $penerimaan->update([
-                'status' => 'diposting',
-            ]);
-
-            DB::commit();
-
-            return $penerimaan;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-
-    private static function postPurchaseJournal(Pembelian $pembelian): void
-    {
-        if ($pembelian->status_posting === 'T') {
-            return;
-        }
-
-        $pembelian->loadMissing('unitUsaha');
-        $transactionCode = match (true) {
-            is_null($pembelian->id_permintaan) && $pembelian->jenis_pembayaran === 'tunai' => 'BPT',
-            is_null($pembelian->id_permintaan) && $pembelian->jenis_pembayaran === 'transfer' => 'BTF',
-            $pembelian->jenis_pembayaran === 'tunai' => 'BTU',
-            $pembelian->jenis_pembayaran === 'transfer' => 'BTF',
-            $pembelian->jenis_pembayaran === 'kredit' => 'BKR',
-            default => throw new \Exception('Jenis pembayaran pembelian tidak valid.'),
-        };
-
-        $jurnal = app(JurnalService::class)->posting(
-            $transactionCode,
-            [
-                'tanggal_jurnal' => $pembelian->tanggal_transaksi,
-                'nomor_nota' => $pembelian->kode_pembelian,
-                'total_pembelian' => (float) $pembelian->total_pembelian,
-                'id_kas_bank' => $pembelian->id_kas_bank,
-                'kode_unit' => $pembelian->unitUsaha?->kode_unit_usaha,
-                'id_pihak' => $pembelian->id_pihak,
-            ],
-            Pembelian::class,
-            (int) $pembelian->id_pembelian,
-            "Pembelian {$pembelian->kode_pembelian}",
-        );
-
-        $pembelian->update([
-            'status_posting' => 'T',
-            'id_jurnal' => $jurnal->id_jurnal,
-        ]);
-
-        if ($pembelian->jenis_pembayaran === 'kredit') {
-            Hutang::updateOrCreate(
-                ['sumber_tipe' => 'PEMBELIAN', 'sumber_id' => $pembelian->id_pembelian],
-                [
-                    'id_entitas' => $pembelian->id_entitas,
-                    'id_pihak' => $pembelian->id_pihak,
-                    'kode_akun' => '2111',
-                    'tanggal' => $pembelian->tanggal_transaksi,
-                    'tgl_jatuh_tempo' => $pembelian->tgl_jatuh_tempo,
-                    'nilai_awal' => $pembelian->total_pembelian,
-                    'nilai_terbayar' => 0,
-                    'status' => 'belum_lunas',
-                ],
-            );
         }
     }
 
@@ -469,7 +245,15 @@ class PembelianService
             ->value('faktor_ke_dasar');
 
         if ($factor === null || (float) $factor <= 0) {
-            throw new \Exception('Konversi satuan barang tidak ditemukan.');
+            $idSatuanDasar = DB::table('master_barang')
+                ->where('id_barang', $idBarang)
+                ->value('id_satuan_dasar');
+
+            if ((int) $idSatuanDasar === $idSatuan) {
+                return 1.0;
+            }
+
+            throw new \Exception('Konversi satuan untuk barang dan satuan yang dipilih tidak ditemukan. Pilih satuan yang tersedia untuk barang tersebut.');
         }
 
         return (float) $factor;
@@ -516,7 +300,36 @@ class PembelianService
         DB::beginTransaction();
 
         try {
-            $pembelian->loadMissing('detail');
+            $pembelian = Pembelian::with(['detail', 'returs.detail'])
+                ->whereKey($pembelian->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $returnedByBarang = $pembelian->returs
+                ->flatMap(fn ($retur) => $retur->detail)
+                ->groupBy('id_barang')
+                ->map(fn ($details) => (float) $details->sum('qty_dasar'));
+            $requestedByBarang = collect($items)
+                ->groupBy('id_barang')
+                ->map(fn ($rows) => (float) $rows->sum('qty_dasar'));
+
+            foreach ($requestedByBarang as $idBarang => $qtyDiminta) {
+                $qtyDibeli = (float) $pembelian->detail
+                    ->where('id_barang', (int) $idBarang)
+                    ->sum('qty_dasar');
+                $qtySudahDiretur = (float) $returnedByBarang->get($idBarang, 0);
+
+                if ($qtyDibeli <= 0) {
+                    throw new \Exception("Barang {$idBarang} tidak ditemukan pada pembelian.");
+                }
+
+                if ($qtySudahDiretur + $qtyDiminta > $qtyDibeli + 0.0000001) {
+                    throw new \Exception(
+                        "Jumlah retur barang {$idBarang} melebihi sisa kuantitas pembelian."
+                    );
+                }
+            }
+
             $kodeRetur = self::generateReturnCode(
                 $pembelian->id_entitas,
                 now()->toDateString(),
@@ -527,20 +340,25 @@ class PembelianService
 
             foreach ($items as $item) {
                 $detailPembelian = $pembelian->detail
-                    ->where('id_barang', (int) $item['id_barang'])
-                    ->first();
+                    ->where('id_barang', (int) $item['id_barang']);
 
-                if (!$detailPembelian) {
+                if ($detailPembelian->isEmpty()) {
                     throw new \Exception(
                         "Barang {$item['id_barang']} tidak ditemukan pada pembelian."
                     );
                 }
 
                 $qtyRetur = (float) $item['qty_dasar'];
-                $faktorKonversi = (float) $detailPembelian->faktor_konversi;
-                $hargaBeliDasar = $faktorKonversi > 0
-                    ? (float) $detailPembelian->harga_satuan_input / $faktorKonversi
-                    : (float) $detailPembelian->harga_satuan_input;
+                $qtyDibeli = (float) $detailPembelian->sum('qty_dasar');
+                $nilaiBeli = $detailPembelian->sum(function ($detail) {
+                    $faktorKonversi = (float) $detail->faktor_konversi;
+                    $hargaSatuanDasar = $faktorKonversi > 0
+                        ? (float) $detail->harga_satuan_input / $faktorKonversi
+                        : (float) $detail->harga_satuan_input;
+
+                    return (float) $detail->qty_dasar * $hargaSatuanDasar;
+                });
+                $hargaBeliDasar = $qtyDibeli > 0 ? $nilaiBeli / $qtyDibeli : 0;
 
                 $item['hpp_rata2'] = $hargaBeliDasar;
                 $itemsWithHpp[] = $item;
@@ -580,130 +398,20 @@ class PembelianService
         }
     }
 
-    /**
-     * Approve purchase return dan post jurnal.
-     *
-     * uang          -> RBU
-     * potong_hutang -> RBH
-     *
-    * ganti_barang tidak membuat jurnal nilai, tetapi mencatat pertukaran stok.
-     *
-     * @param ReturPembelian $retur
-     * @param int|null $idKasBank
-     * @return ReturPembelian
-     * @throws \Exception
-     */
-    public static function approveRetur(
-        ReturPembelian $retur,
-        ?int $idKasBank = null,
-    ): ReturPembelian {
+    /** Mark a return complete within the purchase module only. */
+    public static function approveRetur(ReturPembelian $retur): ReturPembelian
+    {
         if ($retur->status !== 'diajukan') {
-            throw new \Exception(
-                'Hanya retur yang diajukan yang bisa disetujui.'
-            );
+            throw new \Exception('Hanya retur yang diajukan yang dapat diproses.');
         }
 
-        if (
-            $retur->jenis_penyelesaian === 'uang'
-            && !$idKasBank
-        ) {
-            throw new \Exception(
-                'Kas/Bank harus dipilih untuk pengembalian uang.'
-            );
-        }
+        $retur->update([
+            'status' => 'selesai',
+            'status_posting' => 'F',
+            'id_jurnal' => null,
+        ]);
 
-        DB::beginTransaction();
-
-        try {
-            $retur->loadMissing('pembelian.unitUsaha');
-
-            $transactionCode = match ($retur->jenis_penyelesaian) {
-                'uang' => 'RBU',
-                'potong_hutang' => 'RBH',
-                'ganti_barang' => null,
-                default => throw new \Exception(
-                    'Jenis penyelesaian tidak dikenal.'
-                ),
-            };
-
-            $pembelian = $retur->pembelian;
-
-            if (!$pembelian) {
-                throw new \Exception(
-                    'Pembelian untuk retur tidak ditemukan.'
-                );
-            }
-
-            $jurnal = null;
-
-            if ($retur->jenis_penyelesaian === 'ganti_barang') {
-                foreach ($retur->detail as $detail) {
-                    StokService::keluarBarang(
-                        $pembelian->id_entitas,
-                        $pembelian->id_gudang,
-                        $detail->id_barang,
-                        (float) $detail->qty_dasar,
-                        (int) $retur->id_retur,
-                    );
-                    StokService::masukBarang(
-                        $pembelian->id_entitas,
-                        $pembelian->id_gudang,
-                        $detail->id_barang,
-                        (float) $detail->qty_dasar,
-                        (float) $detail->hpp_rata2,
-                        (int) $retur->id_retur,
-                        'RETUR_PEMBELIAN_GANTI',
-                    );
-                }
-            } else {
-                $payload = [
-                    'tanggal_jurnal' => $retur->tgl_retur,
-                    'nomor_nota' => $retur->kode_retur,
-                    'total_nilai' => (float) $retur->total_nilai,
-                    'id_kas_bank' => $idKasBank,
-                    'kode_unit' => $pembelian->unitUsaha?->kode_unit_usaha,
-                    'id_pihak' => $pembelian->id_pihak,
-                ];
-
-                $jurnal = app(JurnalService::class)->posting(
-                    $transactionCode,
-                    $payload,
-                    ReturPembelian::class,
-                    (int) $retur->id_retur,
-                    "Retur {$retur->jenis_penyelesaian} untuk {$pembelian->kode_pembelian}",
-                );
-            }
-
-            $retur->update([
-                'status' => 'selesai',
-                'status_posting' => 'T',
-                'id_jurnal' => $jurnal?->id_jurnal,
-            ]);
-
-            if ($retur->jenis_penyelesaian === 'potong_hutang') {
-                $hutang = Hutang::where('sumber_tipe', 'PEMBELIAN')
-                    ->where('sumber_id', $pembelian->id_pembelian)
-                    ->first();
-
-                if ($hutang) {
-                    $nilaiAwal = max(0, (float) $hutang->nilai_awal - (float) $retur->total_nilai);
-                    $terbayar = (float) $hutang->nilai_terbayar;
-                    $hutang->update([
-                        'nilai_awal' => $nilaiAwal,
-                        'status' => $terbayar >= $nilaiAwal
-                            ? 'lunas'
-                            : ($terbayar > 0 ? 'sebagian' : 'belum_lunas'),
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            return $retur->fresh();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        return $retur->fresh();
     }
 
     private static function generatePurchaseCode(
@@ -734,40 +442,6 @@ class PembelianService
 
         return sprintf(
             'PO/%04d%02d/%04d',
-            $tahun,
-            $bulan,
-            $seq
-        );
-    }
-
-    private static function generateReceiptCode(
-        int $idEntitas,
-        string $tanggal
-    ): string {
-        $tahun = date('Y', strtotime($tanggal));
-        $bulan = date('m', strtotime($tanggal));
-
-        $last = PenerimaanBarang::where('id_entitas', $idEntitas)
-            ->whereYear('created_at', $tahun)
-            ->whereMonth('created_at', $bulan)
-            ->orderByDesc('id_penerimaan')
-            ->first();
-
-        $seq = 1;
-
-        if (
-            $last
-            && preg_match(
-                '/(\d+)$/',
-                $last->kode_penerimaan,
-                $matches
-            )
-        ) {
-            $seq = (int) $matches[1] + 1;
-        }
-
-        return sprintf(
-            'GRN/%04d%02d/%04d',
             $tahun,
             $bulan,
             $seq
