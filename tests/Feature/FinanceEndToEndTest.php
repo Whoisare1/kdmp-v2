@@ -49,6 +49,7 @@ class FinanceEndToEndTest extends TestCase
             'created_at'      => now(),
         ]);
         app()->instance('koperasi_aktif', $this->idKoperasi);
+        app()->instance('entitas_aktif', $this->idKoperasi);
 
         // Setup User
         $idUser = DB::table('pengguna')->insertGetId([

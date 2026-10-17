@@ -85,6 +85,15 @@ class PembelianController extends ModuleCrudController
                 ],
                 'id_pihak' => 'required|exists:master_pihak,id_pihak',
                 'jenis_pembayaran' => 'required|in:tunai,transfer,kredit',
+                'id_kas_bank' => [
+                    'nullable',
+                    'exists:master_kas_bank,id_kas_bank',
+                    function ($attribute, $value, $fail) use ($idEntitas) {
+                        if ($value && ! KasBank::where('id_kas_bank', $value)->where('id_entitas', $idEntitas)->exists()) {
+                            $fail('Kas/Bank tidak tersedia untuk entitas aktif.');
+                        }
+                    },
+                ],
                 'tgl_jatuh_tempo' => [
                     'nullable',
                     'date_format:Y-m-d',

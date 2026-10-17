@@ -6,6 +6,7 @@ use App\Http\Controllers\Akuntansi\JurnalController;
 use App\Http\Controllers\Akuntansi\LaporanController;
 use App\Http\Controllers\Akuntansi\TutupBulanController;
 use App\Http\Controllers\Akuntansi\TutupTahunController;
+use App\Http\Controllers\Akuntansi\SaldoAwalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
@@ -170,8 +171,15 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('akuntansi')->name('akuntansi.')->group(function () {
         Route::resource('jurnal', JurnalController::class)->only(['index', 'show']);
+        Route::post('jurnal/{id}/balik', [JurnalController::class, 'balik'])->name('jurnal.balik');
+        Route::get('saldo-awal', [SaldoAwalController::class, 'index'])->name('saldo-awal.index');
+        Route::post('saldo-awal', [SaldoAwalController::class, 'store'])->name('saldo-awal.store');
         Route::resource('aset-tetap', AsetTetapController::class);
-        Route::resource('config-shu', ConfigShuController::class);
+        // Pembagian SHU hanya untuk Koperasi; entitas lain dialokasikan otomatis saat Tutup Tahun.
+        Route::middleware(\App\Http\Middleware\HanyaKoperasi::class)->group(function () {
+            Route::resource('config-shu', ConfigShuController::class);
+        });
+
         Route::get('tutup-bulan', [TutupBulanController::class, 'index'])->name('tutup-bulan.index');
         Route::post('tutup-bulan', [TutupBulanController::class, 'store'])->name('tutup-bulan.store');
         Route::get('tutup-tahun', [TutupTahunController::class, 'index'])->name('tutup-tahun.index');

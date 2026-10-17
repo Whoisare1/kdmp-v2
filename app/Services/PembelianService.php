@@ -8,6 +8,9 @@ use App\Models\Pembelian\ReturPembelian;
 use App\Models\Pembelian\ReturPembelianDetail;
 use App\Models\Perencanaan\PermintaanPengadaan;
 use App\Models\Master\Barang;
+use App\Models\Master\KasBank;
+use App\Models\Keuangan\Hutang;
+use App\Services\Finance\JurnalService;
 use Illuminate\Support\Facades\DB;
 
 class PembelianService
@@ -195,20 +198,79 @@ class PembelianService
         }
     }
 
-    /** Approve a purchase locally without posting to other modules. */
+    /** Approve a purchase and automatically post to journal and hutang (Option A). */
     public static function approvePembelian(Pembelian $pembelian): Pembelian
     {
         if ($pembelian->status !== 'draft') {
             throw new \Exception('Hanya pembelian draft yang bisa disetujui.');
         }
 
+        DB::beginTransaction();
+
         try {
+            $pembelian->loadMissing(['unitUsaha', 'pihak']);
+
+            $isPetani = $pembelian->pihak?->jenis_pihak === 'petani';
+            $transactionCode = match (true) {
+                $isPetani && $pembelian->jenis_pembayaran === 'tunai' => 'BPT',
+                $pembelian->jenis_pembayaran === 'tunai' => 'BTU',
+                $pembelian->jenis_pembayaran === 'transfer' => 'BTF',
+                $pembelian->jenis_pembayaran === 'kredit' => 'BKR',
+                default => throw new \Exception('Jenis pembayaran pembelian tidak valid.'),
+            };
+
+            $idKasBank = $pembelian->id_kas_bank
+                ?? DB::table('master_kas_bank')
+                    ->where('id_entitas', $pembelian->id_entitas)
+                    ->where('jenis', $pembelian->jenis_pembayaran === 'tunai' ? 'kas' : 'bank')
+                    ->where('is_active', true)
+                    ->value('id_kas_bank')
+                ?? DB::table('master_kas_bank')->where('is_active', true)->value('id_kas_bank');
+
+            $jurnal = app(JurnalService::class)->posting(
+                $transactionCode,
+                [
+                    'tanggal_jurnal' => $pembelian->tanggal_transaksi,
+                    'nomor_nota' => $pembelian->kode_pembelian,
+                    'total_pembelian' => (float) $pembelian->total_pembelian,
+                    'id_kas_bank' => $idKasBank,
+                    'kode_unit' => $pembelian->unitUsaha?->kode_unit_usaha,
+                    'id_pihak' => $pembelian->id_pihak,
+                ],
+                Pembelian::class,
+                (int) $pembelian->id_pembelian,
+                "Pembelian {$pembelian->kode_pembelian} (" . ($pembelian->pihak?->nama ?? 'Supplier') . ")",
+                $pembelian->id_entitas,
+            );
+
             $pembelian->update([
                 'status' => 'disetujui',
-                'status_posting' => 'F',
+                'status_posting' => 'T',
+                'id_jurnal' => $jurnal->id_jurnal,
+                'id_kas_bank' => $idKasBank,
             ]);
+
+            if ($pembelian->jenis_pembayaran === 'kredit') {
+                Hutang::updateOrCreate(
+                    ['sumber_tipe' => 'PEMBELIAN', 'sumber_id' => $pembelian->id_pembelian],
+                    [
+                        'id_entitas' => $pembelian->id_entitas,
+                        'id_pihak' => $pembelian->id_pihak,
+                        'kode_akun' => '2111',
+                        'tanggal' => $pembelian->tanggal_transaksi,
+                        'tgl_jatuh_tempo' => $pembelian->tgl_jatuh_tempo,
+                        'nilai_awal' => $pembelian->total_pembelian,
+                        'nilai_terbayar' => 0,
+                        'status' => 'belum_lunas',
+                    ],
+                );
+            }
+
+            DB::commit();
+
             return $pembelian->fresh();
         } catch (\Exception $e) {
+            DB::rollBack();
             throw $e;
         }
     }
@@ -227,6 +289,18 @@ class PembelianService
 
         try {
             $pembelian->update(['status' => 'dibatalkan']);
+
+            if ($pembelian->id_jurnal) {
+                try {
+                    app(JurnalService::class)->balik((int) $pembelian->id_jurnal, "Pembatalan pembelian {$pembelian->kode_pembelian}");
+                } catch (\Exception $ignored) {}
+            }
+
+            if ($pembelian->jenis_pembayaran === 'kredit') {
+                Hutang::where('sumber_tipe', 'PEMBELIAN')
+                    ->where('sumber_id', $pembelian->id_pembelian)
+                    ->delete();
+            }
 
             DB::commit();
 
@@ -398,20 +472,112 @@ class PembelianService
         }
     }
 
-    /** Mark a return complete within the purchase module only. */
-    public static function approveRetur(ReturPembelian $retur): ReturPembelian
-    {
+    /** Mark a return complete and post relevant journals & hutang reduction (Option A). */
+    public static function approveRetur(
+        ReturPembelian $retur,
+        ?int $idKasBank = null,
+    ): ReturPembelian {
         if ($retur->status !== 'diajukan') {
             throw new \Exception('Hanya retur yang diajukan yang dapat diproses.');
         }
 
-        $retur->update([
-            'status' => 'selesai',
-            'status_posting' => 'F',
-            'id_jurnal' => null,
-        ]);
+        DB::beginTransaction();
 
-        return $retur->fresh();
+        try {
+            $retur->loadMissing(['pembelian.unitUsaha', 'pembelian.pihak']);
+            $pembelian = $retur->pembelian;
+
+            if (!$pembelian) {
+                throw new \Exception('Pembelian untuk retur tidak ditemukan.');
+            }
+
+            $transactionCode = match ($retur->jenis_penyelesaian) {
+                'uang' => 'RBU',
+                'potong_hutang' => 'RBH',
+                'ganti_barang' => null,
+                default => throw new \Exception('Jenis penyelesaian tidak dikenal.'),
+            };
+
+            $jurnal = null;
+
+            if ($retur->jenis_penyelesaian === 'ganti_barang') {
+                foreach ($retur->detail as $detail) {
+                    StokService::keluarBarang(
+                        $pembelian->id_entitas,
+                        $pembelian->id_gudang,
+                        $detail->id_barang,
+                        (float) $detail->qty_dasar,
+                        (int) $retur->id_retur,
+                    );
+                    StokService::masukBarang(
+                        $pembelian->id_entitas,
+                        $pembelian->id_gudang,
+                        $detail->id_barang,
+                        (float) $detail->qty_dasar,
+                        (float) $detail->hpp_rata2,
+                        (int) $retur->id_retur,
+                        'RETUR_PEMBELIAN_GANTI',
+                    );
+                }
+            } elseif ($transactionCode) {
+                $kasBankId = $idKasBank;
+                if ($retur->jenis_penyelesaian === 'uang' && !$kasBankId) {
+                    $kasBankId = KasBank::where('id_entitas', $pembelian->id_entitas)
+                        ->where('is_active', true)
+                        ->value('id_kas_bank');
+                }
+
+                if ($kasBankId || $retur->jenis_penyelesaian === 'potong_hutang') {
+                    $payload = [
+                        'tanggal_jurnal' => $retur->tgl_retur,
+                        'nomor_nota' => $retur->kode_retur,
+                        'total_nilai' => (float) $retur->total_nilai,
+                        'id_kas_bank' => $kasBankId,
+                        'kode_unit' => $pembelian->unitUsaha?->kode_unit_usaha,
+                        'id_pihak' => $pembelian->id_pihak,
+                    ];
+
+                    $jurnal = app(JurnalService::class)->posting(
+                        $transactionCode,
+                        $payload,
+                        ReturPembelian::class,
+                        (int) $retur->id_retur,
+                        "Retur {$retur->jenis_penyelesaian} untuk {$pembelian->kode_pembelian}",
+                        $pembelian->id_entitas,
+                    );
+                }
+            }
+
+            $retur->update([
+                'status' => 'selesai',
+                'status_posting' => $jurnal ? 'T' : 'F',
+                'id_jurnal' => $jurnal?->id_jurnal,
+            ]);
+
+            if ($retur->jenis_penyelesaian === 'potong_hutang') {
+                $hutang = Hutang::where('sumber_tipe', 'PEMBELIAN')
+                    ->where('sumber_id', $pembelian->id_pembelian)
+                    ->first();
+
+                if ($hutang) {
+                    $nilaiAwal = max(0, (float) $hutang->nilai_awal - (float) $retur->total_nilai);
+                    $terbayar = (float) $hutang->nilai_terbayar;
+                    $hutang->update([
+                        'nilai_awal' => $nilaiAwal,
+                        'status' => $terbayar >= $nilaiAwal
+                            ? 'lunas'
+                            : ($terbayar > 0 ? 'sebagian' : 'belum_lunas'),
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return $retur->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     private static function generatePurchaseCode(

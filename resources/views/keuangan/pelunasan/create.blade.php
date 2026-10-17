@@ -83,7 +83,7 @@
                             @foreach ($pihaks as $pihak)
                                 <option value="{{ $pihak->id_pihak }}" @selected(old('id_pihak') == $pihak->id_pihak)>
                                     {{ $pihak->nama }}
-                                    @if($pihak->tipe) ({{ $pihak->tipe }}) @endif
+                                    @if($pihak->jenis_pihak) ({{ $pihak->jenis_pihak }}) @endif
                                 </option>
                             @endforeach
                         </select>

@@ -243,10 +243,10 @@ BEGIN
             NOW()
         )
         ON DUPLICATE KEY UPDATE
-            mutasi_debet       = mutasi_debet  + v_debet,
-            mutasi_kredit      = mutasi_kredit + v_kredit,
             saldo_akhir_debet  = saldo_awal_debet  + mutasi_debet  + v_debet,
             saldo_akhir_kredit = saldo_awal_kredit + mutasi_kredit + v_kredit,
+            mutasi_debet       = mutasi_debet  + v_debet,
+            mutasi_kredit      = mutasi_kredit + v_kredit,
             dihitung_pada      = NOW();
 
         SET v_i = v_i + 1;

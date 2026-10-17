@@ -144,7 +144,7 @@
                 </span>
             </div>
             @if($labaBersih < 0)
-                <p class="mt-1 text-xs text-merah-600">⚠ Koperasi mengalami kerugian pada periode ini.</p>
+                <p class="mt-1 text-xs text-merah-600">⚠ Entitas mengalami kerugian pada periode ini.</p>
             @endif
         </div>
     </div>

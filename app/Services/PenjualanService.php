@@ -8,6 +8,7 @@ use App\Models\Penjualan\DetailPenjualan;
 use App\Models\Penjualan\Penjualan;
 use App\Models\Penjualan\ReturPenjualan;
 use App\Models\Penjualan\ReturPenjualanDetail;
+use App\Services\Finance\JurnalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -131,9 +132,22 @@ class PenjualanService
                 'created_by' => auth()->id(),
             ]);
 
+            $totalHpp = 0.0;
             foreach ($itemsByBarang as $idBarang => $quantity) {
                 $product = $products->get($idBarang);
                 $price = (float) $product->harga_jual_standar;
+
+                $hpp = (float) (DB::table('stok')
+                    ->where('id_gudang', $idGudang)
+                    ->where('id_barang', (int) $idBarang)
+                    ->value('hpp_rata2') ?? 0);
+
+                if ($hpp <= 0) {
+                    $hpp = round($price * 0.7, 2);
+                }
+
+                $lineHpp = $quantity * $hpp;
+                $totalHpp += $lineHpp;
 
                 DetailPenjualan::create([
                     'id_penjualan' => $sale->id_penjualan,
@@ -145,11 +159,40 @@ class PenjualanService
                     'qty_dasar' => $quantity,
                     'harga_satuan' => $price,
                     'subtotal' => $quantity * $price,
-                    'hpp_satuan_dasar' => 0,
-                    'total_hpp' => 0,
+                    'hpp_satuan_dasar' => $hpp,
+                    'total_hpp' => $lineHpp,
                     'harga_titip_satuan' => 0,
                 ]);
             }
+
+            $sale->update(['total_hpp' => $totalHpp]);
+
+            // Realtime Auto-Posting Jurnal Akuntansi (Opsi A)
+            $kodeTransaksi = $metodeBayar === 'transfer' ? 'JTFW' : 'JTW';
+            $unitUsaha = DB::table('master_unit_usaha')->where('id_unit_usaha', $idUnitUsaha)->first();
+
+            $jurnal = app(JurnalService::class)->posting(
+                $kodeTransaksi,
+                [
+                    'tanggal_jurnal' => $sale->tanggal_transaksi,
+                    'nomor_nota' => $sale->kode_penjualan,
+                    'total_bayar' => (float) $sale->total_bayar,
+                    'total_hpp' => (float) $totalHpp,
+                    'id_kas_bank' => $sale->id_kas_bank,
+                    'kode_unit' => $unitUsaha?->kode_unit_usaha,
+                    'is_anggota' => (bool) $pembeli->is_anggota,
+                    'id_pihak' => $pembeli->id_pihak,
+                ],
+                Penjualan::class,
+                (int) $sale->id_penjualan,
+                "Penjualan {$sale->kode_penjualan} ({$pembeli->nama})",
+                $idEntitas,
+            );
+
+            $sale->update([
+                'status_posting' => 'T',
+                'id_jurnal' => $jurnal->id_jurnal,
+            ]);
 
             return $sale->load(['pihak', 'detail.barang.satuanDasar']);
         });
@@ -244,8 +287,39 @@ class PenjualanService
             throw new RuntimeException('Hanya retur yang diajukan yang dapat diselesaikan.');
         }
 
-        $return->update(['status' => 'selesai', 'status_posting' => 'F', 'id_jurnal' => null]);
-        return $return->fresh();
+        return DB::transaction(function () use ($return) {
+            $return->loadMissing(['penjualan.unitUsaha', 'penjualan.pihak']);
+            $sale = $return->penjualan;
+
+            $jurnal = null;
+            if ($return->jenis_penyelesaian === 'uang') {
+                $unitUsaha = $sale->unitUsaha ?? DB::table('master_unit_usaha')->where('id_unit_usaha', $sale->id_unit_usaha)->first();
+
+                $jurnal = app(JurnalService::class)->posting(
+                    'RJU',
+                    [
+                        'tanggal_jurnal' => $return->tgl_retur,
+                        'nomor_nota' => $return->kode_retur,
+                        'total_nilai' => (float) $return->total_nilai,
+                        'total_hpp' => (float) $return->total_hpp,
+                        'kode_unit' => $unitUsaha?->kode_unit_usaha,
+                        'id_pihak' => $sale->id_pihak,
+                    ],
+                    ReturPenjualan::class,
+                    (int) $return->id_retur,
+                    "Retur Penjualan {$return->kode_retur} untuk {$sale->kode_penjualan}",
+                    $return->id_entitas,
+                );
+            }
+
+            $return->update([
+                'status' => 'selesai',
+                'status_posting' => $jurnal ? 'T' : 'F',
+                'id_jurnal' => $jurnal?->id_jurnal,
+            ]);
+
+            return $return->fresh();
+        });
     }
 
     private static function generateSaleCode(int $idEntitas): string

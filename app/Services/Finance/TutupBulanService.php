@@ -105,6 +105,9 @@ class TutupBulanService
             );
         }
 
+        // --- Proses Penyusutan Aset Tetap ---
+        $this->prosesPenyusutanAsetTetap($idEntitas, $tahun, $bulan);
+
         // --- Rebuild buku besar untuk snapshot saldo final ---
         $this->jurnalService->bangunBukuBesar($tahun, $bulan);
 
@@ -123,6 +126,74 @@ class TutupBulanService
         );
 
         return $periode;
+    }
+
+    // =========================================================================
+    // PROSES PENYUSUTAN ASET TETAP
+    // =========================================================================
+    
+    private function prosesPenyusutanAsetTetap(int $idEntitas, int $tahun, int $bulan): void
+    {
+        $asetList = \App\Models\Master\AsetTetap::where('id_entitas', $idEntitas)
+            ->where('status', 'AKTIF')
+            ->whereRaw('(nilai_perolehan - akum_penyusutan) > nilai_residu')
+            ->get();
+
+        if ($asetList->isEmpty()) {
+            return;
+        }
+
+        $tanggalAkhirBulan = \Carbon\Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
+        $totalPenyusutan = 0;
+
+        foreach ($asetList as $aset) {
+            $nilaiSisa = $aset->nilai_perolehan - $aset->akum_penyusutan;
+            if ($nilaiSisa <= $aset->nilai_residu) {
+                continue;
+            }
+
+            // Hitung depresiasi per bulan (garis lurus)
+            $bebanPenyusutanBulanIni = ($aset->nilai_perolehan - $aset->nilai_residu) / $aset->umur_bulan;
+
+            // Jangan biarkan menyusut melebihi nilai residu
+            if ($nilaiSisa - $bebanPenyusutanBulanIni < $aset->nilai_residu) {
+                $bebanPenyusutanBulanIni = $nilaiSisa - $aset->nilai_residu;
+            }
+
+            // Dibulatkan untuk menghindari desimal ganjil
+            $bebanPenyusutanBulanIni = round($bebanPenyusutanBulanIni);
+            if ($bebanPenyusutanBulanIni <= 0) continue;
+
+            $header = [
+                'tanggal_jurnal' => $tanggalAkhirBulan,
+                'kode_transaksi' => 'DEP', // Kode untuk depresiasi
+                'jenis_jurnal'   => 'PENYESUAIAN',
+                'keterangan'     => "Penyusutan Aset Tetap: {$aset->nama_aset} Periode {$bulan}-{$tahun}",
+            ];
+
+            $baris = [
+                [
+                    'kode_anak'  => $aset->kode_akun_biaya,
+                    'posisi'     => 'D',
+                    'nilai'      => $bebanPenyusutanBulanIni,
+                    'keterangan' => "Beban Penyusutan {$aset->nama_aset}"
+                ],
+                [
+                    'kode_anak'  => $aset->kode_akun_akum,
+                    'posisi'     => 'K',
+                    'nilai'      => $bebanPenyusutanBulanIni,
+                    'keterangan' => "Akum. Penyusutan {$aset->nama_aset}"
+                ]
+            ];
+
+            $this->jurnalService->postingManual($header, $baris);
+
+            // Update nilai akumulasi penyusutan di master aset
+            $aset->akum_penyusutan += $bebanPenyusutanBulanIni;
+            $aset->save();
+
+            $totalPenyusutan++;
+        }
     }
 
     // =========================================================================
@@ -185,8 +256,7 @@ class TutupBulanService
         $akunNegatif = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
             ->where('bbp.id_entitas', $idEntitas)
-            ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
+            ->whereRaw('(bbp.periode_tahun * 12 + bbp.periode_bulan) <= ?', [($tahun * 12) + $bulan])
             ->where('c.kelompok', 'Aktiva')
             ->whereIn('c.kode_anak', function ($q) {
                 // akun Kas dan Bank: kode dimulai dengan 111
@@ -194,7 +264,10 @@ class TutupBulanService
                   ->where('kode_anak', 'like', '111%')
                   ->where('is_transaction', 'T');
             })
-            ->whereRaw('(bbp.saldo_akhir_debet - bbp.saldo_akhir_kredit) < 0')
+            ->select('bbp.kode_anak')
+            ->groupBy('bbp.kode_anak')
+            ->having(DB::raw('SUM(bbp.mutasi_debet - bbp.mutasi_kredit)'), '<', 0)
+            ->get()
             ->count();
 
         return [
@@ -217,14 +290,13 @@ class TutupBulanService
         // Total nilai persediaan dari buku besar (akun 112x)
         $saldoBB = DB::table('buku_besar_periode as bbp')
             ->where('bbp.id_entitas', $idEntitas)
-            ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
+            ->whereRaw('(bbp.periode_tahun * 12 + bbp.periode_bulan) <= ?', [($tahun * 12) + $bulan])
             ->whereIn('bbp.kode_anak', function ($q) {
                 $q->select('kode_anak')->from('master_coa')
                   ->where('kode_anak', 'like', '112%')
                   ->where('is_transaction', 'T');
             })
-            ->sum(DB::raw('bbp.saldo_akhir_debet - bbp.saldo_akhir_kredit'));
+            ->sum(DB::raw('bbp.mutasi_debet - bbp.mutasi_kredit'));
 
         // Total nilai fisik stok dari tabel stok.
         // Tabel stok PK = (id_gudang, id_barang) Ã¢â‚¬â€ tidak ada id_entitas.
@@ -262,14 +334,13 @@ class TutupBulanService
         // Saldo piutang dari buku besar (akun 113x)
         $saldoBB = DB::table('buku_besar_periode as bbp')
             ->where('bbp.id_entitas', $idEntitas)
-            ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
+            ->whereRaw('(bbp.periode_tahun * 12 + bbp.periode_bulan) <= ?', [($tahun * 12) + $bulan])
             ->whereIn('bbp.kode_anak', function ($q) {
                 $q->select('kode_anak')->from('master_coa')
                   ->where('kode_anak', 'like', '113%')
                   ->where('is_transaction', 'T');
             })
-            ->sum(DB::raw('bbp.saldo_akhir_debet - bbp.saldo_akhir_kredit'));
+            ->sum(DB::raw('bbp.mutasi_debet - bbp.mutasi_kredit'));
 
         // Total sisa piutang dari buku pembantu
         // Status: 'belum_lunas' atau 'sebagian' (bukan 'OPEN'/'PARTIAL')
@@ -303,8 +374,7 @@ class TutupBulanService
         // Saldo hutang dari buku besar (akun 211x dan 212x)
         $saldoBB = DB::table('buku_besar_periode as bbp')
             ->where('bbp.id_entitas', $idEntitas)
-            ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
+            ->whereRaw('(bbp.periode_tahun * 12 + bbp.periode_bulan) <= ?', [($tahun * 12) + $bulan])
             ->whereIn('bbp.kode_anak', function ($q) {
                 $q->select('kode_anak')->from('master_coa')
                   ->where(function ($q2) {
@@ -313,7 +383,7 @@ class TutupBulanService
                   })
                   ->where('is_transaction', 'T');
             })
-            ->sum(DB::raw('bbp.saldo_akhir_kredit - bbp.saldo_akhir_debet'));
+            ->sum(DB::raw('bbp.mutasi_kredit - bbp.mutasi_debet'));
 
         // Total sisa hutang dari buku pembantu
         // Status: 'belum_lunas' atau 'sebagian' (bukan 'OPEN'/'PARTIAL')
@@ -348,14 +418,13 @@ class TutupBulanService
         // atau akun khusus yang sudah diset di COA
         $saldoBB = DB::table('buku_besar_periode as bbp')
             ->where('bbp.id_entitas', $idEntitas)
-            ->where('bbp.periode_tahun', $tahun)
-            ->where('bbp.periode_bulan', $bulan)
+            ->whereRaw('(bbp.periode_tahun * 12 + bbp.periode_bulan) <= ?', [($tahun * 12) + $bulan])
             ->whereIn('bbp.kode_anak', function ($q) {
                 $q->select('kode_anak')->from('master_coa')
                   ->where('kode_anak', 'like', '1135%') // Piutang Konsinyasi
                   ->where('is_transaction', 'T');
             })
-            ->sum(DB::raw('bbp.saldo_akhir_debet - bbp.saldo_akhir_kredit'));
+            ->sum(DB::raw('bbp.mutasi_debet - bbp.mutasi_kredit'));
 
         // Nilai stok konsinyasi yang masih aktif di gudang koperasi ini (sebagai penerima).
         // stok_konsinyasi punya id_entitas_penerima, qty_sisa, dan harga_titip_satuan Ã¢â‚¬â€

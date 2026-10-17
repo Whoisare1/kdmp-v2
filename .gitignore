@@ -15,3 +15,7 @@ Thumbs.db
 /storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
+
+scratch_*.php
+fix_ledger.php
+*.zip

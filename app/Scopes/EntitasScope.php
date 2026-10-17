@@ -19,7 +19,9 @@ class EntitasScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
-        $id = app()->bound('entitas_aktif') ? app('entitas_aktif') : null;
+        $id = app()->bound('entitas_aktif')
+            ? app('entitas_aktif')
+            : (app()->bound('koperasi_aktif') ? app('koperasi_aktif') : null);
 
         if ($id !== null) {
             $builder->where($model->getTable().'.id_entitas', $id);

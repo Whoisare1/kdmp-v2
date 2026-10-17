@@ -1,4 +1,4 @@
-﻿<x-layouts.app title="Dashboard Ngobar" eyebrow="Daftar Menu">
+<x-layouts.app title="Dashboard Ngobar" eyebrow="Daftar Menu">
     
     <div class="mb-6 flex items-center justify-between">
         <div>
@@ -18,6 +18,7 @@
             ['group' => 'Master', 'title' => 'Barang', 'route' => route('master.barang.index'), 'color' => 'bg-blue-600', 'icon' => '📦'],
             ['group' => 'Master', 'title' => 'Pihak / Mitra', 'route' => route('master.pihak.index'), 'color' => 'bg-blue-600', 'icon' => '🤝'],
             ['group' => 'Master', 'title' => 'Kas & Bank', 'route' => route('master.kas-bank.index'), 'color' => 'bg-blue-600', 'icon' => '🏦'],
+            ['group' => 'Master', 'title' => 'Chart of Accounts', 'route' => route('master.coa.index'), 'color' => 'bg-blue-600', 'icon' => '📜'],
             
             // SURVEI (Indigo)
             ['group' => 'Survei', 'title' => 'Sesi Survei', 'route' => route('survei.sesi.index'), 'color' => 'bg-indigo-600', 'icon' => '📋'],
@@ -50,10 +51,16 @@
             ['group' => 'Keuangan', 'title' => 'Hutang', 'route' => route('keuangan.hutang.index'), 'color' => 'bg-violet-600', 'icon' => '📥'],
             ['group' => 'Keuangan', 'title' => 'Pelunasan', 'route' => route('keuangan.pelunasan.index'), 'color' => 'bg-violet-600', 'icon' => '✅'],
 
-            // AKUNTANSI & LAPORAN (Fuchsia)
+            // AKUNTANSI & LAPORAN (Fuchsia & Slate)
+            ['group' => 'Akuntansi', 'title' => 'Saldo Awal', 'route' => route('akuntansi.saldo-awal.index'), 'color' => 'bg-fuchsia-700', 'icon' => '💵'],
             ['group' => 'Akuntansi', 'title' => 'Jurnal Umum', 'route' => route('akuntansi.jurnal.index'), 'color' => 'bg-fuchsia-700', 'icon' => '📒'],
+            ['group' => 'Akuntansi', 'title' => 'Tutup Bulan', 'route' => route('akuntansi.tutup-bulan.index'), 'color' => 'bg-fuchsia-700', 'icon' => '🔒'],
+            ['group' => 'Akuntansi', 'title' => 'Tutup Tahun', 'route' => route('akuntansi.tutup-tahun.index'), 'color' => 'bg-fuchsia-700', 'icon' => '🔐'],
+            
+            // LAPORAN KEUANGAN (Slate)
             ['group' => 'Laporan', 'title' => 'Neraca Saldo', 'route' => route('akuntansi.laporan.neraca-saldo'), 'color' => 'bg-slate-700', 'icon' => '📑'],
             ['group' => 'Laporan', 'title' => 'Buku Besar', 'route' => route('akuntansi.laporan.buku-besar'), 'color' => 'bg-slate-700', 'icon' => '📖'],
+            ['group' => 'Laporan', 'title' => 'Neraca (Posisi)', 'route' => route('akuntansi.laporan.neraca'), 'color' => 'bg-slate-700', 'icon' => '⚖️'],
             ['group' => 'Laporan', 'title' => 'Laba Rugi', 'route' => route('akuntansi.laporan.laba-rugi'), 'color' => 'bg-slate-700', 'icon' => '📉'],
         ];
     @endphp

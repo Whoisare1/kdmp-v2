@@ -14,9 +14,9 @@ class RtDesaController extends Controller
         $query = RtDesa::with(['wilayah', 'sesi']);
         
         $user = auth()->user();
-        if ($user->id_koperasi && $user->koperasi) {
-            $query->where('id_wilayah', $user->koperasi->id_wilayah);
-            $sesis = \App\Models\Survei\SesiSurvei::where('id_wilayah', $user->koperasi->id_wilayah)->orderBy('id', 'desc')->get();
+        if ($user->id_entitas && $user->entitas) {
+            $query->where('id_wilayah', $user->entitas->id_wilayah);
+            $sesis = \App\Models\Survei\SesiSurvei::where('id_wilayah', $user->entitas->id_wilayah)->orderBy('id', 'desc')->get();
         } else {
             $sesis = \App\Models\Survei\SesiSurvei::orderBy('id', 'desc')->get();
         }
@@ -46,9 +46,9 @@ class RtDesaController extends Controller
     public function create()
     {
         $user = auth()->user();
-        if ($user->id_koperasi && $user->koperasi) {
-            $wilayahs = \App\Models\Tenant\Wilayah::where('id', $user->koperasi->id_wilayah)->get();
-            $sesis = \App\Models\Survei\SesiSurvei::where('id_wilayah', $user->koperasi->id_wilayah)->orderBy('id', 'desc')->get();
+        if ($user->id_entitas && $user->entitas) {
+            $wilayahs = \App\Models\Tenant\Wilayah::where('id', $user->entitas->id_wilayah)->get();
+            $sesis = \App\Models\Survei\SesiSurvei::where('id_wilayah', $user->entitas->id_wilayah)->orderBy('id', 'desc')->get();
         } else {
             $wilayahs = \App\Models\Tenant\Wilayah::where('tingkat', 'Desa')->get();
             $sesis = \App\Models\Survei\SesiSurvei::orderBy('id', 'desc')->get();
@@ -103,9 +103,9 @@ class RtDesaController extends Controller
     public function edit(RtDesa $rt)
     {
         $user = auth()->user();
-        if ($user->id_koperasi && $user->koperasi) {
-            $wilayahs = \App\Models\Tenant\Wilayah::where('id', $user->koperasi->id_wilayah)->get();
-            $sesis = \App\Models\Survei\SesiSurvei::where('id_wilayah', $user->koperasi->id_wilayah)->orderBy('id', 'desc')->get();
+        if ($user->id_entitas && $user->entitas) {
+            $wilayahs = \App\Models\Tenant\Wilayah::where('id', $user->entitas->id_wilayah)->get();
+            $sesis = \App\Models\Survei\SesiSurvei::where('id_wilayah', $user->entitas->id_wilayah)->orderBy('id', 'desc')->get();
         } else {
             $wilayahs = \App\Models\Tenant\Wilayah::where('tingkat', 'Desa')->get();
             $sesis = \App\Models\Survei\SesiSurvei::orderBy('id', 'desc')->get();

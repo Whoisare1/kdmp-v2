@@ -49,7 +49,13 @@ class TutupBulanController extends Controller
         $validasi = $this->service->cekValidasi($tahun, $bulan);
         $semuaLulus = collect($validasi)->every(fn($v) => $v['lulus']);
 
-        return view('akuntansi.tutup-bulan', compact('tahun', 'bulan', 'validasi', 'semuaLulus'));
+        $periode = \App\Models\Tenant\PeriodeAkuntansi::where('id_entitas', $idEntitas)
+            ->where('tahun', $tahun)
+            ->where('bulan', $bulan)
+            ->first();
+        $isClosed = $periode && $periode->status === 'CLOSED';
+
+        return view('akuntansi.tutup-bulan', compact('tahun', 'bulan', 'validasi', 'semuaLulus', 'isClosed'));
     }
 
     /**

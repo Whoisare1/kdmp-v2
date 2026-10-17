@@ -44,16 +44,18 @@ class TenantOwnershipRule implements ValidationRule
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        // Mode konsolidasi pusat: tidak ada koperasi aktif â†’ lewati validasi
-        if (!app()->bound('koperasi_aktif')) {
+        $idEntitas = app()->bound('entitas_aktif')
+            ? app('entitas_aktif')
+            : (app()->bound('koperasi_aktif') ? app('koperasi_aktif') : null);
+
+        // Mode konsolidasi pusat: tidak ada entitas aktif -> lewati validasi
+        if ($idEntitas === null) {
             return;
         }
 
-        $idKoperasi = app('koperasi_aktif');
-
         $ada = DB::table($this->tabel)
             ->where($this->kolom_id, $value)
-            ->where($this->kolom_tenant, $idKoperasi)
+            ->where($this->kolom_tenant, $idEntitas)
             ->exists();
 
         if (!$ada) {

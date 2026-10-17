@@ -128,6 +128,7 @@ class TenantIsolationTest extends TestCase
 
         // Simulasi: User A login â†’ koperasi_aktif = desaA
         app()->instance('koperasi_aktif', $this->desaA->id_entitas);
+        app()->instance('entitas_aktif', $this->desaA->id_entitas);
 
         // Query via Eloquent â€” seharusnya kosong karena BelongsToEntitas scope
         $hasil = BukuBesarPeriode::where('periode_tahun', 2026)->get();
@@ -171,6 +172,7 @@ class TenantIsolationTest extends TestCase
 
         // Login sebagai User A
         app()->instance('koperasi_aktif', $this->desaA->id_entitas);
+        app()->instance('entitas_aktif', $this->desaA->id_entitas);
 
         $jurnal = JurnalHeader::all();
 
