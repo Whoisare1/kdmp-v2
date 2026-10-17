@@ -163,6 +163,7 @@
                                 <th class="px-5 py-3 font-medium">Kategori</th>
                                 <th class="px-5 py-3 font-medium">Komoditas</th>
                                 <th class="px-5 py-3 font-medium">Jumlah</th>
+                                <th class="px-5 py-3 font-medium">Harga / Nilai</th>
                                 <th class="px-5 py-3 font-medium">Periode</th>
                                 <th class="px-5 py-3 font-medium text-center">Aksi</th>
                             </tr>
@@ -186,6 +187,28 @@
                                     <td class="px-5 py-3">
                                         @if($item->jumlah_produksi)
                                             {{ number_format($item->jumlah_produksi, 0, ',', '.') }} {{ $item->satuan }}
+                                        @else
+                                            <span class="text-ink-400">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-3 text-xs">
+                                        @if($item->harga)
+                                            <div class="font-semibold text-ink-900">
+                                                @if($item->tipe_harga === 'Satuan')
+                                                    Rp {{ number_format($item->harga, 0, ',', '.') }} <span class="text-ink-500 font-normal">/ {{ $item->satuan ?? 'satuan' }}</span>
+                                                @else
+                                                    Total Rp {{ number_format($item->harga, 0, ',', '.') }}
+                                                @endif
+                                            </div>
+                                            @if($item->jumlah_produksi && $item->jumlah_produksi > 0)
+                                                <div class="text-[11px] text-ink-500 mt-0.5">
+                                                    @if($item->tipe_harga === 'Satuan')
+                                                        (Total: Rp {{ number_format($item->harga_total, 0, ',', '.') }})
+                                                    @else
+                                                        (Rp {{ number_format($item->harga_satuan, 0, ',', '.') }} / {{ $item->satuan ?? 'satuan' }})
+                                                    @endif
+                                                </div>
+                                            @endif
                                         @else
                                             <span class="text-ink-400">-</span>
                                         @endif

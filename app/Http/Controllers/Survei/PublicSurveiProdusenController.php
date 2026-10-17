@@ -79,6 +79,8 @@ class PublicSurveiProdusenController extends Controller
             'komoditas.*.sub_kategori'    => 'nullable|string|max:50',
             'komoditas.*.jumlah_produksi' => 'nullable|numeric|min:0',
             'komoditas.*.satuan'          => 'nullable|string|max:30',
+            'komoditas.*.harga'           => 'nullable|numeric|min:0',
+            'komoditas.*.tipe_harga'      => 'nullable|in:Satuan,Total',
             'komoditas.*.bulan_produksi'  => 'required|integer|min:1|max:12',
             'komoditas.*.keterangan'      => 'nullable|string|max:500',
         ], [
@@ -103,6 +105,8 @@ class PublicSurveiProdusenController extends Controller
                 'nama_komoditas'  => ucwords(strtolower(trim(str_replace('.', '', $item['nama_komoditas'])))),
                 'jumlah_produksi' => filled($item['jumlah_produksi']) ? $item['jumlah_produksi'] : null,
                 'satuan'          => $item['satuan'] ?? null,
+                'harga'           => filled($item['harga'] ?? null) ? $item['harga'] : null,
+                'tipe_harga'      => filled($item['harga'] ?? null) ? ($item['tipe_harga'] ?? 'Satuan') : 'Satuan',
                 'bulan_produksi'  => (int) $item['bulan_produksi'],
                 'tahun_produksi'  => $sesi->tahun,
                 'keterangan'      => filled($item['keterangan'] ?? null)
