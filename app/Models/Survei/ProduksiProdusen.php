@@ -18,6 +18,8 @@ class ProduksiProdusen extends Model
         'nama_komoditas',
         'jumlah_produksi',
         'satuan',
+        'harga',
+        'tipe_harga',
         'bulan_produksi',
         'tahun_produksi',
         'keterangan',
@@ -27,9 +29,30 @@ class ProduksiProdusen extends Model
     {
         return [
             'jumlah_produksi' => 'decimal:2',
+            'harga'           => 'decimal:2',
             'bulan_produksi'  => 'integer',
             'tahun_produksi'  => 'integer',
         ];
+    }
+
+    /** Total nominal penjualan */
+    public function getHargaTotalAttribute(): ?float
+    {
+        if ($this->harga === null) return null;
+        if ($this->tipe_harga === 'Satuan' && $this->jumlah_produksi) {
+            return (float) ($this->harga * $this->jumlah_produksi);
+        }
+        return (float) $this->harga;
+    }
+
+    /** Harga per satuan */
+    public function getHargaSatuanAttribute(): ?float
+    {
+        if ($this->harga === null) return null;
+        if ($this->tipe_harga === 'Total' && $this->jumlah_produksi && $this->jumlah_produksi > 0) {
+            return (float) ($this->harga / $this->jumlah_produksi);
+        }
+        return (float) $this->harga;
     }
 
     public function sesi()

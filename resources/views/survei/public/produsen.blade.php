@@ -314,6 +314,74 @@
             transition: background 0.15s;
         }
         .btn-del:hover { background: #fee2e2; }
+        .btn-edit {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: none;
+            background: #f0fdf4;
+            color: #15803d;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .btn-edit:hover { background: #dcfce7; }
+
+        /* ── Toggle Tipe Harga ── */
+        .price-toggle {
+            display: flex;
+            background: #f1efe7;
+            padding: 3px;
+            border-radius: 10px;
+            gap: 3px;
+            margin-bottom: 0.5rem;
+        }
+        .price-toggle-btn {
+            flex: 1;
+            padding: 0.45rem 0.5rem;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+            font-family: inherit;
+        }
+        .price-toggle-btn.active {
+            background: #fff;
+            color: #15803d;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .calc-box {
+            margin-top: 0.5rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            line-height: 1.4;
+        }
+        .calc-box-green {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+        .calc-box-blue {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+        .calc-val {
+            font-weight: 700;
+            font-size: 0.88rem;
+        }
 
         /* ── Edit Modal ── */
         .modal-overlay {
@@ -619,6 +687,83 @@
                     </div>
                 </div>
 
+                {{-- Harga / Nilai Jual --}}
+                <div class="field">
+                    <label class="field-label">Perkiraan Harga / Nilai Jual (Opsional)</label>
+
+                    {{-- Toggle Pilihan Satuan vs Total --}}
+                    <div class="price-toggle">
+                        <button type="button" class="price-toggle-btn"
+                                :class="{ active: tipeHarga === 'Satuan' }"
+                                @click="setTipeHarga('Satuan')">
+                            🏷️ Harga per Satuan
+                        </button>
+                        <button type="button" class="price-toggle-btn"
+                                :class="{ active: tipeHarga === 'Total' }"
+                                @click="setTipeHarga('Total')">
+                            💰 Total Nominal Jual
+                        </button>
+                    </div>
+
+                    <div class="input-wrap" x-data="micInput(() => harga, v => harga = v, 'number')">
+                        <input type="number" x-ref="el"
+                               :value="harga"
+                               @input="harga = $event.target.value"
+                               min="0" step="any"
+                               :placeholder="tipeHarga === 'Satuan' ? 'Nominal per ' + (satuan || 'satuan') + ' (cth: 15000)' : 'Total penjualan seluruhnya (cth: 1500000)'">
+                        <button type="button" class="mic-btn" :class="{ listening: isListening }" @click="toggle()" title="Suara">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    {{-- Kotak Kalkulasi Otomatis --}}
+                    <div x-show="harga && parseFloat(harga) > 0" x-cloak>
+                        <template x-if="tipeHarga === 'Satuan'">
+                            <div class="calc-box calc-box-green">
+                                <span style="font-size:1rem;">🧮</span>
+                                <div>
+                                    <template x-if="jumlah && parseFloat(jumlah) > 0">
+                                        <div>
+                                            <span>Estimasi Total Penjualan: </span>
+                                            <span class="calc-val" x-text="formatRupiah(parseFloat(harga) * parseFloat(jumlah))"></span>
+                                            <div style="font-size:0.72rem;color:#15803d;margin-top:0.15rem;"
+                                                 x-text="'(' + jumlah + ' ' + (satuan || 'satuan') + ' × ' + formatRupiah(harga) + ')'"></div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!jumlah || parseFloat(jumlah) <= 0">
+                                        <div style="font-size:0.75rem;color:#166534;">
+                                            💡 Masukkan <strong>Jumlah Produksi</strong> di atas untuk melihat perkalian total penjualan secara otomatis.
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="tipeHarga === 'Total'">
+                            <div class="calc-box calc-box-blue">
+                                <span style="font-size:1rem;">🧮</span>
+                                <div>
+                                    <template x-if="jumlah && parseFloat(jumlah) > 0">
+                                        <div>
+                                            <span>Estimasi Harga per Satuan: </span>
+                                            <span class="calc-val" x-text="formatRupiah(Math.round(parseFloat(harga) / parseFloat(jumlah))) + ' / ' + (satuan || 'satuan')"></span>
+                                            <div style="font-size:0.72rem;color:#1d4ed8;margin-top:0.15rem;"
+                                                 x-text="'(' + formatRupiah(harga) + ' ÷ ' + jumlah + ' ' + (satuan || 'satuan') + ')'"></div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!jumlah || parseFloat(jumlah) <= 0">
+                                        <div style="font-size:0.75rem;color:#1e40af;">
+                                            💡 Masukkan <strong>Jumlah Produksi</strong> di atas untuk menghitung pembagian harga per satuan.
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 {{-- Bulan --}}
                 <div class="field">
                     <label class="field-label">Bulan Produksi <span class="required">*</span></label>
@@ -683,6 +828,26 @@
                         <p class="cart-item-meta">
                             <span x-show="item.jumlah_produksi">
                                 <span x-text="item.jumlah_produksi"></span> <span x-text="item.satuan"></span> &bull;
+                            </span>
+                            <span x-show="item.harga && parseFloat(item.harga) > 0">
+                                <template x-if="item.tipe_harga === 'Satuan'">
+                                    <span>
+                                        <strong x-text="formatRupiah(item.harga) + ' / ' + (item.satuan || 'satuan')"></strong>
+                                        <template x-if="item.jumlah_produksi && parseFloat(item.jumlah_produksi) > 0">
+                                            <span style="color:#15803d;font-weight:600;" x-text="'(Total ' + formatRupiah(parseFloat(item.harga) * parseFloat(item.jumlah_produksi)) + ')'"></span>
+                                        </template>
+                                        &bull;
+                                    </span>
+                                </template>
+                                <template x-if="item.tipe_harga === 'Total'">
+                                    <span>
+                                        <strong x-text="'Total ' + formatRupiah(item.harga)"></strong>
+                                        <template x-if="item.jumlah_produksi && parseFloat(item.jumlah_produksi) > 0">
+                                            <span style="color:#1d4ed8;font-weight:600;" x-text="'(' + formatRupiah(Math.round(parseFloat(item.harga) / parseFloat(item.jumlah_produksi))) + ' / ' + (item.satuan || 'satuan') + ')'"></span>
+                                        </template>
+                                        &bull;
+                                    </span>
+                                </template>
                             </span>
                             Bulan <span x-text="namaBulan(item.bulan_produksi)"></span>
                             <span x-show="item.keterangan"> &bull; <em x-text="item.keterangan"></em></span>
@@ -812,6 +977,62 @@
                         </div>
                     </div>
                 </div>
+                {{-- Harga (Modal Edit) --}}
+                <div class="field" style="margin-bottom:0;">
+                    <label class="field-label">Harga / Nilai Jual</label>
+                    <div class="price-toggle">
+                        <button type="button" class="price-toggle-btn"
+                                :class="{ active: editForm.tipe_harga === 'Satuan' }"
+                                @click="setEditTipeHarga('Satuan')">
+                            🏷️ Harga per Satuan
+                        </button>
+                        <button type="button" class="price-toggle-btn"
+                                :class="{ active: editForm.tipe_harga === 'Total' }"
+                                @click="setEditTipeHarga('Total')">
+                            💰 Total Nominal Jual
+                        </button>
+                    </div>
+                    <div class="input-wrap" x-data="micInput(() => editForm.harga, v => editForm.harga = v, 'number')">
+                        <input type="number" x-ref="el" x-model="editForm.harga"
+                               min="0" step="any"
+                               :placeholder="editForm.tipe_harga === 'Satuan' ? 'Nominal per ' + (editForm.satuan || 'satuan') : 'Total nominal jual'">
+                        <button type="button" class="mic-btn" :class="{ listening: isListening }" @click="toggle()" title="Suara">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    {{-- Kotak Kalkulasi Otomatis (Modal Edit) --}}
+                    <div x-show="editForm.harga && parseFloat(editForm.harga) > 0" x-cloak>
+                        <template x-if="editForm.tipe_harga === 'Satuan'">
+                            <div class="calc-box calc-box-green">
+                                <span>🧮</span>
+                                <div style="flex:1;">
+                                    <template x-if="editForm.jumlah_produksi && parseFloat(editForm.jumlah_produksi) > 0">
+                                        <div>
+                                            <span>Estimasi Total Jual: </span>
+                                            <span class="calc-val" x-text="formatRupiah(parseFloat(editForm.harga) * parseFloat(editForm.jumlah_produksi))"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="editForm.tipe_harga === 'Total'">
+                            <div class="calc-box calc-box-blue">
+                                <span>🧮</span>
+                                <div style="flex:1;">
+                                    <template x-if="editForm.jumlah_produksi && parseFloat(editForm.jumlah_produksi) > 0">
+                                        <div>
+                                            <span>Estimasi Harga per Satuan: </span>
+                                            <span class="calc-val" x-text="formatRupiah(Math.round(parseFloat(editForm.harga) / parseFloat(editForm.jumlah_produksi))) + ' / ' + (editForm.satuan || 'satuan')"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
                 {{-- Bulan --}}
                 <div class="field" style="margin-bottom:0;">
                     <label class="field-label">Bulan Produksi <span class="required">*</span></label>
@@ -860,12 +1081,46 @@
             return {
                 namaResponden: '', kategori: '', subKategori: '',
                 namaKmd: '', jumlah: '', satuan: '', bulan: '{{ $sesi->bulan }}', ket: '',
+                harga: '', tipeHarga: 'Satuan',
                 cart: [], errMsg: '',
 
                 // Edit modal state
                 showEditModal: false,
                 editIdx: null,
-                editForm: { nama_komoditas:'', kategori:'', sub_kategori:'', jumlah_produksi:'', satuan:'', bulan_produksi:'', keterangan:'' },
+                editForm: { nama_komoditas:'', kategori:'', sub_kategori:'', jumlah_produksi:'', satuan:'', harga:'', tipe_harga:'Satuan', bulan_produksi:'', keterangan:'' },
+
+                formatRupiah(num) {
+                    if (num === null || num === undefined || num === '' || isNaN(num)) return 'Rp 0';
+                    return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+                },
+
+                setTipeHarga(newTipe) {
+                    if (this.tipeHarga === newTipe) return;
+                    const j = parseFloat(this.jumlah);
+                    const h = parseFloat(this.harga);
+                    if (h > 0 && j > 0) {
+                        if (newTipe === 'Total' && this.tipeHarga === 'Satuan') {
+                            this.harga = Math.round(h * j);
+                        } else if (newTipe === 'Satuan' && this.tipeHarga === 'Total') {
+                            this.harga = Math.round(h / j);
+                        }
+                    }
+                    this.tipeHarga = newTipe;
+                },
+
+                setEditTipeHarga(newTipe) {
+                    if (this.editForm.tipe_harga === newTipe) return;
+                    const j = parseFloat(this.editForm.jumlah_produksi);
+                    const h = parseFloat(this.editForm.harga);
+                    if (h > 0 && j > 0) {
+                        if (newTipe === 'Total' && this.editForm.tipe_harga === 'Satuan') {
+                            this.editForm.harga = Math.round(h * j);
+                        } else if (newTipe === 'Satuan' && this.editForm.tipe_harga === 'Total') {
+                            this.editForm.harga = Math.round(h / j);
+                        }
+                    }
+                    this.editForm.tipe_harga = newTipe;
+                },
 
                 get pilihanSaran() {
                     return this.subKategori && SARAN[this.subKategori] ? SARAN[this.subKategori] : [];
@@ -874,7 +1129,11 @@
 
                 editItem(i) {
                     this.editIdx  = i;
-                    this.editForm = { ...this.cart[i] };
+                    this.editForm = {
+                        ...this.cart[i],
+                        harga: this.cart[i].harga || '',
+                        tipe_harga: this.cart[i].tipe_harga || 'Satuan'
+                    };
                     this.showEditModal = true;
                 },
                 saveEdit() {
@@ -897,10 +1156,12 @@
                         nama_komoditas: cap(this.namaKmd.replace(/\./g,'')),
                         kategori: this.kategori, sub_kategori: this.subKategori,
                         jumlah_produksi: this.jumlah, satuan: this.satuan,
+                        harga: this.harga,
+                        tipe_harga: this.tipeHarga,
                         bulan_produksi: this.bulan,
                         keterangan: this.ket.replace(/\./g,''),
                     });
-                    this.namaKmd = ''; this.jumlah = ''; this.satuan = ''; this.ket = '';
+                    this.namaKmd = ''; this.jumlah = ''; this.satuan = ''; this.harga = ''; this.tipeHarga = 'Satuan'; this.ket = '';
                 },
                 submitAll() {
                     if (!this.cart.length) { this.errMsg = 'Tambah minimal 1 komoditas dulu!'; return; }
@@ -914,6 +1175,8 @@
                         addF(form, `komoditas[${i}][sub_kategori]`,    it.sub_kategori);
                         addF(form, `komoditas[${i}][jumlah_produksi]`, it.jumlah_produksi);
                         addF(form, `komoditas[${i}][satuan]`,          it.satuan);
+                        addF(form, `komoditas[${i}][harga]`,           it.harga);
+                        addF(form, `komoditas[${i}][tipe_harga]`,      it.tipe_harga);
                         addF(form, `komoditas[${i}][bulan_produksi]`,  it.bulan_produksi);
                         addF(form, `komoditas[${i}][keterangan]`,      it.keterangan);
                     });
