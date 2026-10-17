@@ -52,6 +52,7 @@ class JurnalServiceTest extends TestCase
             'created_at'      => now(),
         ]);
         app()->instance('koperasi_aktif', $this->idKoperasi);
+        app()->instance('entitas_aktif', $this->idKoperasi);
 
         // Insert COA minimal â€” kolom sesuai skema master_coa
         \DB::table('master_coa')->insertOrIgnore([
@@ -264,11 +265,11 @@ class JurnalServiceTest extends TestCase
         ];
 
         // Posting pertama â†’ berhasil
-        $this->service->postingManual($params, $baris);
+        $first = $this->service->postingManual($params, $baris);
 
-        // Posting kedua dengan source_id sama â†’ harus ditolak
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
-        $this->service->postingManual($params, $baris);
+        // Posting kedua dengan source_id sama â†’ aman dan idempoten (mengembalikan jurnal yang sama)
+        $second = $this->service->postingManual($params, $baris);
+        $this->assertEquals($first->id_jurnal, $second->id_jurnal);
     }
 }
 

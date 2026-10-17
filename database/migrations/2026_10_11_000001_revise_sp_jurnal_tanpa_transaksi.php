@@ -292,11 +292,16 @@ BEGIN
           AND prev.kode_anak     = jd.kode_anak
     WHERE jd.id_jurnal = p_id_jurnal
     ON DUPLICATE KEY UPDATE
-        mutasi_debet       = mutasi_debet       + VALUES(mutasi_debet),
-        mutasi_kredit      = mutasi_kredit      + VALUES(mutasi_kredit),
-        saldo_akhir_debet  = saldo_akhir_debet  + VALUES(mutasi_debet),
-        saldo_akhir_kredit = saldo_akhir_kredit + VALUES(mutasi_kredit),
-        dihitung_pada      = NOW();
+        buku_besar_periode.mutasi_debet       = buku_besar_periode.mutasi_debet       + VALUES(buku_besar_periode.mutasi_debet),
+        buku_besar_periode.mutasi_kredit      = buku_besar_periode.mutasi_kredit      + VALUES(buku_besar_periode.mutasi_kredit),
+        buku_besar_periode.saldo_akhir_debet  = buku_besar_periode.saldo_akhir_debet  + VALUES(buku_besar_periode.mutasi_debet),
+        buku_besar_periode.saldo_akhir_kredit = buku_besar_periode.saldo_akhir_kredit + VALUES(buku_besar_periode.mutasi_kredit),
+        buku_besar_periode.dihitung_pada      = NOW();
+
+    -- 4. Tandai jurnal asal sebagai REVERSED
+    UPDATE jurnal_header
+    SET    status = 'REVERSED'
+    WHERE  id_jurnal = p_id_jurnal;
 
     SELECT v_new_id_jurnal AS id_jurnal;
 END

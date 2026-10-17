@@ -246,7 +246,7 @@ class JurnalService
 
     private function bangunBukuBesarInternal(int $tahun, int $bulan): void
     {
-        $idEntitas = app('entitas_aktif');
+        $idEntitas = $this->getEntitasAktif();
 
         // Hapus ringkasan periode ini Ã¢â‚¬â€ akan dibangun ulang dari nol
         DB::table('buku_besar_periode')
@@ -428,7 +428,7 @@ class JurnalService
     /** Validasi bahwa periode akuntansi masih OPEN */
     private function pastikanPeriodeTerbuka(int $tahun, int $bulan, ?int $entitasId = null): void
     {
-        $entitasId ??= app('entitas_aktif');
+        $entitasId = $this->getEntitasAktif($entitasId);
 
         $status = DB::table('periode_akuntansi')
             ->where('id_entitas', $entitasId)
@@ -467,7 +467,7 @@ class JurnalService
      */
     private function generateNomorJurnal(int $tahun, int $bulan, ?int $entitasId = null): string
     {
-        $entitasId ??= app('entitas_aktif');
+        $entitasId = $this->getEntitasAktif($entitasId);
         $prefix = sprintf('JRN-%d-%02d-', $tahun, $bulan);
 
         // Nilai awal jika counter prefix ini belum ada: lanjutkan dari nomor
@@ -521,7 +521,7 @@ class JurnalService
         string  $jenisJurnal,
         ?int    $entitasId = null,
     ): JurnalHeader {
-        $entitasId ??= app('entitas_aktif');
+        $entitasId = $this->getEntitasAktif($entitasId);
 
         try {
             return DB::transaction(function () use ($tahun, $bulan, $header, $baris, $entitasId) {
@@ -568,7 +568,7 @@ class JurnalService
     {
         $payload = json_decode($jsonPayload, true, 512, JSON_THROW_ON_ERROR);
         $baris = $payload['baris'] ?? [];
-        $idEntitas = (int) ($payload['id_entitas'] ?? app('entitas_aktif'));
+        $idEntitas = (int) ($payload['id_entitas'] ?? $this->getEntitasAktif() ?? 1);
 
         return DB::transaction(function () use ($payload, $baris, $idEntitas) {
             $header = JurnalHeader::create([
@@ -605,6 +605,23 @@ class JurnalService
 
             return $header;
         });
+    }
+
+    private function getEntitasAktif(?int $entitasId = null): ?int
+    {
+        if ($entitasId !== null) {
+            return $entitasId;
+        }
+
+        if (app()->bound('entitas_aktif')) {
+            return (int) app('entitas_aktif');
+        }
+
+        if (app()->bound('koperasi_aktif')) {
+            return (int) app('koperasi_aktif');
+        }
+
+        return null;
     }
 }
 
