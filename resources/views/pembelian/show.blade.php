@@ -99,6 +99,31 @@
                     </div>
                 </div>
 
+                @if ($item->kasBank)
+                    <div>
+                        <div class="text-sm font-medium text-ink-600">
+                            Sumber Uang (Kas / Bank)
+                        </div>
+
+                        <div class="mt-1 text-sm font-semibold text-ink-900">
+                            {{ $item->kasBank->nama }}
+                            @if ($item->kasBank->no_rekening)
+                                <span class="text-xs font-normal text-ink-600">({{ $item->kasBank->no_rekening }})</span>
+                            @endif
+                        </div>
+                    </div>
+                @elseif ($item->jenis_pembayaran === 'kredit')
+                    <div>
+                        <div class="text-sm font-medium text-ink-600">
+                            Tanggal Jatuh Tempo
+                        </div>
+
+                        <div class="mt-1 text-sm text-ink-900">
+                            {{ $item->tgl_jatuh_tempo?->format('d M Y') ?? '—' }}
+                        </div>
+                    </div>
+                @endif
+
                 <div>
                     <div class="text-sm font-medium text-ink-600">
                         Total Pembelian
@@ -282,12 +307,14 @@
                     </div>
                 @endif
 
-                <a
-                    href="{{ route("$routeBase.edit", $item) }}"
-                    class="block w-full rounded-sm border border-paper-300 px-4 py-2 text-center text-sm font-medium text-ink-700 hover:bg-paper-100"
-                >
-                    Edit
-                </a>
+                @if ($item->status === 'draft')
+                    <a
+                        href="{{ route("$routeBase.edit", $item) }}"
+                        class="block w-full rounded-sm border border-paper-300 px-4 py-2 text-center text-sm font-medium text-ink-700 hover:bg-paper-100"
+                    >
+                        Edit
+                    </a>
+                @endif
 
                 <a
                     href="{{ route("$routeBase.index") }}"
