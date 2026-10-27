@@ -10,6 +10,6 @@ class EntitasController extends ModuleCrudController
     protected string $model = Entitas::class;
     protected string $view = 'master.koperasi';
     protected string $title = 'Koperasi Desa';
-    protected string $routeBase = 'master.koperasi';
+    protected string $routeBase = 'master.entitas';
 }
 

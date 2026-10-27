@@ -77,7 +77,8 @@ Route::middleware('auth')->group(function () {
 
     // ===== M0 â€” Master & Periode =====
     Route::prefix('master')->name('master.')->group(function () {
-        Route::resource('entitas', EntitasController::class);
+        // Daftar seluruh entitas (lintas desa) hanya untuk super admin.
+        Route::resource('entitas', EntitasController::class)->middleware('super_admin');
         Route::resource('komoditas', KomoditasController::class);
         Route::resource('satuan', SatuanController::class);
         Route::resource('barang', BarangController::class);
