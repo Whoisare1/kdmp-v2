@@ -37,6 +37,10 @@
                 </button>
             </div>
 
+            <p class="mb-3 rounded-sm border border-padi-100 bg-padi-100/50 px-3 py-2 text-xs text-ink-700">
+                Saat disimpan, jumlah stok akan langsung disesuaikan. Jika ada selisih, sistem mencatat mutasi penyesuaian pada kartu stok. Jika tidak ada selisih, hasil hitung tetap tercatat tanpa mutasi nol.
+            </p>
+
             <div class="overflow-x-auto">
                 <table class="w-full border-separate border-spacing-y-2 text-left text-sm">
                     <thead>
