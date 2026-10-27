@@ -30,22 +30,17 @@ return new class extends Migration
         }
 
         $primary = collect($indexes)->first(
-            fn ($index) => ($index['name'] ?? '') === 'PRIMARY'
+            fn ($index) => strtolower($index['name'] ?? '') === 'primary' || !empty($index['primary'])
         );
 
-        if ($primary && ($primary['columns'] ?? []) !== ['id_detail']) {
-            throw new RuntimeException(
-                'Primary Key yang ada bukan id_detail. Pemeriksaan manual diperlukan.'
-            );
+        if ($primary) {
+            return;
         }
 
-        // Pastikan id_detail menjadi Primary Key terlebih dahulu.
-        if (!$primary) {
-            DB::statement(
-                'ALTER TABLE `pengiriman_konsinyasi_detail`
-                 ADD PRIMARY KEY (`id_detail`)'
-            );
-        }
+        DB::statement(
+            'ALTER TABLE `pengiriman_konsinyasi_detail`
+             ADD PRIMARY KEY (`id_detail`)'
+        );
 
         // Setelah menjadi key, aktifkan AUTO_INCREMENT.
         DB::statement(

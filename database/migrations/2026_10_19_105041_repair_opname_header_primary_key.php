@@ -46,7 +46,7 @@ return new class extends Migration
         $indexes = Schema::getIndexes($tableName);
 
         $hasPrimary = collect($indexes)->contains(
-            fn ($index) => ($index['primary'] ?? false) === true
+            fn ($index) => strtolower($index['name'] ?? '') === 'primary' || !empty($index['primary'])
         );
 
         $hasUniqueCode = collect($indexes)->contains(

@@ -21,13 +21,11 @@ return new class extends Migration
         }
 
         $primaryExists = collect($indexes)->contains(
-            fn ($index) => ($index['name'] ?? '') === 'PRIMARY'
+            fn ($index) => strtolower($index['name'] ?? '') === 'primary' || !empty($index['primary'])
         );
 
         if ($primaryExists) {
-            throw new RuntimeException(
-                'Tabel opname_detail sudah memiliki PRIMARY KEY. Pemeriksaan manual diperlukan.'
-            );
+            return;
         }
 
         $nullIds = DB::table('opname_detail')

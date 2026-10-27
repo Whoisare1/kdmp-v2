@@ -2,11 +2,21 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        $indexes = Schema::getIndexes('stok_konsinyasi');
+        $primaryExists = collect($indexes)->contains(
+            fn ($index) => strtolower($index['name'] ?? '') === 'primary' || !empty($index['primary'])
+        );
+
+        if ($primaryExists) {
+            return;
+        }
+
         // Langkah 1: Jadikan kolom ID sebagai primary key.
         DB::statement(
             'ALTER TABLE stok_konsinyasi

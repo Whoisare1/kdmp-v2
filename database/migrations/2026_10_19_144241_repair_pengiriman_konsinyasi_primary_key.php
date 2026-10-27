@@ -14,13 +14,11 @@ return new class extends Migration
         $indexes = Schema::getIndexes($table);
 
         $primaryExists = collect($indexes)->contains(
-            fn ($index) => ($index['name'] ?? '') === 'PRIMARY'
+            fn ($index) => strtolower($index['name'] ?? '') === 'primary' || !empty($index['primary'])
         );
 
         if ($primaryExists) {
-            throw new RuntimeException(
-                'Primary Key sudah ada. Periksa struktur tabel terlebih dahulu.'
-            );
+            return;
         }
 
         $nullIds = DB::table($table)

@@ -70,10 +70,7 @@ return new class extends Migration
         ")->total;
 
         if ($pkHeader > 0 || $pkDetail > 0) {
-            throw new RuntimeException(
-                'Perbaikan dibatalkan: primary key sudah ada. '
-                . 'Periksa struktur tabel sebelum melanjutkan.'
-            );
+            return;
         }
 
         // Pulihkan primary key dan AUTO_INCREMENT.
