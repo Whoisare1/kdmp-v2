@@ -27,10 +27,20 @@
                             <td class="whitespace-nowrap px-4 py-3 font-medium">{{ $item->kode_pembelian }}</td>
                             <td class="whitespace-nowrap px-4 py-3 text-ink-700">{{ $item->tanggal_transaksi?->format('d M Y') }}</td>
                             <td class="px-4 py-3">{{ $item->pihak?->nama_pihak ?? 'N/A' }}</td>
-                            <td class="px-4 py-3 capitalize">{{ $item->jenis_pembayaran }}</td>
+                            <td class="px-4 py-3">
+                                <span class="font-medium capitalize text-ink-900">{{ $item->jenis_pembayaran }}</span>
+                                @if ($item->kasBank)
+                                    <span class="block text-xs text-ink-500">{{ $item->kasBank->nama }}</span>
+                                @elseif ($item->jenis_pembayaran === 'kredit' && $item->tgl_jatuh_tempo)
+                                    <span class="block text-xs text-amber-700">Tempo: {{ $item->tgl_jatuh_tempo->format('d/m/y') }}</span>
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap px-4 py-3 text-right">Rp {{ number_format($item->total_pembelian, 2, ',', '.') }}</td>
                             <td class="px-4 py-3 capitalize">{{ $item->status }}</td>
-                            <td class="px-4 py-3 text-right"><a href="{{ route("$routeBase.show", $item) }}" class="font-medium text-emerald-700 hover:text-emerald-800">Lihat</a></td>
+                            <td class="whitespace-nowrap px-4 py-3 text-right space-x-2">
+                                <a href="{{ route("$routeBase.show", $item) }}" class="font-medium text-emerald-700 hover:text-emerald-800">Lihat</a>
+                            
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="px-4 py-12 text-center text-ink-600">Belum ada pembelian. Gunakan tombol Tambah Pembelian untuk membuat transaksi.</td></tr>

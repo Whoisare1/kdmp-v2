@@ -30,6 +30,7 @@ class PembelianService
         int $idPihak,
         string $jenisPembayaran,
         ?string $tglJatuhTempo = null,
+        ?int $idKasBank = null,
     ): Pembelian {
         if ($pr->status !== 'disetujui') {
             throw new \Exception('PR harus berstatus "disetujui" sebelum dibuat PO.');
@@ -66,7 +67,7 @@ class PembelianService
                 'id_gudang' => $pr->id_gudang,
                 'tanggal_transaksi' => now()->toDateString(),
                 'jenis_pembayaran' => $jenisPembayaran,
-                'id_kas_bank' => null,
+                'id_kas_bank' => $idKasBank,
                 'tgl_jatuh_tempo' => $tglJatuhTempo,
                 'total_pembelian' => $totalPembelian,
                 'status' => 'draft',
@@ -124,6 +125,7 @@ class PembelianService
         array $items,
         string $jenisPembayaran,
         ?string $tglJatuhTempo = null,
+        ?int $idKasBank = null,
     ): Pembelian {
         if (!in_array($jenisPembayaran, ['tunai', 'transfer', 'kredit'], true)) {
             throw new \Exception('Jenis pembayaran pembelian tidak valid.');
@@ -162,7 +164,7 @@ class PembelianService
                 'id_gudang' => $idGudang,
                 'tanggal_transaksi' => now()->toDateString(),
                 'jenis_pembayaran' => $jenisPembayaran,
-                'id_kas_bank' => null,
+                'id_kas_bank' => $idKasBank,
                 'tgl_jatuh_tempo' => $tglJatuhTempo,
                 'total_pembelian' => $totalPembelian,
                 'status' => 'draft',
@@ -227,26 +229,38 @@ class PembelianService
                     ->value('id_kas_bank')
                 ?? DB::table('master_kas_bank')->where('is_active', true)->value('id_kas_bank');
 
-            $jurnal = app(JurnalService::class)->posting(
-                $transactionCode,
-                [
-                    'tanggal_jurnal' => $pembelian->tanggal_transaksi,
-                    'nomor_nota' => $pembelian->kode_pembelian,
-                    'total_pembelian' => (float) $pembelian->total_pembelian,
-                    'id_kas_bank' => $idKasBank,
-                    'kode_unit' => $pembelian->unitUsaha?->kode_unit_usaha,
-                    'id_pihak' => $pembelian->id_pihak,
-                ],
-                Pembelian::class,
-                (int) $pembelian->id_pembelian,
-                "Pembelian {$pembelian->kode_pembelian} (" . ($pembelian->pihak?->nama ?? 'Supplier') . ")",
-                $pembelian->id_entitas,
-            );
+            $idJurnal = null;
+            $statusPosting = 'F';
+
+            try {
+                if (class_exists(JurnalService::class)) {
+                    $jurnal = app(JurnalService::class)->posting(
+                        $transactionCode,
+                        [
+                            'tanggal_jurnal' => $pembelian->tanggal_transaksi,
+                            'nomor_nota' => $pembelian->kode_pembelian,
+                            'total_pembelian' => (float) $pembelian->total_pembelian,
+                            'id_kas_bank' => $idKasBank,
+                            'kode_unit' => $pembelian->unitUsaha?->kode_unit_usaha,
+                            'id_pihak' => $pembelian->id_pihak,
+                        ],
+                        Pembelian::class,
+                        (int) $pembelian->id_pembelian,
+                        "Pembelian {$pembelian->kode_pembelian} (" . ($pembelian->pihak?->nama ?? 'Supplier') . ")",
+                        $pembelian->id_entitas,
+                    );
+                    $idJurnal = $jurnal?->id_jurnal;
+                    $statusPosting = $idJurnal ? 'T' : 'F';
+                }
+            } catch (\Throwable $e) {
+                $idJurnal = null;
+                $statusPosting = 'F';
+            }
 
             $pembelian->update([
                 'status' => 'disetujui',
-                'status_posting' => 'T',
-                'id_jurnal' => $jurnal->id_jurnal,
+                'status_posting' => $statusPosting,
+                'id_jurnal' => $idJurnal,
                 'id_kas_bank' => $idKasBank,
             ]);
 
@@ -269,6 +283,71 @@ class PembelianService
             DB::commit();
 
             return $pembelian->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    public static function updatePurchase(Pembelian $pembelian, array $data): Pembelian
+    {
+        if ($pembelian->status !== 'draft') {
+            throw new \Exception('Hanya pembelian draft yang dapat diubah.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $totalPembelian = 0;
+            foreach ($data['items'] as $item) {
+                $totalPembelian += (float) ($item['qty_dasar'] ?? 0) * (float) ($item['harga_satuan'] ?? 0);
+            }
+
+            $updateData = [
+                'id_pihak' => $data['id_pihak'],
+                'jenis_pembayaran' => $data['jenis_pembayaran'],
+                'id_kas_bank' => in_array($data['jenis_pembayaran'], ['tunai', 'transfer'], true)
+                    ? ($data['id_kas_bank'] ?? $pembelian->id_kas_bank)
+                    : null,
+                'tgl_jatuh_tempo' => $data['jenis_pembayaran'] === 'kredit'
+                    ? ($data['tgl_jatuh_tempo'] ?? null)
+                    : null,
+                'total_pembelian' => $totalPembelian,
+            ];
+
+            if (!empty($data['id_unit_usaha'])) {
+                $updateData['id_unit_usaha'] = $data['id_unit_usaha'];
+            }
+            if (!empty($data['id_gudang'])) {
+                $updateData['id_gudang'] = $data['id_gudang'];
+            }
+
+            $pembelian->update($updateData);
+
+            // Recreate detail pembelian
+            $pembelian->detail()->delete();
+
+            foreach ($data['items'] as $item) {
+                $faktorKonversi = self::conversionFactor(
+                    (int) $item['id_barang'],
+                    (int) $item['id_satuan'],
+                );
+
+                DetailPembelian::create([
+                    'id_pembelian' => $pembelian->id_pembelian,
+                    'id_barang' => $item['id_barang'],
+                    'id_satuan_input' => $item['id_satuan'],
+                    'qty_input' => $item['qty_dasar'],
+                    'faktor_konversi' => $faktorKonversi,
+                    'qty_dasar' => (float) $item['qty_dasar'] * $faktorKonversi,
+                    'harga_satuan_input' => $item['harga_satuan'],
+                    'subtotal' => (float) $item['qty_dasar'] * (float) $item['harga_satuan'],
+                ]);
+            }
+
+            DB::commit();
+
+            return $pembelian->fresh(['detail.barang', 'pihak', 'unitUsaha', 'gudang', 'kasBank']);
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;

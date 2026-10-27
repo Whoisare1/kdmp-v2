@@ -139,15 +139,30 @@
                             <span class="text-ink-700 font-medium">Jenis Pembayaran *</span>
                             <select name="jenis_pembayaran" required onchange="togglePaymentFields()" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                                 <option value="">-- Pilih Jenis --</option>
-                                <option value="tunai">Tunai</option>
-                                <option value="transfer">Transfer</option>
-                                <option value="kredit">Kredit</option>
+                                <option value="tunai" @selected(old('jenis_pembayaran') === 'tunai')>Tunai</option>
+                                <option value="transfer" @selected(old('jenis_pembayaran') === 'transfer')>Transfer</option>
+                                <option value="kredit" @selected(old('jenis_pembayaran') === 'kredit')>Kredit</option>
                             </select>
                         </label>
+                        <div id="sumber_uang_section" style="display: none;">
+                            <label class="block text-sm">
+                                <span class="text-ink-700 font-medium">Sumber Uang (Kas / Bank) *</span>
+                                <select name="id_kas_bank" id="id_kas_bank" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
+                                    <option value="">-- Pilih Sumber Kas / Bank --</option>
+                                    @foreach ($kasBanks as $kasBank)
+                                        <option value="{{ $kasBank->id_kas_bank }}" data-jenis="{{ $kasBank->jenis }}" @selected(old('id_kas_bank') == $kasBank->id_kas_bank)>
+                                            {{ $kasBank->nama }} ({{ ucfirst($kasBank->jenis) }}{{ $kasBank->no_rekening ? ' - ' . $kasBank->no_rekening : '' }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1 text-xs text-ink-500">Pilih akun kas atau rekening bank yang digunakan untuk mendanai pembayaran.</p>
+                            </label>
+                        </div>
                         <div id="jatuh_tempo_section" style="display: none;">
                             <label class="block text-sm">
                                 <span class="text-ink-700 font-medium">Tanggal Jatuh Tempo *</span>
                                 <input type="date" name="tgl_jatuh_tempo" min="{{ now()->format('Y-m-d') }}" value="{{ old('tgl_jatuh_tempo') }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
+                                <p class="mt-1 text-xs text-ink-500">Wajib diisi untuk pembelian dengan tempo/kredit.</p>
                             </label>
                         </div>
                     </div>
@@ -186,16 +201,66 @@
         }
 
         function togglePaymentFields() {
-            const jenis = document.querySelector('select[name="jenis_pembayaran"]').value;
+            const jenisSelect = document.querySelector('select[name="jenis_pembayaran"]');
+            const jenis = jenisSelect ? jenisSelect.value : '';
             const isCredit = jenis === 'kredit';
-            const jatuhTempo = document.querySelector('input[name="tgl_jatuh_tempo"]');
+            const isCashOrBank = jenis === 'tunai' || jenis === 'transfer';
 
-            document.getElementById('jatuh_tempo_section').style.display = isCredit ? 'block' : 'none';
-            jatuhTempo.disabled = !isCredit;
-            jatuhTempo.required = isCredit;
+            const jatuhTempoSection = document.getElementById('jatuh_tempo_section');
+            const jatuhTempoInput = document.querySelector('input[name="tgl_jatuh_tempo"]');
+            const sumberUangSection = document.getElementById('sumber_uang_section');
+            const sumberUangSelect = document.getElementById('id_kas_bank');
 
-            if (!isCredit) {
-                jatuhTempo.value = '';
+            // Tanggal Jatuh Tempo (Hanya saat Kredit)
+            if (jatuhTempoSection && jatuhTempoInput) {
+                jatuhTempoSection.style.display = isCredit ? 'block' : 'none';
+                jatuhTempoInput.disabled = !isCredit;
+                jatuhTempoInput.required = isCredit;
+                if (!isCredit) {
+                    jatuhTempoInput.value = '';
+                }
+            }
+
+            // Sumber Uang (Kas / Bank)
+            if (sumberUangSection && sumberUangSelect) {
+                if (isCashOrBank) {
+                    sumberUangSection.style.display = 'block';
+                    sumberUangSelect.disabled = false;
+                    sumberUangSelect.required = true;
+
+                    // Filter opsi kas vs bank sesuai jenis pembayaran
+                    let hasMatchingSelected = false;
+                    const options = sumberUangSelect.querySelectorAll('option');
+                    options.forEach((opt, idx) => {
+                        if (idx === 0) return; // placeholder
+                        const optJenis = opt.dataset.jenis;
+                        const match = (jenis === 'tunai' && optJenis === 'kas') || (jenis === 'transfer' && optJenis === 'bank');
+                        if (match) {
+                            opt.style.display = '';
+                            opt.disabled = false;
+                            if (opt.value === sumberUangSelect.value) {
+                                hasMatchingSelected = true;
+                            }
+                        } else {
+                            opt.style.display = 'none';
+                            opt.disabled = true;
+                        }
+                    });
+
+                    // Jika belum ada yang cocok atau baru berganti jenis, pilih opsi pertama yang valid
+                    if (!hasMatchingSelected) {
+                        const firstValid = Array.from(options).find((opt, idx) => idx > 0 && !opt.disabled);
+                        if (firstValid) {
+                            sumberUangSelect.value = firstValid.value;
+                        }
+                    }
+                } else {
+                    // Jika kredit atau belum dipilih
+                    sumberUangSection.style.display = 'none';
+                    sumberUangSelect.disabled = true;
+                    sumberUangSelect.required = false;
+                    sumberUangSelect.value = '';
+                }
             }
         }
 
