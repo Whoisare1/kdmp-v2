@@ -37,8 +37,10 @@ use App\Http\Controllers\Pembelian\PembelianController;
 use App\Http\Controllers\Pembelian\ReturPembelianController;
 use App\Http\Controllers\Penjualan\PenjualanController;
 use App\Http\Controllers\Penjualan\ReturPenjualanController;
+use App\Http\Controllers\Perencanaan\DashboardM2Controller;
 use App\Http\Controllers\Perencanaan\DemografiController;
 use App\Http\Controllers\Perencanaan\KebutuhanKomoditasController;
+use App\Http\Controllers\Perencanaan\LaporanM2Controller;
 use App\Http\Controllers\Perencanaan\NeracaKomoditasController;
 use App\Http\Controllers\Perencanaan\PerbandinganHargaController;
 use App\Http\Controllers\Perencanaan\PermintaanPengadaanController;
@@ -81,6 +83,7 @@ Route::middleware('auth')->group(function () {
 
     // ===== M2/M3 — Kalkulasi Kebutuhan & Perencanaan =====
     Route::prefix('perencanaan')->name('perencanaan.')->group(function () {
+        Route::get('dashboard', [DashboardM2Controller::class, 'index'])->name('dashboard');
         Route::resource('demografi', DemografiController::class);
         Route::resource('potensi-produksi', PotensiProduksiController::class);
         Route::resource('standar-kebutuhan', StandarKebutuhanController::class);
@@ -90,6 +93,7 @@ Route::middleware('auth')->group(function () {
             ->only(['index', 'show']);
         Route::resource('neraca-komoditas', NeracaKomoditasController::class)
             ->only(['index', 'show']);
+        Route::get('laporan', [LaporanM2Controller::class, 'index'])->name('laporan.index');
         Route::resource('perbandingan-harga', PerbandinganHargaController::class);
         Route::get('permintaan-pengadaan/from-hasil/{hasil}', [PermintaanPengadaanController::class, 'fromHasil'])
             ->name('permintaan-pengadaan.from-hasil');

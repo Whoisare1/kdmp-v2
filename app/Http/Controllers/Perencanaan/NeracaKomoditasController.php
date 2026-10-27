@@ -6,6 +6,8 @@ use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Models\Master\Komoditas;
 use App\Models\Perencanaan\HasilKalkulasi;
+use App\Models\Perencanaan\KebutuhanKomoditas;
+use App\Models\Perencanaan\KetersediaanKomoditas;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -58,6 +60,13 @@ class NeracaKomoditasController extends ModuleCrudController
 
         $daftarKomoditas = Komoditas::where('is_active', true)->orderBy('nama')->get();
 
+        // Satuan komoditas
+        $satuanMap = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('tahun', $tahun)
+            ->when($bulan, fn ($q) => $q->where('bulan', $bulan))
+            ->pluck('satuan', 'id_komoditas')
+            ->toArray();
+
         // Ringkasan status neraca
         $baseQuery = HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)
@@ -66,6 +75,27 @@ class NeracaKomoditasController extends ModuleCrudController
         $totalSurplus = (clone $baseQuery)->where('status_surplus_defisit', 'surplus')->count();
         $totalDefisit = (clone $baseQuery)->where('status_surplus_defisit', 'defisit')->count();
         $totalSeimbang = (clone $baseQuery)->where('status_surplus_defisit', 'seimbang')->count();
+
+        // Kelengkapan data standar kebutuhan per komoditas
+        $kelengkapanStandarRaw = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('tahun', $tahun)
+            ->when($bulan, fn ($q) => $q->where('bulan', $bulan))
+            ->selectRaw('id_komoditas, COUNT(CASE WHEN id_standar IS NOT NULL AND per_kapita_harian > 0 THEN 1 END) as valid_count, COUNT(*) as total_groups')
+            ->groupBy('id_komoditas')
+            ->get();
+
+        $kelengkapanStandarMap = [];
+        $totalKomoditasKurangStandar = 0;
+        foreach ($kelengkapanStandarRaw as $row) {
+            $kelengkapanStandarMap[$row->id_komoditas] = [
+                'valid' => (int) $row->valid_count,
+                'total' => (int) $row->total_groups,
+                'is_lengkap' => ((int) $row->valid_count > 0 && (int) $row->valid_count >= (int) $row->total_groups),
+            ];
+            if ((int) $row->valid_count < (int) $row->total_groups) {
+                $totalKomoditasKurangStandar++;
+            }
+        }
 
         return view('perencanaan.neraca-komoditas.index', [
             'items' => $items,
@@ -76,9 +106,52 @@ class NeracaKomoditasController extends ModuleCrudController
             'idKomoditas' => $idKomoditas,
             'statusFilter' => $status,
             'daftarKomoditas' => $daftarKomoditas,
+            'satuanMap' => $satuanMap,
             'totalSurplus' => $totalSurplus,
             'totalDefisit' => $totalDefisit,
             'totalSeimbang' => $totalSeimbang,
+            'kelengkapanStandarMap' => $kelengkapanStandarMap,
+            'totalKomoditasKurangStandar' => $totalKomoditasKurangStandar,
+        ]);
+    }
+
+    public function show(int|string $id): View
+    {
+        $idWilayah = $this->wilayahAktifId();
+        $hasil = HasilKalkulasi::with(['wilayah', 'komoditas', 'unitUsahaRekomendasi'])
+            ->where('id_wilayah', $idWilayah)
+            ->findOrFail($id);
+
+        $rincianKebutuhan = KebutuhanKomoditas::with('standar')
+            ->where('id_wilayah', $idWilayah)
+            ->where('id_komoditas', $hasil->id_komoditas)
+            ->where('tahun', $hasil->tahun)
+            ->where('bulan', $hasil->bulan)
+            ->orderBy('kelompok_umur')
+            ->get();
+
+        $ketersediaan = KetersediaanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('id_komoditas', $hasil->id_komoditas)
+            ->where('tahun', $hasil->tahun)
+            ->where('bulan', $hasil->bulan)
+            ->first();
+
+        $satuan = $rincianKebutuhan->first()?->satuan ?? ($ketersediaan?->satuan ?? 'KG');
+
+        $totalKelompok = $rincianKebutuhan->count();
+        $kelompokValidStandar = $rincianKebutuhan->filter(fn ($rk) => $rk->id_standar !== null && (float) $rk->per_kapita_harian > 0)->count();
+        $standarLengkap = ($totalKelompok > 0 && $kelompokValidStandar >= $totalKelompok);
+
+        return view('perencanaan.neraca-komoditas.show', [
+            'hasil' => $hasil,
+            'rincianKebutuhan' => $rincianKebutuhan,
+            'ketersediaan' => $ketersediaan,
+            'satuan' => $satuan,
+            'standarLengkap' => $standarLengkap,
+            'kelompokValidStandar' => $kelompokValidStandar,
+            'totalKelompok' => $totalKelompok,
+            'title' => 'Detail Neraca: ' . ($hasil->komoditas?->nama ?? 'Komoditas'),
+            'routeBase' => $this->routeBase,
         ]);
     }
 }

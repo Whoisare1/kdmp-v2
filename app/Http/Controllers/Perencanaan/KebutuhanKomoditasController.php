@@ -6,7 +6,9 @@ use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Models\Master\Komoditas;
 use App\Models\Perencanaan\DemografiDesa;
+use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
+use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Services\Perencanaan\KalkulasiKebutuhanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -75,6 +77,15 @@ class KebutuhanKomoditasController extends ModuleCrudController
             ->distinct('id_komoditas')
             ->count('id_komoditas');
 
+        $totalBarisTanpaStandar = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('tahun', $tahun)
+            ->when($bulan, fn ($q) => $q->where('bulan', $bulan))
+            ->when($idKomoditas, fn ($q) => $q->where('id_komoditas', $idKomoditas))
+            ->where(function ($q) {
+                $q->whereNull('id_standar')->orWhere('per_kapita_harian', '<=', 0);
+            })
+            ->count();
+
         return view('perencanaan.kebutuhan-komoditas.index', [
             'items' => $items,
             'title' => $this->title,
@@ -87,6 +98,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
             'totalPenduduk' => $totalPendudukTahunIni,
             'ringkasanKebutuhan' => $ringkasanKebutuhan,
             'totalKomoditasTerhitung' => $totalKomoditasTerhitung,
+            'totalBarisTanpaStandar' => $totalBarisTanpaStandar,
         ]);
     }
 
@@ -99,6 +111,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
             'tahun' => ['required', 'integer', 'min:2020', 'max:2100'],
             'bulan' => ['required', 'integer', 'min:1', 'max:12'],
             'id_komoditas' => ['nullable', 'exists:komoditas,id'],
+            'redirect_to' => ['nullable', 'string', 'in:dashboard,kebutuhan,neraca'],
         ]);
 
         try {
@@ -116,13 +129,77 @@ class KebutuhanKomoditasController extends ModuleCrudController
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
             ][$validated['bulan']] ?? $validated['bulan'];
 
+            $pesan = "Kalkulasi kebutuhan berhasil dijalankan untuk {$namaBulan} {$validated['tahun']}. Terhitung {$hasil['total_baris_kebutuhan']} baris kebutuhan dan diperbarui {$hasil['total_hasil_kalkulasi']} neraca komoditas.";
+
+            $redirectTo = $validated['redirect_to'] ?? 'kebutuhan';
+
+            if ($redirectTo === 'dashboard') {
+                return redirect()->route('perencanaan.dashboard', [
+                    'tahun' => $validated['tahun'],
+                    'bulan' => $validated['bulan'],
+                ])->with('status', $pesan);
+            }
+
+            if ($redirectTo === 'neraca') {
+                return redirect()->route('perencanaan.neraca-komoditas.index', [
+                    'tahun' => $validated['tahun'],
+                    'bulan' => $validated['bulan'],
+                    'id_komoditas' => $validated['id_komoditas'] ?? null,
+                ])->with('status', $pesan);
+            }
+
             return redirect()->route('perencanaan.kebutuhan-komoditas.index', [
                 'tahun' => $validated['tahun'],
                 'bulan' => $validated['bulan'],
                 'id_komoditas' => $validated['id_komoditas'] ?? null,
-            ])->with('status', "Kalkulasi kebutuhan berhasil dijalankan untuk {$namaBulan} {$validated['tahun']}. Terhitung {$hasil['total_baris_kebutuhan']} baris kebutuhan dan diperbarui {$hasil['total_hasil_kalkulasi']} neraca komoditas.");
+            ])->with('status', $pesan);
         } catch (Throwable $e) {
             return back()->with('error', $e->getMessage())->withInput();
         }
+    }
+
+    public function show(int|string $id): View
+    {
+        $idWilayah = $this->wilayahAktifId();
+        $item = KebutuhanKomoditas::with(['wilayah', 'komoditas', 'standar'])
+            ->where('id_wilayah', $idWilayah)
+            ->findOrFail($id);
+
+        $rincianKelompok = KebutuhanKomoditas::with('standar')
+            ->where('id_wilayah', $idWilayah)
+            ->where('id_komoditas', $item->id_komoditas)
+            ->where('tahun', $item->tahun)
+            ->where('bulan', $item->bulan)
+            ->orderBy('kelompok_umur')
+            ->get();
+
+        $hasilNeraca = HasilKalkulasi::where('id_wilayah', $idWilayah)
+            ->where('id_komoditas', $item->id_komoditas)
+            ->where('tahun', $item->tahun)
+            ->where('bulan', $item->bulan)
+            ->latest('versi')
+            ->first();
+
+        $ketersediaan = KetersediaanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('id_komoditas', $item->id_komoditas)
+            ->where('tahun', $item->tahun)
+            ->where('bulan', $item->bulan)
+            ->first();
+
+        $totalKelompok = $rincianKelompok->count();
+        $kelompokValidStandar = $rincianKelompok->filter(fn ($rk) => $rk->id_standar !== null && (float) $rk->per_kapita_harian > 0)->count();
+        $standarLengkap = ($totalKelompok > 0 && $kelompokValidStandar >= $totalKelompok);
+
+        return view('perencanaan.kebutuhan-komoditas.show', [
+            'item' => $item,
+            'rincianKelompok' => $rincianKelompok,
+            'hasilNeraca' => $hasilNeraca,
+            'ketersediaan' => $ketersediaan,
+            'standarLengkap' => $standarLengkap,
+            'kelompokValidStandar' => $kelompokValidStandar,
+            'totalKelompok' => $totalKelompok,
+            'title' => 'Detail Kalkulasi: ' . ($item->komoditas?->nama ?? 'Komoditas'),
+            'routeBase' => $this->routeBase,
+        ]);
     }
 }

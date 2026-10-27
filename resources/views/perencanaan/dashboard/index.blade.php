@@ -1,0 +1,481 @@
+<x-layouts.app title="Dashboard M2 — Kalkulasi & Neraca Komoditas" eyebrow="Modul M2 — Perencanaan Pangan">
+    {{-- Sub Navigasi Modul M2 --}}
+    <x-perencanaan.nav-m2 active="dashboard" />
+
+    {{-- Flash Notifications --}}
+    @if (session('status'))
+        <div class="mb-5 flex items-center justify-between rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-sawah-600">✓ Berhasil:</span>
+                <span>{{ session('status') }}</span>
+            </div>
+            <span class="font-mono text-xs text-ink-600/70">{{ now()->format('H:i') }}</span>
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="mb-5 flex items-center justify-between rounded-sm border border-merah-400 bg-merah-50 px-4 py-3 text-sm text-merah-700">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-merah-600">⚠ Gagal:</span>
+                <span>{{ session('error') }}</span>
+            </div>
+        </div>
+    @endif
+
+    @php
+        $namaBulanList = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+    @endphp
+
+    {{-- Filter & Action Header --}}
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
+        <form method="GET" action="{{ route('perencanaan.dashboard') }}" class="flex flex-wrap items-center gap-3">
+            {{-- Wilayah Desa Aktif (Read-Only Context) --}}
+            <div class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800">
+                <span class="font-mono text-[10px] uppercase text-ink-600/70">Wilayah:</span>
+                <span class="font-semibold text-ink-950">{{ $wilayah?->nama ?? 'Desa Terdaftar' }}</span>
+            </div>
+
+            {{-- Filter Kategori --}}
+            <select name="kategori" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">Semua Kategori</option>
+                @foreach ($daftarKategori as $kat)
+                    <option value="{{ $kat }}" {{ $kategori === $kat ? 'selected' : '' }}>
+                        {{ ucwords(str_replace('_', ' ', $kat)) }}
+                    </option>
+                @endforeach
+            </select>
+
+            {{-- Filter Tahun --}}
+            <select name="tahun" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                @foreach (range(2025, 2030) as $t)
+                    <option value="{{ $t }}" {{ $tahun == $t ? 'selected' : '' }}>Tahun {{ $t }}</option>
+                @endforeach
+            </select>
+
+            {{-- Filter Bulan --}}
+            <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">Semua Bulan (Tahunan)</option>
+                @foreach ($namaBulanList as $num => $nama)
+                    <option value="{{ $num }}" {{ $bulan == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                @endforeach
+            </select>
+
+            <button type="submit" class="rounded-sm border border-paper-300 bg-paper-200/80 px-3 py-2 text-xs font-medium text-ink-800 hover:border-merah-400 hover:text-merah-600">
+                Terapkan Filter
+            </button>
+            @if ($bulan || $kategori)
+                <a href="{{ route('perencanaan.dashboard', ['tahun' => $tahun]) }}" class="text-xs text-ink-600 hover:text-merah-600 hover:underline">
+                    Reset
+                </a>
+            @endif
+        </form>
+
+        {{-- Tombol Utama --}}
+        <div class="flex items-center gap-2">
+            <button type="button"
+                    onclick="document.getElementById('modal-kalkulasi').classList.remove('hidden')"
+                    class="inline-flex items-center gap-2 rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
+                <span>⚡</span>
+                <span>Jalankan Kalkulasi M2</span>
+            </button>
+        </div>
+    </div>
+
+    {{-- Banner Status Terkini & Waktu Kalkulasi --}}
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3 border-l-4 border-merah-500 bg-paper-50 px-4 py-3 text-xs text-ink-800 shadow-2xs">
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="font-semibold text-ink-900">Status Snapshot Terkini:</span>
+            <span>
+                Periode Terpilih: <strong>{{ $bulan ? $namaBulanList[$bulan] . ' ' : '' }}{{ $tahun }}</strong>
+            </span>
+            <span class="text-paper-300">|</span>
+            <span>
+                Snapshot Versi: <span class="rounded bg-paper-200 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink-800">v{{ $versiAktif }}</span>
+            </span>
+            <span class="text-paper-300">|</span>
+            <span>
+                Terakhir Dihitung:
+                <strong>{{ $waktuKalkulasiTerakhir ? \Carbon\Carbon::parse($waktuKalkulasiTerakhir)->format('d M Y, H:i') . ' WIB' : 'Belum Pernah' }}</strong>
+            </span>
+        </div>
+        <div>
+            @if ($adaDataDemografi)
+                <span class="inline-flex items-center gap-1 rounded bg-sawah-100 px-2 py-0.5 font-mono text-[11px] font-medium text-sawah-600">
+                    ✓ Data Demografi M1 Siap ({{ number_format($totalPenduduk, 0, ',', '.') }} Jiwa)
+                </span>
+            @else
+                <span class="inline-flex items-center gap-1 rounded bg-merah-100 px-2 py-0.5 font-mono text-[11px] font-medium text-merah-600">
+                    ⚠ Data Demografi Belum Tersedia di M1
+                </span>
+            @endif
+        </div>
+    </div>
+
+    {{-- Ringkasan KPI Cards --}}
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {{-- Card 1: Komoditas Terhitung --}}
+        <div class="rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
+            <div class="flex items-center justify-between">
+                <p class="font-mono text-[11px] uppercase tracking-wider text-ink-600/70">Total Komoditas</p>
+                <span class="rounded bg-paper-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-700">M2</span>
+            </div>
+            <p class="mt-2 font-display text-3xl font-semibold text-ink-950">{{ $totalKomoditasTerhitung }}</p>
+            <p class="mt-1 text-xs text-ink-600">
+                Kebutuhan: <strong class="font-mono text-ink-900">{{ number_format($totalKebutuhanVolume, 1, ',', '.') }}</strong> sat.
+            </p>
+        </div>
+
+        {{-- Card 2: Komoditas Surplus --}}
+        <div class="rounded-sm border border-sawah-500/30 bg-sawah-100/40 p-4 shadow-2xs">
+            <div class="flex items-center justify-between">
+                <p class="font-mono text-[11px] uppercase tracking-wider text-sawah-600">Komoditas Surplus</p>
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-sawah-500 text-xs text-paper-50 font-bold">✓</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <p class="font-display text-3xl font-semibold text-sawah-600">{{ $totalSurplus }}</p>
+                <span class="text-xs font-medium text-sawah-600/80">({{ $persenSurplus }}%)</span>
+            </div>
+            <p class="mt-1 text-xs text-ink-700">
+                Kelebihan panen desa: <span class="font-mono font-medium text-sawah-600">+{{ number_format($totalSurplusVolume, 1, ',', '.') }}</span>
+            </p>
+        </div>
+
+        {{-- Card 3: Komoditas Seimbang --}}
+        <div class="rounded-sm border border-padi-500/30 bg-padi-100/40 p-4 shadow-2xs">
+            <div class="flex items-center justify-between">
+                <p class="font-mono text-[11px] uppercase tracking-wider text-padi-600">Komoditas Seimbang</p>
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-padi-500 text-xs text-paper-50 font-bold">=</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <p class="font-display text-3xl font-semibold text-ink-900">{{ $totalSeimbang }}</p>
+                <span class="text-xs font-medium text-padi-600/90">({{ $persenSeimbang }}%)</span>
+            </div>
+            <p class="mt-1 text-xs text-ink-600">
+                Produksi tepat memenuhi konsumsi warga
+            </p>
+        </div>
+
+        {{-- Card 4: Komoditas Defisit --}}
+        <div class="rounded-sm border border-merah-500/30 bg-merah-50 p-4 shadow-2xs">
+            <div class="flex items-center justify-between">
+                <p class="font-mono text-[11px] uppercase tracking-wider text-merah-600">Komoditas Defisit</p>
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-merah-500 text-xs text-paper-50 font-bold">!</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+                <p class="font-display text-3xl font-semibold text-merah-600">{{ $totalDefisit }}</p>
+                <span class="text-xs font-medium text-merah-600/80">({{ $persenDefisit }}%)</span>
+            </div>
+            <p class="mt-1 text-xs text-ink-700">
+                Kekurangan pasokan: <span class="font-mono font-semibold text-merah-600">-{{ number_format($totalDefisitVolume, 1, ',', '.') }}</span>
+            </p>
+        </div>
+    </div>
+
+    {{-- Grid 2 Kolom: Grafik Distribusi Status & Daftar Top Defisit --}}
+    <div class="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {{-- Kolom Kiri (7 Kolom): Visualisasi & Perbandingan Volume Komoditas --}}
+        <div class="space-y-6 lg:col-span-7">
+            {{-- Visualisasi Distribusi Status --}}
+            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs">
+                <div class="flex items-center justify-between border-b border-paper-200 pb-3">
+                    <div>
+                        <h3 class="font-display text-base font-semibold text-ink-900">Distribusi Status Neraca Komoditas</h3>
+                        <p class="text-xs text-ink-600">Proporsi surplus, seimbang, dan defisit pada periode terpilih</p>
+                    </div>
+                    <span class="font-mono text-xs text-ink-600/70">{{ $totalKomoditasTerhitung }} Komoditas</span>
+                </div>
+
+                {{-- Stacked Progress Bar --}}
+                <div class="mt-4">
+                    <div class="flex h-4 w-full overflow-hidden rounded-xs bg-paper-200">
+                        @if ($totalKomoditasTerhitung > 0)
+                            <div style="width: {{ $persenSurplus }}%" class="bg-sawah-500 transition-all" title="Surplus: {{ $persenSurplus }}%"></div>
+                            <div style="width: {{ $persenSeimbang }}%" class="bg-padi-500 transition-all" title="Seimbang: {{ $persenSeimbang }}%"></div>
+                            <div style="width: {{ $persenDefisit }}%" class="bg-merah-500 transition-all" title="Defisit: {{ $persenDefisit }}%"></div>
+                        @else
+                            <div class="w-full bg-paper-300" title="Belum ada data"></div>
+                        @endif
+                    </div>
+
+                    {{-- Legend --}}
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="h-3 w-3 rounded-[2px] bg-sawah-500"></span>
+                            <span class="text-ink-800">Surplus: <strong>{{ $totalSurplus }}</strong> ({{ $persenSurplus }}%)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="h-3 w-3 rounded-[2px] bg-padi-500"></span>
+                            <span class="text-ink-800">Seimbang: <strong>{{ $totalSeimbang }}</strong> ({{ $persenSeimbang }}%)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="h-3 w-3 rounded-[2px] bg-merah-500"></span>
+                            <span class="text-ink-800">Defisit: <strong>{{ $totalDefisit }}</strong> ({{ $persenDefisit }}%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Rincian Bar Volume Per Komoditas --}}
+                <div class="mt-6">
+                    <p class="mb-3 font-mono text-[11px] uppercase tracking-wide text-ink-600/70">Perbandingan Kebutuhan vs Ketersediaan Per Komoditas</p>
+                    <div class="space-y-3">
+                        @forelse ($daftarHasil as $hasil)
+                            @php
+                                $maxVol = max((float)$hasil->total_kebutuhan, (float)$hasil->total_ketersediaan, 1);
+                                $wKebutuhan = round(((float)$hasil->total_kebutuhan / $maxVol) * 100);
+                                $wKetersediaan = round(((float)$hasil->total_ketersediaan / $maxVol) * 100);
+                            @endphp
+                            <div class="rounded-sm border border-paper-200 bg-paper-100/60 p-3">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="font-semibold text-ink-950">{{ $hasil->komoditas?->nama }}</span>
+                                    <span class="font-mono text-[11px] uppercase
+                                          {{ $hasil->status_surplus_defisit === 'surplus' ? 'text-sawah-600 font-semibold' : ($hasil->status_surplus_defisit === 'defisit' ? 'text-merah-600 font-semibold' : 'text-ink-700') }}">
+                                        {{ $hasil->status_surplus_defisit }}
+                                        ({{ number_format($hasil->persentase_kecukupan, 1, ',', '.') }}%)
+                                    </span>
+                                </div>
+
+                                {{-- Bar Kebutuhan (Merah/Abu) --}}
+                                <div class="mt-2 space-y-1">
+                                    <div class="flex items-center gap-2 text-[11px]">
+                                        <span class="w-20 shrink-0 text-ink-600">Kebutuhan:</span>
+                                        <div class="flex-1 overflow-hidden rounded-[2px] bg-paper-200 h-2">
+                                            <div style="width: {{ $wKebutuhan }}%" class="h-full bg-ink-700"></div>
+                                        </div>
+                                        <span class="w-24 text-right font-mono text-ink-800">{{ number_format($hasil->total_kebutuhan, 1, ',', '.') }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[11px]">
+                                        <span class="w-20 shrink-0 text-ink-600">Ketersediaan:</span>
+                                        <div class="flex-1 overflow-hidden rounded-[2px] bg-paper-200 h-2">
+                                            <div style="width: {{ $wKetersediaan }}%" class="h-full {{ $hasil->selisih >= 0 ? 'bg-sawah-500' : 'bg-merah-500' }}"></div>
+                                        </div>
+                                        <span class="w-24 text-right font-mono text-ink-800">{{ number_format($hasil->total_ketersediaan, 1, ',', '.') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="py-4 text-center text-xs text-ink-600/70">Belum ada data kalkulasi untuk periode ini.</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Kolom Kanan (5 Kolom): Daftar Defisit Terbesar & Info Sumber Data M1 --}}
+        <div class="space-y-6 lg:col-span-5">
+            {{-- Tabel Komoditas Defisit Terbesar (Top Deficits) --}}
+            <div class="rounded-sm border border-merah-500/30 bg-paper-50 p-5 shadow-2xs">
+                <div class="flex items-center justify-between border-b border-paper-200 pb-3">
+                    <div>
+                        <h3 class="font-display text-base font-semibold text-merah-700">Defisit Terbesar (Prioritas Pengadaan)</h3>
+                        <p class="text-xs text-ink-600">Komoditas yang memerlukan pemenuhan pasokan luar (M3)</p>
+                    </div>
+                    <span class="rounded bg-merah-100 px-2 py-0.5 font-mono text-xs font-semibold text-merah-700">
+                        {{ $komoditasDefisitTerbesar->count() }} Item
+                    </span>
+                </div>
+
+                <div class="mt-4 divide-y divide-paper-200">
+                    @forelse ($komoditasDefisitTerbesar as $item)
+                        <div class="py-3 first:pt-0 last:pb-0">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <p class="font-semibold text-ink-950">{{ $item->komoditas?->nama }}</p>
+                                    <p class="text-xs text-ink-600">
+                                        Kebutuhan: {{ number_format($item->total_kebutuhan, 1, ',', '.') }} | Ketersediaan: {{ number_format($item->total_ketersediaan, 1, ',', '.') }}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-mono text-sm font-bold text-merah-600">
+                                        {{ number_format($item->selisih, 1, ',', '.') }}
+                                    </p>
+                                    <span class="text-[10px] text-ink-600/70">Kecukupan: {{ number_format($item->persentase_kecukupan, 1, ',', '.') }}%</span>
+                                </div>
+                            </div>
+
+                            <div class="mt-2 flex items-center justify-between">
+                                <a href="{{ route('perencanaan.neraca-komoditas.show', $item->id_hasil) }}" class="text-xs text-ink-700 hover:text-merah-600 hover:underline">
+                                    Lihat Detail &rarr;
+                                </a>
+                                <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', ['hasil' => $item->id_hasil]) }}"
+                                   class="inline-flex items-center gap-1 rounded-sm bg-merah-500 px-2.5 py-1 text-[11px] font-semibold text-paper-50 hover:bg-merah-600">
+                                    <span>+ Buat PR (M3)</span>
+                                </a>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="py-6 text-center text-xs text-ink-600">
+                            <p class="font-semibold text-sawah-600">Tidak ada komoditas defisit</p>
+                            <p class="mt-1 text-ink-600/70">Seluruh komoditas pada periode ini berada dalam status seimbang atau surplus.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            {{-- Kartu Info Sumber Data M1 --}}
+            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs">
+                <div class="flex items-center justify-between border-b border-paper-200 pb-3">
+                    <h3 class="font-display text-base font-semibold text-ink-900">Sumber Data M1 Lapangan</h3>
+                    <span class="rounded bg-paper-200 px-2 py-0.5 font-mono text-[10px] text-ink-700">M1 &rarr; M2</span>
+                </div>
+
+                <div class="mt-4 space-y-3 text-xs text-ink-800">
+                    <div class="flex items-start justify-between border-b border-paper-200/60 pb-2">
+                        <div>
+                            <p class="font-medium text-ink-900">Demografi Kependudukan (M1 Sesi 1)</p>
+                            <p class="text-[11px] text-ink-600/80">Basis jumlah jiwa per kelompok umur</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-mono font-semibold text-ink-900">{{ number_format($totalPenduduk, 0, ',', '.') }} Jiwa</span>
+                            <p class="text-[10px] text-sawah-600 font-medium">Tahun {{ $tahun }}</p>
+                        </div>
+                    </div>
+
+                    {{-- Mini Breakdown Kelompok Umur --}}
+                    <div class="grid grid-cols-5 gap-1 text-center font-mono text-[10px]">
+                        <div class="rounded bg-paper-100 p-1">
+                            <div class="text-ink-600/70">Balita</div>
+                            <div class="font-semibold text-ink-900">{{ $demografiPerKelompok['balita'] }}</div>
+                        </div>
+                        <div class="rounded bg-paper-100 p-1">
+                            <div class="text-ink-600/70">Anak</div>
+                            <div class="font-semibold text-ink-900">{{ $demografiPerKelompok['anak'] }}</div>
+                        </div>
+                        <div class="rounded bg-paper-100 p-1">
+                            <div class="text-ink-600/70">Remaja</div>
+                            <div class="font-semibold text-ink-900">{{ $demografiPerKelompok['remaja'] }}</div>
+                        </div>
+                        <div class="rounded bg-paper-100 p-1">
+                            <div class="text-ink-600/70">Dewasa</div>
+                            <div class="font-semibold text-ink-900">{{ $demografiPerKelompok['dewasa'] }}</div>
+                        </div>
+                        <div class="rounded bg-paper-100 p-1">
+                            <div class="text-ink-600/70">Lansia</div>
+                            <div class="font-semibold text-ink-900">{{ $demografiPerKelompok['lansia'] }}</div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start justify-between border-b border-paper-200/60 pb-2 pt-1">
+                        <div>
+                            <p class="font-medium text-ink-900">Potensi Panen & Ketersediaan (M1 Sesi 2)</p>
+                            <p class="text-[11px] text-ink-600/80">Produksi pertanian komoditas lokal</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-mono font-semibold text-ink-900">{{ $jumlahCatatanProduksi }} Komoditas</span>
+                            <p class="text-[10px] text-ink-600">Bulan panen aktif</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start justify-between pt-1">
+                        <div>
+                            <p class="font-medium text-ink-900">Sesi Survei M1 Terakhir</p>
+                            <p class="text-[11px] text-ink-600/80">Petugas survei lapangan desa</p>
+                        </div>
+                        <div class="text-right">
+                            @if ($sesiSurveiTerakhir)
+                                <span class="font-mono font-semibold text-ink-900">Sesi #{{ $sesiSurveiTerakhir->id }}</span>
+                                <p class="text-[10px] text-ink-600">{{ $sesiSurveiTerakhir->tanggal_survei ? $sesiSurveiTerakhir->tanggal_survei->format('d/m/Y') : '—' }}</p>
+                            @else
+                                <span class="text-ink-600">—</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 border-t border-paper-200 pt-3">
+                    <a href="{{ route('survei.sesi.index') }}" class="inline-flex items-center gap-1 text-xs font-medium text-merah-600 hover:underline">
+                        <span>Buka Modul Survei M1</span>
+                        <span>&rarr;</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal Jalankan Kalkulasi M2 --}}
+    <div id="modal-kalkulasi" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-ink-950/70 p-4 backdrop-blur-xs">
+        <div class="w-full max-w-md rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-paper-200 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-sm bg-merah-500 font-bold text-paper-50 text-sm">⚡</span>
+                    <div>
+                        <h3 class="font-display text-base font-semibold text-ink-950">Jalankan Kalkulasi Kebutuhan M2</h3>
+                        <p class="text-[11px] text-ink-600">Perhitungan snapshot kebutuhan & neraca desa</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-kalkulasi').classList.add('hidden')"
+                        class="text-ink-600 hover:text-ink-900 text-lg leading-none">&times;</button>
+            </div>
+
+            <form method="POST" action="{{ route('perencanaan.kebutuhan-komoditas.kalkulasi') }}" class="mt-4 space-y-4">
+                @csrf
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Tahun Perencanaan</label>
+                    <select name="tahun" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                        @foreach (range(2025, 2030) as $t)
+                            <option value="{{ $t }}" {{ $tahun == $t ? 'selected' : '' }}>Tahun {{ $t }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Bulan Perencanaan</label>
+                    <select name="bulan" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                        @foreach ($namaBulanList as $num => $nama)
+                            <option value="{{ $num }}" {{ ($bulan ?? date('n')) == $num ? 'selected' : '' }}>{{ $nama }} (Bulan {{ $num }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Komoditas</label>
+                    <select name="id_komoditas" class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                        <option value="">-- Semua Komoditas Aktif --</option>
+                        @foreach ($daftarKomoditas as $k)
+                            <option value="{{ $k->id }}">{{ $k->nama }} ({{ $k->kategori }})</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-[11px] text-ink-600/70">Pilih komoditas spesifik atau hitung seluruh komoditas sekaligus.</p>
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Tampilkan Hasil Pada:</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 p-2 text-xs cursor-pointer hover:border-merah-400">
+                            <input type="radio" name="redirect_to" value="dashboard" checked class="text-merah-500">
+                            <span class="font-medium text-ink-900">Dashboard</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 p-2 text-xs cursor-pointer hover:border-merah-400">
+                            <input type="radio" name="redirect_to" value="kebutuhan" class="text-merah-500">
+                            <span class="font-medium text-ink-900">Kebutuhan</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 p-2 text-xs cursor-pointer hover:border-merah-400">
+                            <input type="radio" name="redirect_to" value="neraca" class="text-merah-500">
+                            <span class="font-medium text-ink-900">Neraca</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="rounded-sm border border-paper-300/80 bg-paper-200/60 p-3 text-xs text-ink-700">
+                    <p class="font-semibold text-ink-900">Formula Kalkulasi:</p>
+                    <p class="mt-0.5 font-mono text-[11px] text-ink-800">Kebutuhan = Populasi × Standar Konsumsi × Hari × Musiman</p>
+                    <p class="mt-1 text-[10px] text-ink-600/80">Hasil kalkulasi disimpan sebagai snapshot idempoten di <code class="text-ink-900">kebutuhan_komoditas</code> dan dimutakhirkan ke <code class="text-ink-900">hasil_kalkulasi</code>.</p>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <button type="button"
+                            onclick="document.getElementById('modal-kalkulasi').classList.add('hidden')"
+                            class="rounded-sm border border-paper-300 px-3 py-2 text-xs font-medium text-ink-700 hover:border-paper-400">
+                        Batal
+                    </button>
+                    <button type="submit" class="rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 hover:bg-merah-600 shadow-xs">
+                        Proses Kalkulasi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</x-layouts.app>

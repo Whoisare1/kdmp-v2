@@ -155,4 +155,79 @@ class M2KalkulasiTest extends TestCase
         $form->assertSee('PR - Pengadaan Defisit');
         $form->assertSee($hasilDefisit->komoditas->nama ?? 'Komoditas');
     }
+
+    public function test_dashboard_m2_dapat_diakses_dan_menampilkan_ringkasan_komoditas(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $this->assertNotNull($user);
+
+        // Pastikan ada data kalkulasi
+        $service = app(KalkulasiKebutuhanService::class);
+        $service->hitungKebutuhan(1, 2026, 3);
+
+        $response = $this->actingAs($user)->get(route('perencanaan.dashboard', [
+            'tahun' => 2026,
+            'bulan' => 3,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Dashboard M2');
+        $response->assertSee('Distribusi Status Neraca Komoditas');
+        $response->assertSee('Surplus');
+        $response->assertSee('Defisit');
+        $response->assertSee('Sumber Data M1');
+        $response->assertSee('Jalankan Kalkulasi M2');
+    }
+
+    public function test_laporan_m2_dapat_diakses_dan_menampilkan_rekapitulasi(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $this->assertNotNull($user);
+
+        $response = $this->actingAs($user)->get(route('perencanaan.laporan.index', [
+            'tahun' => 2026,
+            'bulan' => 3,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Laporan Rekapitulasi Neraca Komoditas Pangan');
+        $response->assertSee('DOKUMEN RESMI M2');
+        $response->assertSee('Cetak / Ekspor PDF');
+    }
+
+    public function test_detail_kebutuhan_komoditas_dapat_diakses(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $this->assertNotNull($user);
+
+        $itemKebutuhan = KebutuhanKomoditas::where('id_wilayah', 1)->first();
+        $this->assertNotNull($itemKebutuhan);
+
+        $response = $this->actingAs($user)->get(route('perencanaan.kebutuhan-komoditas.show', [
+            'kebutuhan_komodita' => $itemKebutuhan->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Rincian Perhitungan Kebutuhan Berdasarkan Kelompok Umur');
+        $response->assertSee($itemKebutuhan->komoditas->nama ?? 'Komoditas');
+    }
+
+    public function test_detail_neraca_komoditas_dapat_diakses(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $this->assertNotNull($user);
+
+        $hasilNeraca = HasilKalkulasi::where('id_wilayah', 1)->first();
+        $this->assertNotNull($hasilNeraca);
+
+        $response = $this->actingAs($user)->get(route('perencanaan.neraca-komoditas.show', [
+            'neraca_komodita' => $hasilNeraca->id_hasil,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Total Kebutuhan Konsumsi');
+        $response->assertSee('Ketersediaan Produksi Panen');
+        $response->assertSee('Selisih Neraca');
+        $response->assertSee($hasilNeraca->komoditas->nama ?? 'Komoditas');
+    }
 }

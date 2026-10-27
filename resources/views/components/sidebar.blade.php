@@ -2,7 +2,7 @@
     $groups = [
         ['no' => 'M0', 'label' => 'Master & Periode', 'route' => 'master.koperasi.index', 'match' => 'master.*'],
         ['no' => 'M1', 'label' => 'Survey', 'route' => 'survei.sesi.index', 'match' => 'survei.*'],
-        ['no' => 'M2', 'label' => 'Kalkulasi Kebutuhan', 'route' => 'perencanaan.kebutuhan-komoditas.index', 'match' => 'perencanaan.kebutuhan-komoditas.*,perencanaan.neraca-komoditas.*,perencanaan.standar-kebutuhan.*,perencanaan.demografi.*,perencanaan.potensi-produksi.*'],
+        ['no' => 'M2', 'label' => 'Kalkulasi Kebutuhan', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard,perencanaan.kebutuhan-komoditas.*,perencanaan.neraca-komoditas.*,perencanaan.laporan.*,perencanaan.standar-kebutuhan.*,perencanaan.demografi.*,perencanaan.potensi-produksi.*'],
         ['no' => 'M3', 'label' => 'Perencanaan Pengadaan', 'route' => 'perencanaan.permintaan-pengadaan.index', 'match' => 'perencanaan.permintaan-pengadaan.*,perencanaan.perbandingan-harga.*'],
         ['no' => 'M4', 'label' => 'Gudang', 'route' => 'gudang.stok.index', 'match' => 'gudang.*'],
         ['no' => 'M5', 'label' => 'Pembelian', 'route' => 'pembelian.pembelian.index', 'match' => 'pembelian.*'],
