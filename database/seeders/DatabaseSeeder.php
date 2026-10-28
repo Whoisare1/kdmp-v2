@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             DataAwalSeeder::class,
             M2PerencanaanSeeder::class,
             M3PerencanaanSeeder::class,
+            KonsinyasiDemoSeeder::class,
         ]);
     }
 }
