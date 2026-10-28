@@ -11,7 +11,7 @@ class BarangPerKoperasi extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id_koperasi', 'id_barang', 'stok_minimum', 'stok_maksimum',
+        'id_entitas', 'id_barang', 'stok_minimum', 'stok_maksimum',
         'harga_jual_standar', 'is_dijual',
     ];
 
@@ -20,3 +20,4 @@ class BarangPerKoperasi extends Model
         return ['is_dijual' => 'boolean'];
     }
 }
+

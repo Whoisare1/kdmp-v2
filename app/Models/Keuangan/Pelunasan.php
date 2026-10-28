@@ -2,21 +2,21 @@
 
 namespace App\Models\Keuangan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
 use Illuminate\Database\Eloquent\Model;
 
 class Pelunasan extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'pelunasan';
     protected $primaryKey = 'id_pelunasan';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'kode_pelunasan', 'jenis', 'id_pihak', 'tanggal',
+        'id_entitas', 'kode_pelunasan', 'jenis', 'id_pihak', 'tanggal',
         'id_kas_bank', 'total_nilai', 'status_posting', 'id_jurnal',
         'catatan', 'created_by',
     ];
@@ -41,3 +41,4 @@ class Pelunasan extends Model
         return $this->hasMany(PelunasanDetail::class, 'id_pelunasan', 'id_pelunasan');
     }
 }
+

@@ -156,7 +156,7 @@ return new class extends Migration
 
         Schema::create('perbandingan_harga', function (Blueprint $t) {
             $t->id('id_perbandingan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_komoditas')->constrained('komoditas');
             $t->foreignId('id_wilayah_sumber')->constrained('wilayah');
             $t->unsignedTinyInteger('bulan');
@@ -169,12 +169,12 @@ return new class extends Migration
             $t->unsignedTinyInteger('rank_harga')->nullable();
             $t->boolean('dipilih')->default(false);
             $t->timestamp('created_at')->nullable();
-            $t->index(['id_koperasi', 'id_komoditas', 'tahun', 'bulan'], 'banding_lookup');
+            $t->index(['id_entitas', 'id_komoditas', 'tahun', 'bulan'], 'banding_lookup');
         });
 
         Schema::create('permintaan_pengadaan', function (Blueprint $t) {
             $t->id('id_permintaan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_permintaan', 30);
             $t->foreignId('id_pihak')->nullable()->constrained('master_pihak', 'id_pihak');
             $t->date('tgl_pengajuan');
@@ -186,7 +186,7 @@ return new class extends Migration
             $t->unsignedBigInteger('approved_by')->nullable();
             $t->dateTime('approved_at')->nullable();
             $t->timestamps();
-            $t->unique(['id_koperasi', 'kode_permintaan']);
+            $t->unique(['id_entitas', 'kode_permintaan']);
         });
 
         Schema::create('permintaan_pengadaan_detail', function (Blueprint $t) {
@@ -212,3 +212,4 @@ return new class extends Migration
         }
     }
 };
+

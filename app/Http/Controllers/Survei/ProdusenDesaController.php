@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Survei\ProdusenDesa;
 use App\Models\Survei\ProduksiProdusen;
 use App\Models\Tenant\Wilayah;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\SesiSurvei;
 use Illuminate\Http\Request;
 
 class ProdusenDesaController extends Controller
@@ -14,7 +14,7 @@ class ProdusenDesaController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $idWilayah = $user->id_koperasi && $user->koperasi ? $user->koperasi->id_wilayah : null;
+        $idWilayah = $user->id_entitas && $user->entitas ? $user->entitas->id_wilayah : null;
 
         // Daftar semua sesi yang tersedia (untuk dropdown pilih periode)
         $sesiQuery = SesiSurvei::with('wilayah')->orderBy('tahun', 'desc')->orderBy('bulan', 'desc');
@@ -54,8 +54,8 @@ class ProdusenDesaController extends Controller
     public function create()
     {
         $user = auth()->user();
-        if ($user->id_koperasi && $user->koperasi) {
-            $wilayahs = Wilayah::where('id', $user->koperasi->id_wilayah)->get();
+        if ($user->id_entitas && $user->entitas) {
+            $wilayahs = Wilayah::where('id', $user->entitas->id_wilayah)->get();
         } else {
             $wilayahs = Wilayah::where('tingkat', 'Desa')->get();
         }
@@ -79,8 +79,8 @@ class ProdusenDesaController extends Controller
     public function edit(ProdusenDesa $produsen)
     {
         $user = auth()->user();
-        if ($user->id_koperasi && $user->koperasi) {
-            $wilayahs = Wilayah::where('id', $user->koperasi->id_wilayah)->get();
+        if ($user->id_entitas && $user->entitas) {
+            $wilayahs = Wilayah::where('id', $user->entitas->id_wilayah)->get();
         } else {
             $wilayahs = Wilayah::where('tingkat', 'Desa')->get();
         }

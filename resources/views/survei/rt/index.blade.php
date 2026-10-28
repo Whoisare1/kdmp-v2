@@ -44,7 +44,7 @@
         </div>
         
         <button type="submit"
-                class="rounded-sm bg-merah-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-merah-700">
+                class="rounded-sm bg-merah-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-merah-600">
             Cari
         </button>
         @if(request('search') || request('id_sesi'))

@@ -11,7 +11,7 @@ use RuntimeException;
 class StokService
 {
     public function masuk(
-        int $koperasiId,
+        int $entitasId,
         int $gudangId,
         int $barangId,
         string $qty,
@@ -25,7 +25,7 @@ class StokService
         $this->pastikanTidakNegatif($hargaSatuan, 'harga satuan');
 
         return DB::transaction(function () use (
-            $koperasiId,
+            $entitasId,
             $gudangId,
             $barangId,
             $qty,
@@ -72,7 +72,7 @@ class StokService
             );
 
             return KartuStok::create([
-                'id_koperasi' => $koperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
                 'tanggal' => $tanggal ?? now()->toDateString(),
@@ -92,7 +92,7 @@ class StokService
     }
 
     public function keluar(
-        int $koperasiId,
+        int $entitasId,
         int $gudangId,
         int $barangId,
         string $qty,
@@ -104,7 +104,7 @@ class StokService
         $this->pastikanPositif($qty, 'qty');
 
         return DB::transaction(function () use (
-            $koperasiId,
+            $entitasId,
             $gudangId,
             $barangId,
             $qty,
@@ -139,7 +139,7 @@ class StokService
                 ]);
 
             return KartuStok::create([
-                'id_koperasi' => $koperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
                 'tanggal' => $tanggal ?? now()->toDateString(),
@@ -174,6 +174,89 @@ class StokService
             ->value('qty_on_hand') ?? '0');
     }
 
+    public function sesuaikanOpname(
+        int $entitasId,
+        int $gudangId,
+        int $barangId,
+        string $qtyFisik,
+        int $opnameId,
+        ?int $createdBy = null,
+    ): array {
+        return DB::transaction(function () use (
+            $entitasId,
+            $gudangId,
+            $barangId,
+            $qtyFisik,
+            $opnameId,
+            $createdBy,
+        ): array {
+            $stok = Stok::query()
+                ->where('id_gudang', $gudangId)
+                ->where('id_barang', $barangId)
+                ->lockForUpdate()
+                ->first();
+
+            $qtySistem = (string) ($stok?->qty_on_hand ?? '0');
+            $hpp = (string) ($stok?->hpp_rata2 ?? '0');
+            $selisih = bcsub($qtyFisik, $qtySistem, 4);
+            $nilaiSelisih = bcmul($selisih, $hpp, 2);
+
+            if (bccomp($selisih, '0', 4) === 0) {
+                return [
+                    'qty_sistem' => $qtySistem,
+                    'selisih' => $selisih,
+                    'hpp_rata2' => $hpp,
+                    'nilai_selisih' => $nilaiSelisih,
+                ];
+            }
+
+            $nilaiPersediaanBaru = bcmul($qtyFisik, $hpp, 2);
+            $jenisMutasi = bccomp($selisih, '0', 4) > 0 ? 'ADJ_IN' : 'ADJ_OUT';
+            $qtyMutasi = bccomp($selisih, '0', 4) > 0
+                ? $selisih
+                : bcsub('0', $selisih, 4);
+
+            Stok::query()->updateOrInsert(
+                [
+                    'id_gudang' => $gudangId,
+                    'id_barang' => $barangId,
+                ],
+                [
+                    'qty_on_hand' => $qtyFisik,
+                    'qty_reserved' => $stok?->qty_reserved ?? '0',
+                    'hpp_rata2' => $hpp,
+                    'nilai_persediaan' => $nilaiPersediaanBaru,
+                    'updated_at' => now(),
+                ],
+            );
+
+            KartuStok::create([
+                'id_entitas' => $entitasId,
+                'id_gudang' => $gudangId,
+                'id_barang' => $barangId,
+                'tanggal' => now()->toDateString(),
+                'jenis_mutasi' => $jenisMutasi,
+                'ref_tipe' => 'OPNAME',
+                'ref_id' => $opnameId,
+                'qty_masuk' => $jenisMutasi === 'ADJ_IN' ? $qtyMutasi : '0',
+                'qty_keluar' => $jenisMutasi === 'ADJ_OUT' ? $qtyMutasi : '0',
+                'harga_satuan' => $hpp,
+                'nilai_mutasi' => bcmul($qtyMutasi, $hpp, 2),
+                'saldo_qty' => $qtyFisik,
+                'saldo_nilai' => $nilaiPersediaanBaru,
+                'hpp_rata2_setelah' => $hpp,
+                'created_by' => $createdBy,
+            ]);
+
+            return [
+                'qty_sistem' => $qtySistem,
+                'selisih' => $selisih,
+                'hpp_rata2' => $hpp,
+                'nilai_selisih' => $nilaiSelisih,
+            ];
+        });
+    }
+
     private function pastikanPositif(string $value, string $field): void
     {
         if (bccomp($value, '0', 4) <= 0) {
@@ -205,7 +288,7 @@ class StokService
      * @throws \Exception
      */
     public static function masukBarang(
-        int $kooperasiId,
+        int $entitasId,
         int $idGudang,
         int $idBarang,
         float $qtyMasuk,
@@ -254,7 +337,7 @@ class StokService
 
             // 4. Create kartu stok (detail mutasi)
             KartuStok::create([
-                'id_koperasi' => $kooperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $idGudang,
                 'id_barang' => $idBarang,
                 'tanggal' => now()->toDateString(),
@@ -292,7 +375,7 @@ class StokService
      * @throws \Exception
      */
     public static function keluarBarang(
-        int $kooperasiId,
+        int $entitasId,
         int $idGudang,
         int $idBarang,
         float $qtyKeluar,
@@ -329,7 +412,7 @@ class StokService
 
             // 4. Create kartu stok
             KartuStok::create([
-                'id_koperasi' => $kooperasiId,
+                'id_entitas' => $entitasId,
                 'id_gudang' => $idGudang,
                 'id_barang' => $idBarang,
                 'tanggal' => now()->toDateString(),
@@ -462,7 +545,7 @@ class StokService
                 $nilaiMutasi = bcmul($absDiff, $hppPakai, 2);
 
                 KartuStok::create([
-                    'id_koperasi' => 1,
+                    'id_entitas' => app('entitas_aktif') ?: 1,
                     'id_gudang' => $idGudang,
                     'id_barang' => $adj['id_barang'],
                     'tanggal' => now()->toDateString(),
@@ -486,3 +569,4 @@ class StokService
         }
     }
 }
+

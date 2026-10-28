@@ -10,15 +10,16 @@ class PeriodeAkuntansi extends Model
     protected $primaryKey = 'id_periode';
     public $timestamps = false;
 
-    protected $fillable = ['id_koperasi', 'tahun', 'bulan', 'status', 'tgl_tutup', 'ditutup_oleh'];
+    protected $fillable = ['id_entitas', 'tahun', 'bulan', 'status', 'tgl_tutup', 'ditutup_oleh'];
 
     protected function casts(): array
     {
         return ['tgl_tutup' => 'datetime'];
     }
 
-    public function koperasi()
+    public function entitas()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas', 'id_entitas');
     }
 }
+

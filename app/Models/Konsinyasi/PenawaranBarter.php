@@ -2,7 +2,7 @@
 
 namespace App\Models\Konsinyasi;
 
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Model;
 
 class PenawaranBarter extends Model
@@ -10,7 +10,7 @@ class PenawaranBarter extends Model
     protected $table = 'penawaran_barter';
 
     protected $fillable = [
-        'id_permintaan_barter', 'id_koperasi_penawar', 'id_penawar',
+        'id_permintaan_barter', 'id_entitas_penawar', 'id_penawar',
         'qty_ditawarkan_dasar', 'harga_titip_satuan', 'status', 'catatan',
     ];
 
@@ -26,6 +26,7 @@ class PenawaranBarter extends Model
 
     public function koperasiPenawar()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi_penawar', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas_penawar', 'id_entitas');
     }
 }
+

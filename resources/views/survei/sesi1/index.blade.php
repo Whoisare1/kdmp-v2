@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="Survei — Sesi 1">
+﻿<x-layouts.app :title="$title" eyebrow="Survei — Sesi 1">
 
     {{-- ═══════════════════════════════════════════════════════════════════
          HEADER HALAMAN
@@ -160,7 +160,7 @@
                                             'terverifikasi' => 'bg-blue-100 text-blue-800',
                                             default         => 'bg-ink-100 text-ink-500',
                                         };
-                                        $nsStLabel = \Survei\Models\NarasumberSesi::LABEL_STATUS[$nsSt] ?? $nsSt;
+                                        $nsStLabel = \App\Models\Survei\NarasumberSesi::LABEL_STATUS[$nsSt] ?? $nsSt;
                                         $nsKK = $kkPerNarasumber[$ns->id_narasumber] ?? 0;
                                     @endphp
                                     <tr class="hover:bg-paper-100 transition-colors">

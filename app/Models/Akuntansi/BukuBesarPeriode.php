@@ -2,7 +2,7 @@
 
 namespace App\Models\Akuntansi;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -12,13 +12,13 @@ use Illuminate\Database\Eloquent\Model;
  */
 class BukuBesarPeriode extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
     protected $table = 'buku_besar_periode';
     public $timestamps = false;
     public $incrementing = false;
 
     protected $fillable = [
-        'id_koperasi', 'periode_tahun', 'periode_bulan', 'kode_anak',
+        'id_entitas', 'periode_tahun', 'periode_bulan', 'kode_anak',
         'saldo_awal_debet', 'saldo_awal_kredit', 'mutasi_debet', 'mutasi_kredit',
         'saldo_akhir_debet', 'saldo_akhir_kredit', 'dihitung_pada',
     ];
@@ -28,3 +28,4 @@ class BukuBesarPeriode extends Model
         return ['dihitung_pada' => 'datetime'];
     }
 }
+

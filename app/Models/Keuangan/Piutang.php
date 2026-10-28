@@ -2,20 +2,20 @@
 
 namespace App\Models\Keuangan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Pihak;
 use Illuminate\Database\Eloquent\Model;
 
 class Piutang extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'piutang';
     protected $primaryKey = 'id_piutang';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'id_pihak', 'sumber_tipe', 'sumber_id', 'kode_akun',
+        'id_entitas', 'id_pihak', 'sumber_tipe', 'sumber_id', 'kode_akun',
         'tanggal', 'tgl_jatuh_tempo', 'nilai_awal', 'nilai_terbayar', 'status',
     ];
 
@@ -39,3 +39,4 @@ class Piutang extends Model
         return bcsub((string) $this->nilai_awal, (string) $this->nilai_terbayar, 2);
     }
 }
+

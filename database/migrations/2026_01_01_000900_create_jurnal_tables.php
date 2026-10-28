@@ -11,7 +11,7 @@ return new class extends Migration
     {
         Schema::create('jurnal_header', function (Blueprint $t) {
             $t->id('id_jurnal');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('no_jurnal', 30);
             $t->string('nomor_nota', 30)->nullable();
             $t->date('tanggal_jurnal');
@@ -33,10 +33,10 @@ return new class extends Migration
             $t->dateTime('posted_at')->nullable();
             $t->timestamp('created_at')->nullable();
 
-            $t->unique(['id_koperasi', 'no_jurnal']);
+            $t->unique(['id_entitas', 'no_jurnal']);
             // Pengaman lapis database terhadap posting ganda
-            $t->unique(['id_koperasi', 'source_type', 'source_id', 'jenis_jurnal'], 'jurnal_idempoten');
-            $t->index(['id_koperasi', 'periode_tahun', 'periode_bulan', 'status'], 'jurnal_periode');
+            $t->unique(['id_entitas', 'source_type', 'source_id', 'jenis_jurnal'], 'jurnal_idempoten');
+            $t->index(['id_entitas', 'periode_tahun', 'periode_bulan', 'status'], 'jurnal_periode');
             $t->foreign('id_jurnal_asal')->references('id_jurnal')->on('jurnal_header');
             $t->foreign('kode_transaksi')->references('kode_transaksi')->on('master_transaksi');
         });
@@ -56,8 +56,10 @@ return new class extends Migration
         });
 
         // Satu baris tidak boleh punya debet DAN kredit sekaligus
-        DB::statement('ALTER TABLE jurnal_detail ADD CONSTRAINT jd_satu_sisi
-            CHECK ((debet = 0 AND kredit > 0) OR (debet > 0 AND kredit = 0))');
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE jurnal_detail ADD CONSTRAINT jd_satu_sisi
+                CHECK ((debet = 0 AND kredit > 0) OR (debet > 0 AND kredit = 0))');
+        }
 
         /**
          * Ringkasan saldo per akun per bulan. Bisa DIBANGUN ULANG kapan saja
@@ -67,7 +69,7 @@ return new class extends Migration
          * master_coa.kelompok, bukan tabel terpisah.
          */
         Schema::create('buku_besar_periode', function (Blueprint $t) {
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->year('periode_tahun');
             $t->unsignedTinyInteger('periode_bulan');
             $t->string('kode_anak', 10);
@@ -78,7 +80,7 @@ return new class extends Migration
             $t->decimal('saldo_akhir_debet', 18, 2)->default(0);
             $t->decimal('saldo_akhir_kredit', 18, 2)->default(0);
             $t->dateTime('dihitung_pada')->nullable();
-            $t->primary(['id_koperasi', 'periode_tahun', 'periode_bulan', 'kode_anak'], 'bbp_pk');
+            $t->primary(['id_entitas', 'periode_tahun', 'periode_bulan', 'kode_anak'], 'bbp_pk');
             $t->foreign('kode_anak')->references('kode_anak')->on('master_coa');
         });
 
@@ -88,7 +90,7 @@ return new class extends Migration
         DB::statement("
             CREATE VIEW v_saldo_berjalan AS
             SELECT
-                jh.id_koperasi,
+                jh.id_entitas,
                 jh.periode_tahun,
                 jh.periode_bulan,
                 jd.kode_anak,
@@ -106,7 +108,7 @@ return new class extends Migration
             JOIN jurnal_detail jd ON jd.id_jurnal = jh.id_jurnal
             JOIN master_coa    c  ON c.kode_anak  = jd.kode_anak
             WHERE jh.status = 'POSTED'
-            GROUP BY jh.id_koperasi, jh.periode_tahun, jh.periode_bulan,
+            GROUP BY jh.id_entitas, jh.periode_tahun, jh.periode_bulan,
                      jd.kode_anak, c.nama_rekening, c.kelompok,
                      c.posisi_normal, c.is_kontra
         ");
@@ -118,8 +120,8 @@ return new class extends Migration
             SELECT
                 k.id_kiriman,
                 k.kode_kiriman,
-                k.id_koperasi_pemilik,
-                k.id_koperasi_penerima,
+                k.id_entitas_pemilik,
+                k.id_entitas_penerima,
                 COALESCE(p.nilai_awal - p.nilai_terbayar, 0) AS sisa_piutang_pemilik,
                 COALESCE(h.nilai_awal - h.nilai_terbayar, 0) AS sisa_hutang_penerima,
                 COALESCE(p.nilai_awal - p.nilai_terbayar, 0)
@@ -132,7 +134,8 @@ return new class extends Migration
         ");
 
         // Jurnal POSTED tidak boleh diubah atau dihapus. Koreksi = jurnal pembalik.
-        DB::unprepared("
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::unprepared("
             CREATE TRIGGER trg_jurnal_detail_no_update
             BEFORE UPDATE ON jurnal_detail
             FOR EACH ROW
@@ -144,9 +147,9 @@ return new class extends Migration
                     SET MESSAGE_TEXT = 'Detail jurnal POSTED tidak boleh diubah. Gunakan jurnal pembalik.';
                 END IF;
             END
-        ");
+            ");
 
-        DB::unprepared("
+            DB::unprepared("
             CREATE TRIGGER trg_jurnal_detail_no_delete
             BEFORE DELETE ON jurnal_detail
             FOR EACH ROW
@@ -158,7 +161,8 @@ return new class extends Migration
                     SET MESSAGE_TEXT = 'Detail jurnal POSTED tidak boleh dihapus.';
                 END IF;
             END
-        ");
+            ");
+        }
     }
 
     public function down(): void
@@ -172,3 +176,4 @@ return new class extends Migration
         Schema::dropIfExists('jurnal_header');
     }
 };
+

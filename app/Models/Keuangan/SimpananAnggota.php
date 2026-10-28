@@ -2,7 +2,7 @@
 
 namespace App\Models\Keuangan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
 use Illuminate\Database\Eloquent\Model;
@@ -13,14 +13,14 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SimpananAnggota extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'simpanan_anggota';
     protected $primaryKey = 'id_simpanan';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'id_pihak', 'jenis', 'tanggal', 'arah', 'nilai',
+        'id_entitas', 'id_pihak', 'jenis', 'tanggal', 'arah', 'nilai',
         'id_kas_bank', 'status_posting', 'id_jurnal',
     ];
 
@@ -39,3 +39,4 @@ class SimpananAnggota extends Model
         return $this->belongsTo(KasBank::class, 'id_kas_bank', 'id_kas_bank');
     }
 }
+

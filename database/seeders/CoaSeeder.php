@@ -86,6 +86,10 @@ class CoaSeeder extends Seeder
             ['34',    '3',    'Sisa Hasil Usaha',                    'K', 'F', 'Modal', 0, 2],
             ['341',   '34',   'SHU Tahun Berjalan',                  'K', 'T', 'Modal', 0, 3],
             ['342',   '34',   'SHU Ditahan (Tahun Lalu)',            'K', 'T', 'Modal', 0, 3],
+            // Akun hasil usaha untuk entitas non-koperasi (lihat ProfilPenutupan)
+            ['344',   '34',   'Laba Ditahan',                        'K', 'T', 'Modal', 0, 3],
+            ['345',   '34',   'Saldo Kas Kelompok',                  'K', 'T', 'Modal', 0, 3],
+            ['346',   '34',   'Modal Pemilik',                       'K', 'T', 'Modal', 0, 3],
 
             // ---------- 4 PENDAPATAN ----------
             ['4',     null,   'PENDAPATAN',                          'K', 'F', 'Pendapatan', 0, 1],

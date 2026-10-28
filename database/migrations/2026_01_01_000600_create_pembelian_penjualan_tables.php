@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('pembelian', function (Blueprint $t) {
             $t->id('id_pembelian');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_pembelian', 30);
             $t->foreignId('id_permintaan')->nullable()
               ->constrained('permintaan_pengadaan', 'id_permintaan');
@@ -28,7 +28,7 @@ return new class extends Migration
             $t->unsignedBigInteger('id_jurnal')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamps();
-            $t->unique(['id_koperasi', 'kode_pembelian']);
+            $t->unique(['id_entitas', 'kode_pembelian']);
         });
 
         Schema::create('detail_pembelian', function (Blueprint $t) {
@@ -45,7 +45,7 @@ return new class extends Migration
 
         Schema::create('retur_pembelian', function (Blueprint $t) {
             $t->id('id_retur');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_retur', 30);
             $t->foreignId('id_pembelian')->constrained('pembelian', 'id_pembelian');
             $t->foreignId('id_penerimaan')->nullable()->constrained('penerimaan_barang', 'id_penerimaan');
@@ -58,7 +58,7 @@ return new class extends Migration
             $t->enum('status_posting', ['F', 'T'])->default('F');
             $t->unsignedBigInteger('id_jurnal')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->unique(['id_koperasi', 'kode_retur']);
+            $t->unique(['id_entitas', 'kode_retur']);
         });
 
         Schema::create('retur_pembelian_detail', function (Blueprint $t) {
@@ -80,7 +80,7 @@ return new class extends Migration
          */
         Schema::create('penjualan', function (Blueprint $t) {
             $t->id('id_penjualan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_penjualan', 30);
             $t->foreignId('id_pihak')->constrained('master_pihak', 'id_pihak');
             $t->foreignId('id_unit_usaha')->constrained('master_unit_usaha', 'id_unit_usaha');
@@ -100,8 +100,8 @@ return new class extends Migration
             $t->unsignedBigInteger('id_jurnal')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamps();
-            $t->unique(['id_koperasi', 'kode_penjualan']);
-            $t->index(['id_koperasi', 'tanggal_transaksi']);
+            $t->unique(['id_entitas', 'kode_penjualan']);
+            $t->index(['id_entitas', 'tanggal_transaksi']);
         });
 
         Schema::create('detail_penjualan', function (Blueprint $t) {
@@ -126,7 +126,7 @@ return new class extends Migration
 
         Schema::create('retur_penjualan', function (Blueprint $t) {
             $t->id('id_retur');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_retur', 30);
             $t->foreignId('id_penjualan')->constrained('penjualan', 'id_penjualan');
             $t->date('tgl_retur');
@@ -138,7 +138,7 @@ return new class extends Migration
             $t->enum('status_posting', ['F', 'T'])->default('F');
             $t->unsignedBigInteger('id_jurnal')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->unique(['id_koperasi', 'kode_retur']);
+            $t->unique(['id_entitas', 'kode_retur']);
         });
 
         Schema::create('retur_penjualan_detail', function (Blueprint $t) {
@@ -163,3 +163,4 @@ return new class extends Migration
         }
     }
 };
+

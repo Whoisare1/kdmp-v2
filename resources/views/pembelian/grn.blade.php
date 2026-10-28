@@ -1,10 +1,10 @@
 <x-layouts.app :title="$title" eyebrow="Penerimaan Barang">
 
 ```
-<div class="grid gap-6 lg:grid-cols-3">
+<div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
     {{-- Form Penerimaan --}}
-    <div class="lg:col-span-2">
+    <div class="md:col-span-2 xl:col-span-2">
 
         @if ($errors->any())
             <div class="mb-4 rounded-sm border border-merah-300 bg-merah-50 p-4">
@@ -18,7 +18,7 @@
         @endif
 
         @if (session('success'))
-            <div class="mb-4 rounded-sm border border-hijau-300 bg-hijau-50 p-4 text-sm text-hijau-800">
+                <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                 {{ session('success') }}
             </div>
         @endif
@@ -45,7 +45,7 @@
 
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm">
-                            <thead class="bg-paper-100 text-left text-ink-700">
+                            <thead class="bg-emerald-50 text-left text-emerald-950">
                                 <tr>
                                     <th class="px-3 py-2">Barang</th>
                                     <th class="px-3 py-2 text-right">Qty Dipesan</th>
@@ -72,7 +72,7 @@
                                         </td>
 
                                         <td class="px-3 py-3 text-right text-ink-700">
-                                            {{ number_format($line->qty_dasar, 2, ',', '.') }}
+                                            {{ rtrim(rtrim(number_format((float) $line->qty_dasar, 2, ',', '.'), '0'), ',') }}
                                         </td>
 
                                         <td class="px-3 py-3">
@@ -149,7 +149,7 @@
                     <div class="mt-4 flex gap-2">
                         <button
                             type="submit"
-                            class="rounded-sm bg-merah-500 px-4 py-2 font-medium text-paper-50 hover:bg-merah-600"
+                            class="rounded-sm bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700"
                         >
                             ✓ Terima Barang
                         </button>
@@ -169,7 +169,7 @@
     </div>
 
     {{-- Informasi PO --}}
-    <div class="lg:col-span-1">
+    <div class="md:col-span-2 xl:col-span-1">
 
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
             <h3 class="mb-3 font-semibold text-ink-900">Informasi PO</h3>

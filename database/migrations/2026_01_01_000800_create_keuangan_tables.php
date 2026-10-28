@@ -15,7 +15,7 @@ return new class extends Migration
          */
         Schema::create('piutang', function (Blueprint $t) {
             $t->id('id_piutang');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_pihak')->constrained('master_pihak', 'id_pihak');
             $t->enum('sumber_tipe', ['PENJUALAN', 'KONSINYASI', 'LAIN']);
             $t->unsignedBigInteger('sumber_id');
@@ -27,13 +27,13 @@ return new class extends Migration
             $t->enum('status', ['belum_lunas', 'sebagian', 'lunas', 'hapus_buku'])->default('belum_lunas');
             $t->timestamp('created_at')->nullable();
             $t->unique(['sumber_tipe', 'sumber_id']);
-            $t->index(['id_koperasi', 'status', 'tgl_jatuh_tempo'], 'piutang_aging');
+            $t->index(['id_entitas', 'status', 'tgl_jatuh_tempo'], 'piutang_aging');
             $t->foreign('kode_akun')->references('kode_anak')->on('master_coa');
         });
 
         Schema::create('hutang', function (Blueprint $t) {
             $t->id('id_hutang');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_pihak')->constrained('master_pihak', 'id_pihak');
             $t->enum('sumber_tipe', ['PEMBELIAN', 'KONSINYASI', 'LAIN']);
             $t->unsignedBigInteger('sumber_id');
@@ -45,13 +45,13 @@ return new class extends Migration
             $t->enum('status', ['belum_lunas', 'sebagian', 'lunas'])->default('belum_lunas');
             $t->timestamp('created_at')->nullable();
             $t->unique(['sumber_tipe', 'sumber_id']);
-            $t->index(['id_koperasi', 'status', 'tgl_jatuh_tempo'], 'hutang_aging');
+            $t->index(['id_entitas', 'status', 'tgl_jatuh_tempo'], 'hutang_aging');
             $t->foreign('kode_akun')->references('kode_anak')->on('master_coa');
         });
 
         Schema::create('pelunasan', function (Blueprint $t) {
             $t->id('id_pelunasan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_pelunasan', 30);
             $t->enum('jenis', ['terima_piutang', 'bayar_hutang', 'offset']);
             $t->foreignId('id_pihak')->constrained('master_pihak', 'id_pihak');
@@ -63,7 +63,7 @@ return new class extends Migration
             $t->text('catatan')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->unique(['id_koperasi', 'kode_pelunasan']);
+            $t->unique(['id_entitas', 'kode_pelunasan']);
         });
 
         Schema::create('pelunasan_detail', function (Blueprint $t) {
@@ -76,7 +76,7 @@ return new class extends Migration
 
         Schema::create('kas_transaksi', function (Blueprint $t) {
             $t->id('id_kas_trx');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_trx', 30);
             $t->date('tanggal');
             $t->enum('jenis', ['masuk', 'keluar', 'mutasi_antar_kas']);
@@ -89,7 +89,7 @@ return new class extends Migration
             $t->unsignedBigInteger('id_jurnal')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->unique(['id_koperasi', 'kode_trx']);
+            $t->unique(['id_entitas', 'kode_trx']);
             $t->foreign('kode_akun_lawan')->references('kode_anak')->on('master_coa');
         });
 
@@ -99,7 +99,7 @@ return new class extends Migration
          */
         Schema::create('simpanan_anggota', function (Blueprint $t) {
             $t->id('id_simpanan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_pihak')->constrained('master_pihak', 'id_pihak');
             $t->enum('jenis', ['pokok', 'wajib', 'sukarela']);
             $t->date('tanggal');
@@ -109,7 +109,7 @@ return new class extends Migration
             $t->enum('status_posting', ['F', 'T'])->default('F');
             $t->unsignedBigInteger('id_jurnal')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->index(['id_koperasi', 'id_pihak', 'jenis'], 'simpanan_lookup');
+            $t->index(['id_entitas', 'id_pihak', 'jenis'], 'simpanan_lookup');
         });
     }
 
@@ -123,3 +123,4 @@ return new class extends Migration
         }
     }
 };
+

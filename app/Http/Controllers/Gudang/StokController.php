@@ -18,7 +18,14 @@ class StokController extends ModuleCrudController
 
     public function index(Request $request): View
     {
-        $query = Stok::query()->with(['gudang', 'barang.satuanDasar']);
+        $query = Stok::query()
+            ->select('stok.*', 'barang_per_koperasi.stok_minimum')
+            ->leftJoin('gudang as gudang_stok', 'gudang_stok.id_gudang', '=', 'stok.id_gudang')
+            ->leftJoin('barang_per_koperasi', function ($join) {
+                $join->on('barang_per_koperasi.id_barang', '=', 'stok.id_barang')
+                    ->on('barang_per_koperasi.id_entitas', '=', 'gudang_stok.id_entitas');
+            })
+            ->with(['gudang', 'barang.satuanDasar']);
 
         if ($search = $request->query('q')) {
             $query->where(function ($q) use ($search) {
@@ -28,7 +35,7 @@ class StokController extends ModuleCrudController
         }
 
         // Stok punya composite primary key, jadi tidak bisa sort by ID standar
-        $items = $query->orderBy('id_gudang')->orderBy('id_barang')->paginate(15)->withQueryString();
+        $items = $query->orderBy('stok.id_gudang')->orderBy('stok.id_barang')->paginate(15)->withQueryString();
 
         return view('gudang.stok.index', [
             'items' => $items,

@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="Survei — Sesi 1">
+﻿<x-layouts.app :title="$title" eyebrow="Survei — Sesi 1">
 
     {{-- ═══════════════════════════════════════════════════════════════════
          HEADER
@@ -34,7 +34,7 @@
                 };
             @endphp
             <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $stCls }}">
-                {{ \Survei\Models\NarasumberSesi::LABEL_STATUS[$narasumber->status] ?? $narasumber->status }}
+                {{ \App\Models\Survei\NarasumberSesi::LABEL_STATUS[$narasumber->status] ?? $narasumber->status }}
             </span>
         </div>
 

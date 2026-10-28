@@ -2,7 +2,7 @@
 
 namespace App\Models\Perencanaan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Pihak;
 use App\Models\Pengguna;
 use App\Models\Tenant\KoperasiDesa;
@@ -11,22 +11,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class PermintaanPengadaan extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'permintaan_pengadaan';
     protected $primaryKey = 'id_permintaan';
 
     protected $fillable = [
-        'id_koperasi',
-        'kode_permintaan',
-        'id_pihak',
-        'tgl_pengajuan',
-        'total_nilai',
-        'status',
-        'catatan',
-        'created_by',
-        'approved_by',
-        'approved_at',
+        'id_entitas', 'kode_permintaan', 'id_pihak', 'tgl_pengajuan', 'total_nilai',
+        'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
     ];
 
     protected function casts(): array
@@ -48,14 +40,14 @@ class PermintaanPengadaan extends Model
         return $this->belongsTo(Pihak::class, 'id_pihak', 'id_pihak');
     }
 
-    public function pembuat()
+    public function unitUsaha()
     {
-        return $this->belongsTo(Pengguna::class, 'created_by', 'id');
+        return $this->belongsTo(\App\Models\Master\UnitUsaha::class, 'id_unit_usaha', 'id_unit_usaha');
     }
 
-    public function penyetuju()
+    public function gudang()
     {
-        return $this->belongsTo(Pengguna::class, 'approved_by', 'id');
+        return $this->belongsTo(\App\Models\Master\Gudang::class, 'id_gudang', 'id_gudang');
     }
 
     public function detail()
@@ -114,3 +106,4 @@ class PermintaanPengadaan extends Model
         return $prefix . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
     }
 }
+

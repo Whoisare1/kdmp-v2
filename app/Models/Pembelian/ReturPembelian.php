@@ -2,19 +2,19 @@
 
 namespace App\Models\Pembelian;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use Illuminate\Database\Eloquent\Model;
 
 class ReturPembelian extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'retur_pembelian';
     protected $primaryKey = 'id_retur';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'kode_retur', 'id_pembelian', 'id_penerimaan', 'tgl_retur',
+        'id_entitas', 'kode_retur', 'id_pembelian', 'id_penerimaan', 'tgl_retur',
         'jenis_penyelesaian', 'total_nilai', 'alasan', 'foto_bukti', 'status',
         'status_posting', 'id_jurnal',
     ];
@@ -34,3 +34,4 @@ class ReturPembelian extends Model
         return $this->hasMany(ReturPembelianDetail::class, 'id_retur', 'id_retur');
     }
 }
+

@@ -33,7 +33,7 @@ return new class extends Migration
          */
         Schema::create('kartu_stok', function (Blueprint $t) {
             $t->id('id_kartu');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_gudang')->constrained('gudang', 'id_gudang');
             $t->foreignId('id_barang')->constrained('master_barang', 'id_barang');
             $t->date('tanggal');
@@ -57,14 +57,14 @@ return new class extends Migration
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamp('created_at')->nullable();
 
-            $t->index(['id_koperasi', 'id_gudang', 'id_barang', 'tanggal'], 'kartu_lookup');
+            $t->index(['id_entitas', 'id_gudang', 'id_barang', 'tanggal'], 'kartu_lookup');
             // Pengaman lapis database terhadap posting ganda
             $t->unique(['ref_tipe', 'ref_id', 'id_barang', 'jenis_mutasi'], 'kartu_idempoten');
         });
 
         Schema::create('penerimaan_barang', function (Blueprint $t) {
             $t->id('id_penerimaan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_gudang')->constrained('gudang', 'id_gudang');
             $t->string('kode_penerimaan', 30);
             $t->unsignedBigInteger('id_pembelian')->nullable();
@@ -74,7 +74,7 @@ return new class extends Migration
             $t->text('catatan')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->unique(['id_koperasi', 'kode_penerimaan']);
+            $t->unique(['id_entitas', 'kode_penerimaan']);
         });
 
         // Hasil sortir jadi kolom di sini, bukan tabel terpisah, supaya pada
@@ -97,14 +97,14 @@ return new class extends Migration
 
         Schema::create('opname_header', function (Blueprint $t) {
             $t->id('id_opname');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_gudang')->constrained('gudang', 'id_gudang');
             $t->string('kode_opname', 30);
             $t->date('tanggal');
             $t->enum('status', ['draft', 'dihitung', 'disetujui', 'diposting'])->default('draft');
             $t->unsignedBigInteger('approved_by')->nullable();
             $t->timestamp('created_at')->nullable();
-            $t->unique(['id_koperasi', 'kode_opname']);
+            $t->unique(['id_entitas', 'kode_opname']);
         });
 
         Schema::create('opname_detail', function (Blueprint $t) {
@@ -121,7 +121,7 @@ return new class extends Migration
 
         Schema::create('kerusakan_barang', function (Blueprint $t) {
             $t->id('id_kerusakan');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_gudang')->constrained('gudang', 'id_gudang');
             $t->foreignId('id_barang')->constrained('master_barang', 'id_barang');
             $t->date('tanggal');
@@ -146,3 +146,4 @@ return new class extends Migration
         }
     }
 };
+

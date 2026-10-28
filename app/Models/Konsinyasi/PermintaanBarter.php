@@ -3,7 +3,7 @@
 namespace App\Models\Konsinyasi;
 
 use App\Models\Master\Barang;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Model;
 
 class PermintaanBarter extends Model
@@ -11,7 +11,7 @@ class PermintaanBarter extends Model
     protected $table = 'permintaan_barter';
 
     protected $fillable = [
-        'id_koperasi_pemohon', 'id_pemohon', 'id_barang', 'qty_diminta_dasar',
+        'id_entitas_pemohon', 'id_pemohon', 'id_barang', 'qty_diminta_dasar',
         'tgl_dibutuhkan', 'status', 'catatan',
     ];
 
@@ -22,7 +22,7 @@ class PermintaanBarter extends Model
 
     public function koperasiPemohon()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi_pemohon', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas_pemohon', 'id_entitas');
     }
 
     public function barang()
@@ -35,3 +35,4 @@ class PermintaanBarter extends Model
         return $this->hasMany(PenawaranBarter::class, 'id_permintaan_barter');
     }
 }
+

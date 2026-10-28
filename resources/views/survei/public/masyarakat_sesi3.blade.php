@@ -85,7 +85,17 @@
                         <div class="space-y-1">
                             <label class="block text-xs font-semibold text-slate-600 uppercase">Jumlah / Bulan</label>
                             <div class="flex gap-2">
-                                <input type="number" x-model="item.jumlah" :name="`items[${index}][jumlah]`" class="w-full rounded-xl border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" min="0.1" step="0.1" required>
+                                <div class="flex-1">
+                                    <x-speech-input 
+                                        type="number"
+                                        x-bind:name="`items[${index}][jumlah]`"
+                                        xmodel="item.jumlah"
+                                        placeholder="0"
+                                        min="0.1"
+                                        step="0.1"
+                                        required="true"
+                                    />
+                                </div>
                                 <input type="text" x-model="item.satuan" :name="`items[${index}][satuan]`" class="w-20 rounded-xl border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed" readonly required>
                             </div>
                         </div>
@@ -116,11 +126,39 @@
                         <div class="space-y-1">
                             <label class="block text-xs font-semibold text-slate-600 uppercase">Perkiraan Harga (Rp)</label>
                             <div class="flex gap-2">
-                                <input type="number" x-model="item.harga" :name="`items[${index}][harga]`" class="w-full rounded-xl border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Contoh: 15000" min="0">
+                                <div class="flex-1">
+                                    <x-speech-input 
+                                        type="number"
+                                        x-bind:name="`items[${index}][harga]`"
+                                        xmodel="item.harga"
+                                        placeholder="Contoh: 15000"
+                                        min="0"
+                                    />
+                                </div>
                                 <select x-model="item.tipe_harga" :name="`items[${index}][tipe_harga]`" class="w-36 rounded-xl border-slate-300 bg-slate-50 px-2 py-2.5 text-xs font-medium focus:border-blue-500 focus:ring-blue-500" required>
                                     <option value="Total">Total Sebulan</option>
                                     <option value="Satuan">Per Satuan</option>
                                 </select>
+                            </div>
+
+                            <!-- Kalkulasi Otomatis Total Sebulan -->
+                            <div class="pt-1 min-h-[22px]">
+                                <template x-if="item.harga && item.jumlah && item.tipe_harga === 'Satuan'">
+                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-800">
+                                        <span>Estimasi sebulan:</span>
+                                        <span class="font-bold text-emerald-700 text-sm" x-text="formatRupiah(hitungSubtotal(item))"></span>
+                                        <span class="text-emerald-600 text-[11px]" x-text="`(${item.jumlah} ${item.satuan || 'satuan'} × ${formatRupiah(item.harga)})`"></span>
+                                    </div>
+                                </template>
+                                <template x-if="item.harga && item.tipe_harga === 'Total'">
+                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                                        <span>Total sebulan:</span>
+                                        <span class="font-bold text-slate-800" x-text="formatRupiah(item.harga)"></span>
+                                        <template x-if="item.jumlah && item.jumlah > 0">
+                                            <span class="text-slate-500 text-[11px]" x-text="`(${formatRupiah(Math.round(item.harga / item.jumlah))} / ${item.satuan || 'satuan'})`"></span>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -135,10 +173,16 @@
 
         <!-- Datalist untuk Suggestions -->
         <datalist id="komoditas-list">
-            <template x-for="k in komoditasList" :key="k.nama">
-                <option :value="k.nama"></option>
-            </template>
+            @foreach($komoditasList as $k)
+                <option value="{{ $k->nama }}"></option>
+            @endforeach
         </datalist>
+
+        <!-- Ringkasan Total Pengeluaran Sebulan -->
+        <div x-show="hitungTotalSemua() > 0" class="mt-6 bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+            <span class="text-sm font-semibold text-slate-700">Total Estimasi Belanja Pangan Seluruh Komoditas:</span>
+            <span class="text-xl font-bold text-blue-600" x-text="formatRupiah(hitungTotalSemua()) + ' / bulan'"></span>
+        </div>
 
         <div class="mt-8 flex justify-end">
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-colors w-full sm:w-auto text-center text-lg">
@@ -208,10 +252,29 @@ document.addEventListener('alpine:init', () => {
         },
         
         updateSatuan(item) {
-            const selected = this.komoditasList.find(k => k.nama.toLowerCase() === item.nama_komoditas.toLowerCase());
+            const selected = this.komoditasList.find(k => k.nama.toLowerCase() === (item.nama_komoditas || '').toLowerCase());
             if (selected) {
                 item.satuan = selected.satuan || 'kg';
             }
+        },
+
+        formatRupiah(val) {
+            const num = parseFloat(val);
+            if (isNaN(num) || num <= 0) return 'Rp 0';
+            return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+        },
+
+        hitungSubtotal(item) {
+            const h = parseFloat(item.harga) || 0;
+            const j = parseFloat(item.jumlah) || 0;
+            if (item.tipe_harga === 'Satuan') {
+                return h * j;
+            }
+            return h;
+        },
+
+        hitungTotalSemua() {
+            return this.items.reduce((total, item) => total + this.hitungSubtotal(item), 0);
         }
     }));
 });

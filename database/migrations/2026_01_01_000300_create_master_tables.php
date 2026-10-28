@@ -71,20 +71,20 @@ return new class extends Migration
 
         // Parameter barang yang berbeda antar desa
         Schema::create('barang_per_koperasi', function (Blueprint $t) {
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->foreignId('id_barang')->constrained('master_barang', 'id_barang');
             $t->decimal('stok_minimum', 18, 4)->default(0);
             $t->decimal('stok_maksimum', 18, 4)->default(0);
             $t->decimal('harga_jual_standar', 18, 2)->default(0);
             $t->boolean('is_dijual')->default(true);
-            $t->primary(['id_koperasi', 'id_barang']);
+            $t->primary(['id_entitas', 'id_barang']);
         });
 
         Schema::create('master_pihak', function (Blueprint $t) {
             $t->id('id_pihak');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
-            $t->enum('jenis_pihak', ['supplier', 'petani', 'warga', 'koperasi_desa_lain']);
-            $t->unsignedBigInteger('id_koperasi_mitra')->nullable();
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
+            $t->enum('jenis_pihak', ['supplier', 'petani', 'warga', 'entitas_lain']);
+            $t->unsignedBigInteger('id_entitas_mitra')->nullable();
             $t->string('nama');
             $t->string('nik', 20)->nullable();
             $t->boolean('is_anggota')->default(false)
@@ -99,14 +99,14 @@ return new class extends Migration
             $t->boolean('is_active')->default(true);
             $t->timestamps();
 
-            $t->unique(['id_koperasi', 'no_anggota']);
-            $t->index(['id_koperasi', 'jenis_pihak']);
-            $t->foreign('id_koperasi_mitra')->references('id_koperasi')->on('koperasi_desa');
+            $t->unique(['id_entitas', 'no_anggota']);
+            $t->index(['id_entitas', 'jenis_pihak']);
+            $t->foreign('id_entitas_mitra')->references('id_entitas')->on('entitas');
         });
 
         Schema::create('master_kas_bank', function (Blueprint $t) {
             $t->id('id_kas_bank');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->enum('jenis', ['kas', 'bank']);
             $t->string('nama', 100);
             $t->string('no_rekening', 50)->nullable();
@@ -118,17 +118,17 @@ return new class extends Migration
 
         Schema::create('gudang', function (Blueprint $t) {
             $t->id('id_gudang');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_gudang', 20);
             $t->string('nama_gudang', 100);
             $t->text('alamat')->nullable();
             $t->boolean('is_active')->default(true);
-            $t->unique(['id_koperasi', 'kode_gudang']);
+            $t->unique(['id_entitas', 'kode_gudang']);
         });
 
         Schema::create('aset_tetap', function (Blueprint $t) {
             $t->id('id_aset');
-            $t->foreignId('id_koperasi')->constrained('koperasi_desa', 'id_koperasi');
+            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
             $t->string('kode_aset', 30);
             $t->string('nama_aset', 150);
             $t->enum('kategori', ['tanah', 'gedung', 'kendaraan', 'peralatan']);
@@ -141,7 +141,7 @@ return new class extends Migration
             $t->string('kode_akun_akum', 10)->nullable();
             $t->string('kode_akun_biaya', 10)->nullable();
             $t->enum('status', ['aktif', 'habis_susut', 'dilepas'])->default('aktif');
-            $t->unique(['id_koperasi', 'kode_aset']);
+            $t->unique(['id_entitas', 'kode_aset']);
         });
     }
 
@@ -156,3 +156,4 @@ return new class extends Migration
         }
     }
 };
+

@@ -2,19 +2,19 @@
 
 namespace App\Models\Penjualan;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use Illuminate\Database\Eloquent\Model;
 
 class ReturPenjualan extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'retur_penjualan';
     protected $primaryKey = 'id_retur';
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'id_koperasi', 'kode_retur', 'id_penjualan', 'tgl_retur', 'jenis_penyelesaian',
+        'id_entitas', 'kode_retur', 'id_penjualan', 'tgl_retur', 'jenis_penyelesaian',
         'total_nilai', 'total_hpp', 'alasan', 'status', 'status_posting', 'id_jurnal',
     ];
 
@@ -33,3 +33,4 @@ class ReturPenjualan extends Model
         return $this->hasMany(ReturPenjualanDetail::class, 'id_retur', 'id_retur');
     }
 }
+

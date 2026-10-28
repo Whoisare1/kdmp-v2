@@ -5,7 +5,7 @@ namespace App\Models\Survei;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Survei\Models\SesiSurvei;
+use App\Models\Survei\SesiSurvei;
 use App\Models\Tenant\Wilayah;
 
 class MasyarakatDesa extends Model

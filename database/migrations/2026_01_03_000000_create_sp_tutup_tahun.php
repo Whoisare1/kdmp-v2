@@ -9,14 +9,14 @@ use Illuminate\Support\Facades\DB;
  * Tugas tunggal: membuat Jurnal Penutup otomatis untuk menutup tahun buku.
  *
  * Alur kerja (dalam 1 TRANSACTION):
- *   1. Hitung total saldo Pendapatan (kelompok Pendapatan, Non-Operasional) → saldo Kredit normal
- *   2. Hitung total saldo Biaya + HPP (kelompok Biaya, HPP) → saldo Debet normal
+ *   1. Hitung total saldo Pendapatan (kelompok Pendapatan, Non-Operasional) â†’ saldo Kredit normal
+ *   2. Hitung total saldo Biaya + HPP (kelompok Biaya, HPP) â†’ saldo Debet normal
  *   3. INSERT jurnal penutup (PENUTUP) tanggal 31 Desember tahun tersebut:
- *        [D] Setiap akun Pendapatan senilai saldo bersihnya → meng-NOL-kan
- *        [K] Setiap akun Biaya+HPP senilai saldo bersihnya → meng-NOL-kan
- *        [K/D] Akun Ikhtisar Laba Rugi (811) → tampung selisih
+ *        [D] Setiap akun Pendapatan senilai saldo bersihnya â†’ meng-NOL-kan
+ *        [K] Setiap akun Biaya+HPP senilai saldo bersihnya â†’ meng-NOL-kan
+ *        [K/D] Akun Ikhtisar Laba Rugi (811) â†’ tampung selisih
  *   4. Pindahkan saldo akun 811 ke pos-pos Modal/SHU sesuai config_shu
- *        Setiap pos config_shu: [D] 811, [K] kode_akun SHU (persentase × laba bersih)
+ *        Setiap pos config_shu: [D] 811, [K] kode_akun SHU (persentase Ã— laba bersih)
  *
  * Akun Ikhtisar Laba Rugi (811):
  *   Ini adalah clearing account yang mempertemukan semua akun nominal.
@@ -38,7 +38,7 @@ return new class extends Migration
 
         DB::unprepared("
 CREATE PROCEDURE sp_tutup_tahun(
-    IN p_id_koperasi  BIGINT UNSIGNED,
+    IN p_id_entitas  BIGINT UNSIGNED,
     IN p_tahun        SMALLINT UNSIGNED,
     IN p_user_id      BIGINT UNSIGNED
 )
@@ -82,7 +82,7 @@ BEGIN
             (SUM(bbp.saldo_akhir_kredit) - SUM(bbp.saldo_akhir_debet)) AS saldo_bersih
         FROM buku_besar_periode bbp
         JOIN master_coa c ON c.kode_anak = bbp.kode_anak
-        WHERE bbp.id_koperasi = p_id_koperasi
+        WHERE bbp.id_entitas = p_id_entitas
           AND bbp.periode_tahun = p_tahun
           AND c.kelompok IN ('Pendapatan', 'Non-Operasional')
           AND c.posisi_normal = 'K'
@@ -97,7 +97,7 @@ BEGIN
             (SUM(bbp.saldo_akhir_debet) - SUM(bbp.saldo_akhir_kredit)) AS saldo_bersih
         FROM buku_besar_periode bbp
         JOIN master_coa c ON c.kode_anak = bbp.kode_anak
-        WHERE bbp.id_koperasi = p_id_koperasi
+        WHERE bbp.id_entitas = p_id_entitas
           AND bbp.periode_tahun = p_tahun
           AND c.kelompok IN ('Biaya', 'HPP')
           AND c.posisi_normal = 'D'
@@ -109,7 +109,7 @@ BEGIN
     DECLARE cur_shu CURSOR FOR
         SELECT persentase, kode_akun
         FROM config_shu
-        WHERE id_koperasi = p_id_koperasi
+        WHERE id_entitas = p_id_entitas
           AND tahun = p_tahun
         ORDER BY id_config;
 
@@ -122,7 +122,7 @@ BEGIN
 
     -- Tanggal penutup = 31 Desember tahun yang ditutup
     SET v_tanggal_tutup = MAKEDATE(p_tahun, 365);
-    -- Jika tahun kabisat, MAKEDATE(tahun, 365) = 30 Des — kita tambah 1 hari lagi
+    -- Jika tahun kabisat, MAKEDATE(tahun, 365) = 30 Des â€” kita tambah 1 hari lagi
     IF DAY(v_tanggal_tutup) = 30 AND MONTH(v_tanggal_tutup) = 12 THEN
         SET v_tanggal_tutup = DATE_ADD(v_tanggal_tutup, INTERVAL 1 DAY);
     END IF;
@@ -138,7 +138,7 @@ BEGIN
     INTO v_total_pendapatan, v_total_biaya
     FROM buku_besar_periode bbp
     JOIN master_coa c ON c.kode_anak = bbp.kode_anak
-    WHERE bbp.id_koperasi = p_id_koperasi
+    WHERE bbp.id_entitas = p_id_entitas
       AND bbp.periode_tahun = p_tahun
       AND c.kelompok IN ('Pendapatan','Non-Operasional','Biaya','HPP')
       AND c.is_transaction = 'T';
@@ -149,13 +149,13 @@ BEGIN
     -- LANGKAH 2: INSERT jurnal_header untuk Jurnal Penutup
     -- =========================================================
     INSERT INTO jurnal_header (
-        id_koperasi, no_jurnal, nomor_nota, tanggal_jurnal,
+        id_entitas, no_jurnal, nomor_nota, tanggal_jurnal,
         periode_tahun, periode_bulan, kode_transaksi, jenis_jurnal,
         source_type, source_id, keterangan,
         total_debet, total_kredit, status,
         created_by, posted_by, posted_at, created_at
     ) VALUES (
-        p_id_koperasi,
+        p_id_entitas,
         CONCAT('JTP-', p_tahun, '-001'),   -- Nomor jurnal penutup
         NULL,
         v_tanggal_tutup,
@@ -180,7 +180,7 @@ BEGIN
     SET v_urutan = 1;
 
     -- =========================================================
-    -- LANGKAH 3A: Loop akun Pendapatan → Debet untuk meng-NOL-kan
+    -- LANGKAH 3A: Loop akun Pendapatan â†’ Debet untuk meng-NOL-kan
     -- =========================================================
     SET v_done = 0;
     OPEN cur_pendapatan;
@@ -195,20 +195,20 @@ BEGIN
 
         -- Update buku_besar_periode: tambahkan mutasi balik
         INSERT INTO buku_besar_periode (
-            id_koperasi, periode_tahun, periode_bulan, kode_anak,
+            id_entitas, periode_tahun, periode_bulan, kode_anak,
             saldo_awal_debet, saldo_awal_kredit,
             mutasi_debet, mutasi_kredit,
             saldo_akhir_debet, saldo_akhir_kredit,
             dihitung_pada
         )
         SELECT
-            p_id_koperasi, p_tahun, 12, v_kode_anak,
+            p_id_entitas, p_tahun, 12, v_kode_anak,
             bbp.saldo_awal_debet, bbp.saldo_awal_kredit,
             0, 0,
             bbp.saldo_akhir_debet, bbp.saldo_akhir_kredit,
             NOW()
         FROM buku_besar_periode bbp
-        WHERE bbp.id_koperasi = p_id_koperasi AND bbp.periode_tahun = p_tahun AND bbp.periode_bulan = 12 AND bbp.kode_anak = v_kode_anak
+        WHERE bbp.id_entitas = p_id_entitas AND bbp.periode_tahun = p_tahun AND bbp.periode_bulan = 12 AND bbp.kode_anak = v_kode_anak
         ON DUPLICATE KEY UPDATE
             mutasi_debet       = buku_besar_periode.mutasi_debet + v_saldo_bersih,
             saldo_akhir_debet  = buku_besar_periode.saldo_awal_debet + buku_besar_periode.mutasi_debet + v_saldo_bersih,
@@ -227,7 +227,7 @@ BEGIN
     END IF;
 
     -- =========================================================
-    -- LANGKAH 3B: Loop akun Biaya+HPP → Kredit untuk meng-NOL-kan
+    -- LANGKAH 3B: Loop akun Biaya+HPP â†’ Kredit untuk meng-NOL-kan
     -- =========================================================
     SET v_done = 0;
     OPEN cur_biaya;
@@ -242,20 +242,20 @@ BEGIN
 
         -- Update buku_besar_periode: tambahkan mutasi balik
         INSERT INTO buku_besar_periode (
-            id_koperasi, periode_tahun, periode_bulan, kode_anak,
+            id_entitas, periode_tahun, periode_bulan, kode_anak,
             saldo_awal_debet, saldo_awal_kredit,
             mutasi_debet, mutasi_kredit,
             saldo_akhir_debet, saldo_akhir_kredit,
             dihitung_pada
         )
         SELECT
-            p_id_koperasi, p_tahun, 12, v_kode_anak,
+            p_id_entitas, p_tahun, 12, v_kode_anak,
             bbp.saldo_awal_debet, bbp.saldo_awal_kredit,
             0, 0,
             bbp.saldo_akhir_debet, bbp.saldo_akhir_kredit,
             NOW()
         FROM buku_besar_periode bbp
-        WHERE bbp.id_koperasi = p_id_koperasi AND bbp.periode_tahun = p_tahun AND bbp.periode_bulan = 12 AND bbp.kode_anak = v_kode_anak
+        WHERE bbp.id_entitas = p_id_entitas AND bbp.periode_tahun = p_tahun AND bbp.periode_bulan = 12 AND bbp.kode_anak = v_kode_anak
         ON DUPLICATE KEY UPDATE
             mutasi_kredit      = buku_besar_periode.mutasi_kredit + v_saldo_bersih,
             saldo_akhir_kredit = buku_besar_periode.saldo_awal_kredit + buku_besar_periode.mutasi_kredit + v_saldo_bersih,
@@ -275,16 +275,16 @@ BEGIN
 
     -- =========================================================
     -- LANGKAH 4: INSERT jurnal_header untuk distribusi SHU
-    -- Saldo 811 = v_laba_bersih → dibagi ke pos-pos Modal/SHU
+    -- Saldo 811 = v_laba_bersih â†’ dibagi ke pos-pos Modal/SHU
     -- =========================================================
     INSERT INTO jurnal_header (
-        id_koperasi, no_jurnal, nomor_nota, tanggal_jurnal,
+        id_entitas, no_jurnal, nomor_nota, tanggal_jurnal,
         periode_tahun, periode_bulan, kode_transaksi, jenis_jurnal,
         source_type, source_id, keterangan,
         total_debet, total_kredit, status,
         created_by, posted_by, posted_at, created_at
     ) VALUES (
-        p_id_koperasi,
+        p_id_entitas,
         CONCAT('JTP-', p_tahun, '-002'),
         NULL,
         v_tanggal_tutup,
@@ -357,3 +357,4 @@ END
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_tutup_tahun');
     }
 };
+

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * TutupTahunService — Melaksanakan proses "Hard-Close" satu tahun buku.
+ * TutupTahunService Ã¢â‚¬â€ Melaksanakan proses "Hard-Close" satu tahun buku.
  *
  * KONSEP (dari KONSEP-TUTUP-BUKU.md):
  *   Tutup Tahun bukan mematikan sistem kasir.
@@ -20,8 +20,8 @@ use Illuminate\Support\Facades\DB;
  *   1. Validasi: config_shu total persentase = 100%
  *   2. Validasi: bulan 1-11 semua sudah CLOSED
  *   3. Validasi: bulan 12 masih OPEN (belum di-hard-close sebelumnya)
- *   4. Panggil sp_tutup_tahun → buat Jurnal Penutup otomatis
- *   5. Kunci semua periode tahun tersebut → LOCKED (tidak bisa dibuka)
+ *   4. Panggil sp_tutup_tahun Ã¢â€ â€™ buat Jurnal Penutup otomatis
+ *   5. Kunci semua periode tahun tersebut Ã¢â€ â€™ LOCKED (tidak bisa dibuka)
  *
  * AKUN IKHTISAR (Akun 811):
  *   Jurnal Penutup menggunakan akun "Ikhtisar Laba Rugi" (811) sebagai
@@ -38,7 +38,7 @@ use Illuminate\Support\Facades\DB;
 class TutupTahunService
 {
     // =========================================================================
-    // METHOD PUBLIK: cekPraKondisi() — dipakai Controller untuk tampilkan status
+    // METHOD PUBLIK: cekPraKondisi() Ã¢â‚¬â€ dipakai Controller untuk tampilkan status
     // =========================================================================
 
     /**
@@ -48,17 +48,25 @@ class TutupTahunService
      */
     public function cekPraKondisi(int $tahun): array
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
         return [
-            $this->cekTotalPersentaseShu($idKoperasi, $tahun),
-            $this->cekBulan1Sampai11Closed($idKoperasi, $tahun),
-            $this->cekBulan12BelumLocked($idKoperasi, $tahun),
+            $this->cekAlokasiHasilUsaha($idEntitas, $tahun),
+            $this->cekBulan1Sampai11Closed($idEntitas, $tahun),
+            $this->cekBulan12BelumLocked($idEntitas, $tahun),
         ];
     }
 
+    /**
+     * Profil penutupan (mode, label, akun default) untuk entitas aktif.
+     */
+    public function profil(): ProfilPenutupan
+    {
+        return ProfilPenutupan::untuk((int) app('entitas_aktif'));
+    }
+
     // =========================================================================
-    // METHOD PUBLIK: tutupTahun() — eksekusi hard-close
+    // METHOD PUBLIK: tutupTahun() Ã¢â‚¬â€ eksekusi hard-close
     // =========================================================================
 
     /**
@@ -69,10 +77,10 @@ class TutupTahunService
      */
     public function tutupTahun(int $tahun): void
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
         // --- Cek apakah sudah pernah di-locked ---
-        $sudahLocked = PeriodeAkuntansi::where('id_koperasi', $idKoperasi)
+        $sudahLocked = PeriodeAkuntansi::where('id_entitas', $idEntitas)
             ->where('tahun', $tahun)
             ->where('status', 'LOCKED')
             ->exists();
@@ -94,7 +102,11 @@ class TutupTahunService
             );
         }
 
-        DB::transaction(function () use ($idKoperasi, $tahun) {
+        DB::transaction(function () use ($idEntitas, $tahun) {
+            // --- Langkah 0: Entitas non-koperasi tanpa config_shu -> alokasikan
+            // 100% hasil usaha ke akun ekuitas default (laba maupun rugi). ---
+            $this->pastikanAlokasiDefault($idEntitas, $tahun);
+
             // --- Langkah 1: Panggil SP untuk membuat Jurnal Penutup ---
             // SP akan:
             //   a. Hitung total Pendapatan (kredit kelompok 4xx)
@@ -102,15 +114,15 @@ class TutupTahunService
             //   c. Buat Jurnal Penutup tanggal 31-Des menggunakan akun 811 (Ikhtisar)
             //   d. Pindahkan saldo 811 ke Modal/SHU sesuai config_shu
             DB::statement('CALL sp_tutup_tahun(?, ?, ?)', [
-                $idKoperasi,
+                $idEntitas,
                 $tahun,
                 Auth::id(),
             ]);
 
-            // --- Langkah 2: Kunci semua periode tahun ini → LOCKED ---
+            // --- Langkah 2: Kunci semua periode tahun ini Ã¢â€ â€™ LOCKED ---
             // Termasuk bulan 13 (periode penyesuaian) jika ada.
             // LOCKED berarti tidak bisa dibuka kembali (lebih ketat dari CLOSED).
-            PeriodeAkuntansi::where('id_koperasi', $idKoperasi)
+            PeriodeAkuntansi::where('id_entitas', $idEntitas)
                 ->where('tahun', $tahun)
                 ->update([
                     'status'       => 'LOCKED',
@@ -124,7 +136,7 @@ class TutupTahunService
             for ($bulan = 1; $bulan <= 12; $bulan++) {
                 PeriodeAkuntansi::updateOrCreate(
                     [
-                        'id_koperasi' => $idKoperasi,
+                        'id_entitas' => $idEntitas,
                         'tahun'       => $tahun,
                         'bulan'       => $bulan,
                     ],
@@ -139,7 +151,7 @@ class TutupTahunService
     }
 
     // =========================================================================
-    // HELPER: ringkasanLabaRugi() — dipakai view untuk preview sebelum finalisasi
+    // HELPER: ringkasanLabaRugi() Ã¢â‚¬â€ dipakai view untuk preview sebelum finalisasi
     // =========================================================================
 
     /**
@@ -150,21 +162,21 @@ class TutupTahunService
      */
     public function ringkasanLabaRugi(int $tahun): array
     {
-        $idKoperasi = app('koperasi_aktif');
+        $idEntitas = app('entitas_aktif');
 
-        // Total Pendapatan: akun kelompok Pendapatan → saldo normal Kredit
+        // Total Pendapatan: akun kelompok Pendapatan Ã¢â€ â€™ saldo normal Kredit
         $totalPendapatan = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->whereIn('c.kelompok', ['Pendapatan', 'Non-Operasional'])
             ->where('c.posisi_normal', 'K')
             ->sum(DB::raw('bbp.saldo_akhir_kredit - bbp.saldo_akhir_debet'));
 
-        // Total Biaya + HPP: akun kelompok Biaya dan HPP → saldo normal Debet
+        // Total Biaya + HPP: akun kelompok Biaya dan HPP Ã¢â€ â€™ saldo normal Debet
         $totalBiaya = DB::table('buku_besar_periode as bbp')
             ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
-            ->where('bbp.id_koperasi', $idKoperasi)
+            ->where('bbp.id_entitas', $idEntitas)
             ->where('bbp.periode_tahun', $tahun)
             ->whereIn('c.kelompok', ['Biaya', 'HPP'])
             ->where('c.posisi_normal', 'D')
@@ -183,32 +195,80 @@ class TutupTahunService
     // VALIDASI PRA-KONDISI TUTUP TAHUN
     // =========================================================================
 
-    /** Pra-kondisi 1: Total persentase config_shu = 100% */
-    private function cekTotalPersentaseShu(int $idKoperasi, int $tahun): array
+    /**
+     * Pra-kondisi 1: Alokasi hasil usaha valid.
+     *  - Jika config_shu sudah ada: total persentase wajib 100% (semua entitas).
+     *  - Jika belum ada: Koperasi wajib mengisi; entitas lain otomatis 100% ke akun default.
+     */
+    private function cekAlokasiHasilUsaha(int $idEntitas, int $tahun): array
     {
-        $total = DB::table('config_shu')
-            ->where('id_koperasi', $idKoperasi)
-            ->where('tahun', $tahun)
-            ->sum('persentase');
+        $profil = ProfilPenutupan::untuk($idEntitas);
+        $label  = $profil->labelHasil();
 
-        // Toleransi floating: 99.99 ~ 100.01
-        $lulus = abs((float) $total - 100.0) < 0.02;
+        $query  = DB::table('config_shu')
+            ->where('id_entitas', $idEntitas)
+            ->where('tahun', $tahun);
+        $adaConfig = (clone $query)->exists();
+        $total     = (clone $query)->sum('persentase');
+
+        if ($adaConfig || $profil->isDistribusi()) {
+            // Toleransi floating: 99.99 ~ 100.01
+            $lulus = abs((float) $total - 100.0) < 0.02;
+
+            return [
+                'no'     => 1,
+                'label'  => "Konfigurasi {$label}: total persentase = 100%",
+                'lulus'  => $lulus,
+                'detail' => !$lulus
+                    ? "Total persentase {$label} saat ini: {$total}%. Harus tepat 100%."
+                    : null,
+            ];
+        }
+
+        // Mode OTOMATIS tanpa config: pastikan akun default tersedia di COA.
+        $akun  = $profil->akunDefault();
+        $ada   = DB::table('master_coa')->where('kode_anak', $akun)->exists();
 
         return [
             'no'     => 1,
-            'label'  => 'Konfigurasi SHU: total persentase = 100%',
-            'lulus'  => $lulus,
-            'detail' => !$lulus
-                ? "Total persentase SHU saat ini: {$total}%. Harus tepat 100%."
-                : null,
+            'label'  => "Alokasi {$label}: otomatis 100% ke akun {$akun}",
+            'lulus'  => $ada,
+            'detail' => $ada
+                ? "Hasil usaha (laba/rugi) dipindahkan ke akun {$akun}."
+                : "Akun {$akun} belum ada di COA. Jalankan migrasi/seeder COA.",
         ];
     }
 
+    /**
+     * Untuk mode OTOMATIS yang belum punya config_shu tahun ini, buat 1 baris 100%.
+     */
+    private function pastikanAlokasiDefault(int $idEntitas, int $tahun): void
+    {
+        $profil = ProfilPenutupan::untuk($idEntitas);
+
+        $sudahAda = DB::table('config_shu')
+            ->where('id_entitas', $idEntitas)
+            ->where('tahun', $tahun)
+            ->exists();
+
+        if ($sudahAda || $profil->isDistribusi()) {
+            return;
+        }
+
+        DB::table('config_shu')->insert([
+            'id_entitas' => $idEntitas,
+            'tahun'      => $tahun,
+            'pos'        => $profil->namaPos(),
+            'persentase' => 100,
+            'kode_akun'  => $profil->akunDefault(),
+        ]);
+    }
+
     /** Pra-kondisi 2: Bulan 1 s/d 11 semua sudah CLOSED atau LOCKED */
-    private function cekBulan1Sampai11Closed(int $idKoperasi, int $tahun): array
+    private function cekBulan1Sampai11Closed(int $idEntitas, int $tahun): array
     {
         $belumTutup = DB::table('periode_akuntansi')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->where('tahun', $tahun)
             ->whereBetween('bulan', [1, 11])
             ->whereNotIn('status', ['CLOSED', 'LOCKED'])
@@ -217,7 +277,7 @@ class TutupTahunService
         // Bulan yang belum punya baris = belum ditutup
         // Hitung berapa bulan yang SEHARUSNYA ada (1-11) tapi tidak ada barisnya
         $adaBaris = DB::table('periode_akuntansi')
-            ->where('id_koperasi', $idKoperasi)
+            ->where('id_entitas', $idEntitas)
             ->where('tahun', $tahun)
             ->whereBetween('bulan', [1, 11])
             ->count();
@@ -235,9 +295,9 @@ class TutupTahunService
     }
 
     /** Pra-kondisi 3: Tahun ini belum pernah di-LOCKED (belum finalisasi) */
-    private function cekBulan12BelumLocked(int $idKoperasi, int $tahun): array
+    private function cekBulan12BelumLocked(int $idEntitas, int $tahun): array
     {
-        $sudahLocked = PeriodeAkuntansi::where('id_koperasi', $idKoperasi)
+        $sudahLocked = PeriodeAkuntansi::where('id_entitas', $idEntitas)
             ->where('tahun', $tahun)
             ->where('status', 'LOCKED')
             ->exists();
@@ -252,3 +312,5 @@ class TutupTahunService
         ];
     }
 }
+
+

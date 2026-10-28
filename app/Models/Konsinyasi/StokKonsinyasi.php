@@ -4,11 +4,11 @@ namespace App\Models\Konsinyasi;
 
 use App\Models\Master\Barang;
 use App\Models\Master\Gudang;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Stok titipan di gudang penerima — TERPISAH dari tabel stok karena BUKAN
+ * Stok titipan di gudang penerima Ã¢â‚¬â€ TERPISAH dari tabel stok karena BUKAN
  * aset desa penerima. Invariant: qty_titip = terjual + retur + susut + sisa.
  */
 class StokKonsinyasi extends Model
@@ -17,7 +17,7 @@ class StokKonsinyasi extends Model
     protected $primaryKey = 'id_stok_konsinyasi';
 
     protected $fillable = [
-        'id_kiriman', 'id_koperasi_pemilik', 'id_koperasi_penerima', 'id_gudang_penerima',
+        'id_kiriman', 'id_entitas_pemilik', 'id_entitas_penerima', 'id_gudang_penerima',
         'id_barang', 'qty_titip', 'qty_terjual', 'qty_retur', 'qty_susut', 'qty_sisa',
         'harga_titip_satuan', 'harga_jual_satuan', 'hpp_pemilik', 'status',
     ];
@@ -56,7 +56,7 @@ class StokKonsinyasi extends Model
      */
     public function scopeMilikKoperasi($query): void
     {
-        $query->where('id_koperasi_pemilik', app('koperasi_aktif'));
+        $query->where('id_entitas_pemilik', app('entitas_aktif'));
     }
 
     /**
@@ -65,7 +65,7 @@ class StokKonsinyasi extends Model
      */
     public function scopeDiKoperasi($query): void
     {
-        $query->where('id_koperasi_penerima', app('koperasi_aktif'));
+        $query->where('id_entitas_penerima', app('entitas_aktif'));
     }
 
     /**
@@ -73,10 +73,12 @@ class StokKonsinyasi extends Model
      */
     public function scopeTerlibat($query): void
     {
-        $id = app('koperasi_aktif');
+        $id = app('entitas_aktif');
         $query->where(function ($q) use ($id) {
-            $q->where('id_koperasi_pemilik', $id)
-              ->orWhere('id_koperasi_penerima', $id);
+            $q->where('id_entitas_pemilik', $id)
+              ->orWhere('id_entitas_penerima', $id);
         });
     }
 }
+
+

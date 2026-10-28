@@ -23,9 +23,11 @@ class KonsinyasiService
      */
     public function kirim(int $idKiriman): bool
     {
-        // sp_post_jurnal mengelola transaksi database sendiri, sehingga proses
-        // ini tidak dibungkus DB::transaction kedua yang akan bentrok saat COMMIT.
-        return (function () use ($idKiriman): bool {
+        // Sejak revisi 2026-10-11 sp_post_jurnal tidak lagi COMMIT sendiri, sehingga
+        // seluruh proses (stok keluar, stok konsinyasi, jurnal KTK, status kiriman)
+        // dibungkus SATU transaksi: berhasil semua atau batal semua.
+        return DB::transaction(function () use ($idKiriman): bool {
+            $persiapan = DB::transaction(function () use ($idKiriman): array|false {
             $kiriman = DB::table('pengiriman_konsinyasi')
                 ->where('id_kiriman', $idKiriman)
                 ->lockForUpdate()
@@ -39,7 +41,7 @@ class KonsinyasiService
                 throw new RuntimeException('Pengiriman ini sudah diposting.');
             }
 
-            if ($kiriman->id_koperasi_pemilik === $kiriman->id_koperasi_penerima) {
+            if ($kiriman->id_entitas_pemilik === $kiriman->id_entitas_penerima) {
                 throw new RuntimeException('Pemilik dan penerima harus merupakan koperasi yang berbeda.');
             }
 
@@ -60,6 +62,17 @@ class KonsinyasiService
             $kekurangan = [];
 
             foreach ($detail as $item) {
+                $mutasiStokAda = DB::table('kartu_stok')
+                    ->where('ref_tipe', 'KIRIM_KONSINYASI')
+                    ->where('ref_id', $idKiriman)
+                    ->where('id_barang', $item->id_barang)
+                    ->where('jenis_mutasi', 'OUT')
+                    ->exists();
+
+                if ($mutasiStokAda) {
+                    continue;
+                }
+
                 $tersedia = $this->stok->tersedia((int) $kiriman->id_gudang_asal, (int) $item->id_barang);
                 if (bccomp($tersedia, (string) $item->qty_dasar, 4) < 0) {
                     $kekurangan[] = "barang {$item->id_barang}: tersedia {$tersedia}, diminta {$item->qty_dasar}";
@@ -105,7 +118,7 @@ class KonsinyasiService
                 } else {
                     $hpp = $this->stok->hppSaatIni((int) $kiriman->id_gudang_asal, (int) $item->id_barang);
                     $kartuStok = $this->stok->keluar(
-                        koperasiId: (int) $kiriman->id_koperasi_pemilik,
+                        entitasId: (int) $kiriman->id_entitas_pemilik,
                         gudangId: (int) $kiriman->id_gudang_asal,
                         barangId: (int) $item->id_barang,
                         qty: (string) $item->qty_dasar,
@@ -136,8 +149,8 @@ class KonsinyasiService
                 if (! $stokKonsinyasi) {
                     $stokKonsinyasiId = DB::table('stok_konsinyasi')->insertGetId([
                         'id_kiriman' => $idKiriman,
-                        'id_koperasi_pemilik' => $kiriman->id_koperasi_pemilik,
-                        'id_koperasi_penerima' => $kiriman->id_koperasi_penerima,
+                        'id_entitas_pemilik' => $kiriman->id_entitas_pemilik,
+                        'id_entitas_penerima' => $kiriman->id_entitas_penerima,
                         'id_gudang_penerima' => $kiriman->id_gudang_tujuan,
                         'id_barang' => $item->id_barang,
                         'qty_titip' => $item->qty_dasar,
@@ -149,7 +162,18 @@ class KonsinyasiService
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
+                } else {
+                    $stokKonsinyasiId = (int) $stokKonsinyasi->id_stok_konsinyasi;
+                }
 
+                $kartuKonsinyasiAda = DB::table('kartu_konsinyasi')
+                    ->where('ref_tipe', 'KIRIM_KONSINYASI')
+                    ->where('ref_id', $idKiriman)
+                    ->where('id_stok_konsinyasi', $stokKonsinyasiId)
+                    ->where('jenis_mutasi', 'TITIP')
+                    ->exists();
+
+                if (! $kartuKonsinyasiAda) {
                     DB::table('kartu_konsinyasi')->insert([
                         'id_stok_konsinyasi' => $stokKonsinyasiId,
                         'tanggal' => $kiriman->tgl_kirim,
@@ -165,32 +189,46 @@ class KonsinyasiService
                 }
             }
 
-            $jurnal = $this->jurnal->posting(
-                kodeTransaksi: 'KTK',
-                payload: [
-                    'tanggal_jurnal' => (string) $kiriman->tgl_kirim,
-                    'total_hpp' => $totalHpp,
-                    'kode_unit' => $kodeUnit,
-                    'nomor_nota' => $kiriman->kode_kiriman,
-                ],
-                sourceType: 'pengiriman_konsinyasi',
-                sourceId: $idKiriman,
-                keterangan: "Kirim titipan {$kiriman->kode_kiriman}",
-                koperasiId: (int) $kiriman->id_koperasi_pemilik,
-            );
+            return [
+                'kiriman' => $kiriman,
+                'kode_unit' => $kodeUnit,
+                'total_hpp' => $totalHpp,
+                'total_titip' => $totalTitip,
+            ];
+        });
 
-            DB::table('pengiriman_konsinyasi')
-                ->where('id_kiriman', $idKiriman)
-                ->update([
-                    'status' => 'dikirim',
-                    'status_posting' => 'T',
-                    'total_nilai_titip' => $totalTitip,
-                    'total_hpp_pemilik' => $totalHpp,
-                    'id_jurnal_kirim' => $jurnal->id_jurnal,
-                    'updated_at' => now(),
-                ]);
+        if ($persiapan === false) {
+            return false;
+        }
+
+        $kiriman = $persiapan['kiriman'];
+        $jurnal = $this->jurnal->posting(
+            kodeTransaksi: 'KTK',
+            payload: [
+                'tanggal_jurnal' => (string) $kiriman->tgl_kirim,
+                'total_hpp' => $persiapan['total_hpp'],
+                'kode_unit' => $persiapan['kode_unit'],
+                'nomor_nota' => $kiriman->kode_kiriman,
+            ],
+            sourceType: 'pengiriman_konsinyasi',
+            sourceId: $idKiriman,
+            keterangan: "Kirim titipan {$kiriman->kode_kiriman}",
+            entitasId: (int) $kiriman->id_entitas_pemilik,
+        );
+
+        DB::table('pengiriman_konsinyasi')
+            ->where('id_kiriman', $idKiriman)
+            ->update([
+                'status' => 'dikirim',
+                'status_posting' => 'T',
+                'total_nilai_titip' => $persiapan['total_titip'],
+                'total_hpp_pemilik' => $persiapan['total_hpp'],
+                'id_jurnal_kirim' => $jurnal->id_jurnal,
+                'updated_at' => now(),
+            ]);
 
             return true;
-        })();
+        }, 3);
     }
 }
+

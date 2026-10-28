@@ -67,6 +67,11 @@ class TransaksiTemplateSeeder extends Seeder
             ['OPK',  'Opname - Selisih Kurang',         'gudang'],
             ['OPL',  'Opname - Selisih Lebih',          'gudang'],
             ['PNY',  'Penyusutan Aset Tetap',           'penyesuaian'],
+            // --- akuntansi ---
+            // JOP tidak punya template baris (baris bebas, bukan otomatis).
+            // Dipakai hanya sebagai kode_transaksi di jurnal_header untuk
+            // identifikasi, bukan untuk posting() via template.
+            ['JOP',  'Jurnal Pembuka (Saldo Awal)',     'akuntansi'],
         ];
 
         foreach ($transaksi as $t) {

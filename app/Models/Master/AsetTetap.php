@@ -2,19 +2,19 @@
 
 namespace App\Models\Master;
 
-use App\Models\Concerns\BelongsToKoperasi;
+use App\Models\Concerns\BelongsToEntitas;
 use Illuminate\Database\Eloquent\Model;
 
 class AsetTetap extends Model
 {
-    use BelongsToKoperasi;
+    use BelongsToEntitas;
 
     protected $table = 'aset_tetap';
     protected $primaryKey = 'id_aset';
     public $timestamps = false;
 
     protected $fillable = [
-        'id_koperasi', 'kode_aset', 'nama_aset', 'kategori', 'tgl_perolehan',
+        'id_entitas', 'kode_aset', 'nama_aset', 'kategori', 'tgl_perolehan',
         'nilai_perolehan', 'nilai_residu', 'umur_bulan', 'akum_penyusutan',
         'kode_akun_aset', 'kode_akun_akum', 'kode_akun_biaya', 'status',
     ];
@@ -29,3 +29,4 @@ class AsetTetap extends Model
         ];
     }
 }
+
