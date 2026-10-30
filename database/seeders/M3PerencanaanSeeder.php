@@ -6,8 +6,7 @@ use App\Models\Master\Barang;
 use App\Models\Master\Komoditas;
 use App\Models\Master\Satuan;
 use App\Models\Master\UnitUsaha;
-use App\Models\Perencanaan\PerbandinganHarga;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use App\Models\Tenant\Wilayah;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -71,15 +70,15 @@ class M3PerencanaanSeeder extends Seeder
         }
 
         // 2. Data Master Kelompok Tani sebagai Supplier di master_pihak
-        $koperasiMekar = KoperasiDesa::where('kode_koperasi', 'KDMP-A')->first();
-        $koperasiSukamaju = KoperasiDesa::where('kode_koperasi', 'KDMP-B')->first();
+        $koperasiMekar = Entitas::where('kode_entitas', 'KDMP-A')->first();
+        $koperasiSukamaju = Entitas::where('kode_entitas', 'KDMP-B')->first();
         $wilayahMekar = Wilayah::where('nama', 'Desa Mekar Jaya')->first();
         $wilayahSukamaju = Wilayah::where('nama', 'Desa Sukamaju')->first();
 
         if ($koperasiMekar && $wilayahMekar) {
             DB::table('master_pihak')->updateOrInsert(
                 [
-                    'id_koperasi' => $koperasiMekar->id_koperasi,
+                    'id_entitas' => $koperasiMekar->id_entitas,
                     'nama' => 'Kelompok Tani Makmur Subur',
                 ],
                 [
@@ -101,7 +100,7 @@ class M3PerencanaanSeeder extends Seeder
             if ($wilayahSukamaju) {
                 DB::table('master_pihak')->updateOrInsert(
                     [
-                        'id_koperasi' => $koperasiMekar->id_koperasi,
+                        'id_entitas' => $koperasiMekar->id_entitas,
                         'nama' => 'Kelompok Tani Sri Rejeki (Mitra Sukamaju)',
                     ],
                     [
@@ -124,7 +123,7 @@ class M3PerencanaanSeeder extends Seeder
         if ($koperasiSukamaju && $wilayahSukamaju) {
             DB::table('master_pihak')->updateOrInsert(
                 [
-                    'id_koperasi' => $koperasiSukamaju->id_koperasi,
+                    'id_entitas' => $koperasiSukamaju->id_entitas,
                     'nama' => 'Kelompok Tani Sri Rejeki',
                 ],
                 [
@@ -151,7 +150,7 @@ class M3PerencanaanSeeder extends Seeder
             if ($komoditasGula) {
                 DB::table('perbandingan_harga')->updateOrInsert(
                     [
-                        'id_koperasi' => $koperasiMekar->id_koperasi,
+                        'id_entitas' => $koperasiMekar->id_entitas,
                         'id_komoditas' => $komoditasGula->id,
                         'id_wilayah_sumber' => $wilayahSukamaju->id,
                         'bulan' => 3,
@@ -173,7 +172,7 @@ class M3PerencanaanSeeder extends Seeder
             if ($komoditasMinyak) {
                 DB::table('perbandingan_harga')->updateOrInsert(
                     [
-                        'id_koperasi' => $koperasiMekar->id_koperasi,
+                        'id_entitas' => $koperasiMekar->id_entitas,
                         'id_komoditas' => $komoditasMinyak->id,
                         'id_wilayah_sumber' => $wilayahSukamaju->id,
                         'bulan' => 3,

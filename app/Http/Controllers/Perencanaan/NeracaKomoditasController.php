@@ -8,6 +8,7 @@ use App\Models\Master\Komoditas;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Perencanaan\KetersediaanKomoditas;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -33,6 +34,8 @@ class NeracaKomoditasController extends ModuleCrudController
         $query = HasilKalkulasi::with(['wilayah', 'komoditas'])
             ->where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun);
+
+        $this->onlyLatestVersion($query);
 
         if ($bulan !== null) {
             $query->where('bulan', $bulan);
@@ -71,6 +74,8 @@ class NeracaKomoditasController extends ModuleCrudController
         $baseQuery = HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)
             ->when($bulan, fn ($q) => $q->where('bulan', $bulan));
+
+        $this->onlyLatestVersion($baseQuery);
 
         $totalSurplus = (clone $baseQuery)->where('status_surplus_defisit', 'surplus')->count();
         $totalDefisit = (clone $baseQuery)->where('status_surplus_defisit', 'defisit')->count();
@@ -113,6 +118,13 @@ class NeracaKomoditasController extends ModuleCrudController
             'kelengkapanStandarMap' => $kelengkapanStandarMap,
             'totalKomoditasKurangStandar' => $totalKomoditasKurangStandar,
         ]);
+    }
+
+    private function onlyLatestVersion(Builder $query): Builder
+    {
+        return $query->whereRaw(
+            'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
+        );
     }
 
     public function show(int|string $id): View

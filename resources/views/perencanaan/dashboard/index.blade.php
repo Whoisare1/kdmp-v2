@@ -1,7 +1,4 @@
 <x-layouts.app title="Dashboard M2 — Kalkulasi & Neraca Komoditas" eyebrow="Modul M2 — Perencanaan Pangan">
-    {{-- Sub Navigasi Modul M2 --}}
-    <x-perencanaan.nav-m2 active="dashboard" />
-
     {{-- Flash Notifications --}}
     @if (session('status'))
         <div class="mb-5 flex items-center justify-between rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">
@@ -29,6 +26,54 @@
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ];
     @endphp
+
+    <div class="mb-7">
+        <div class="mb-4">
+            <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-600/70">Modul M2</p>
+            <h2 class="mt-1 font-display text-2xl font-semibold text-ink-950">Kalkulasi &amp; Perencanaan</h2>
+            <p class="mt-1 text-sm text-ink-600">Pilih fitur untuk mengelola data kebutuhan, neraca, dan laporan komoditas desa.</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <a href="{{ route('perencanaan.dashboard') }}" class="group rounded-sm border border-merah-500 bg-merah-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-merah-600 text-lg text-paper-50">▦</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Dashboard M2</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Pantau status komoditas</p>
+            </a>
+
+            <a href="{{ route('perencanaan.demografi.index') }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-lg text-blue-700">⌂</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Data &amp; Parameter</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Kelola data dasar M2</p>
+            </a>
+
+            <a href="{{ route('perencanaan.kebutuhan-komoditas.index', ['tahun' => $tahun]) }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-lg text-amber-700">∑</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Kalkulasi Kebutuhan</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Proses kebutuhan bulanan</p>
+            </a>
+
+            <a href="{{ route('perencanaan.neraca-komoditas.index', ['tahun' => $tahun]) }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-sawah-100 text-lg text-sawah-700">⇄</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Neraca Komoditas</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Baca surplus dan defisit</p>
+            </a>
+
+            <a href="{{ route('perencanaan.laporan.index', ['tahun' => $tahun]) }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-lg text-purple-700">▤</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Laporan M2</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Rekap dan arsip M2</p>
+            </a>
+        </div>
+    </div>
+
+    <div class="mb-4 flex items-center justify-between border-l-4 border-merah-500 bg-paper-50 px-4 py-3">
+        <div>
+            <h2 class="font-display text-lg font-semibold text-ink-950">Ringkasan Status Kebutuhan</h2>
+            <p class="mt-0.5 text-xs text-ink-600">Surplus, seimbang, dan defisit komoditas pada periode terpilih.</p>
+        </div>
+        <span class="hidden font-mono text-[10px] uppercase tracking-wider text-ink-600/70 sm:block">Dashboard M2</span>
+    </div>
 
     {{-- Filter & Action Header --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">

@@ -8,7 +8,6 @@ use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\PermintaanPengadaan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PermintaanPengadaanController extends ModuleCrudController
@@ -62,13 +61,11 @@ class PermintaanPengadaanController extends ModuleCrudController
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->id_koperasi) {
+        if (! $user || ! $user->id_entitas) {
             abort(403, 'Hanya pengguna desa yang dapat membuat PR.');
         }
 
-        $idWilayahUser = DB::table('koperasi_desa')
-            ->where('id_koperasi', $user->id_koperasi)
-            ->value('id_wilayah');
+        $idWilayahUser = $user->entitas?->id_wilayah;
 
         if ((int) $hasil->id_wilayah !== (int) $idWilayahUser) {
             abort(403, 'Hasil kalkulasi tidak milik koperasi aktif Anda.');

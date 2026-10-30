@@ -9,7 +9,6 @@ use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Perencanaan\StandarKebutuhanKomoditas;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -49,6 +48,17 @@ class KalkulasiKebutuhanService
                 throw new RuntimeException("Data demografi penduduk untuk tahun {$tahun} belum tersedia pada wilayah ini. Pastikan data survey kependudukan sudah diisi.");
             }
 
+            $kelompokUmurWajib = ['balita', 'anak', 'remaja', 'dewasa', 'lansia'];
+            $kelompokUmurTerisi = $demografi->pluck('kelompok_umur')->unique()->all();
+            $kelompokUmurKurang = array_values(array_diff($kelompokUmurWajib, $kelompokUmurTerisi));
+
+            if ($kelompokUmurKurang !== []) {
+                throw new RuntimeException(
+                    'Kalkulasi dibatalkan karena data demografi belum lengkap. Lengkapi kelompok umur: '
+                    . implode(', ', $kelompokUmurKurang) . '.'
+                );
+            }
+
             // 2. Tentukan komoditas yang akan dikalkulasi
             $queryKomoditas = Komoditas::where('is_active', true);
             if ($idKomoditas !== null) {
@@ -73,12 +83,11 @@ class KalkulasiKebutuhanService
             foreach ($daftarKomoditas as $komoditas) {
                 $subtotalKebutuhanKomoditas = 0.0;
                 $satuanKomoditas = 'KG';
-                $standarDitemukan = false;
+                $standarDitemukan = true;
+                $standarPerKelompokUmur = [];
 
-                // 4. Hitung kebutuhan per kelompok umur
                 foreach ($demografi as $demo) {
-                    // Cari standar kebutuhan komoditas yang aktif pada periode ini
-                    $standar = StandarKebutuhanKomoditas::where('id_komoditas', $komoditas->id)
+                    $standarPerKelompokUmur[$demo->kelompok_umur] = StandarKebutuhanKomoditas::where('id_komoditas', $komoditas->id)
                         ->where('kelompok_umur', $demo->kelompok_umur)
                         ->where('berlaku_mulai', '<=', $endOfMonth)
                         ->where(function ($q) use ($startOfMonth) {
@@ -87,15 +96,40 @@ class KalkulasiKebutuhanService
                         })
                         ->latest('berlaku_mulai')
                         ->first();
+                }
+
+                $kelompokTanpaStandar = collect($standarPerKelompokUmur)
+                    ->filter(fn ($standar) => $standar === null || (float) $standar->per_kapita_harian <= 0)
+                    ->keys()
+                    ->all();
+
+                if ($kelompokTanpaStandar !== []) {
+                    throw new RuntimeException(
+                        "Kalkulasi {$komoditas->nama} dibatalkan karena standar kebutuhan belum lengkap untuk kelompok umur: "
+                        . implode(', ', $kelompokTanpaStandar) . '.'
+                    );
+                }
+
+                $satuanStandar = collect($standarPerKelompokUmur)
+                    ->map(fn ($standar) => strtoupper(trim((string) $standar->satuan)))
+                    ->unique()
+                    ->values();
+
+                if ($satuanStandar->count() > 1) {
+                    throw new RuntimeException(
+                        "Kalkulasi {$komoditas->nama} dibatalkan karena satuan standar kebutuhan tidak konsisten: "
+                        . $satuanStandar->implode(', ') . '.'
+                    );
+                }
+
+                // 4. Hitung kebutuhan per kelompok umur
+                foreach ($demografi as $demo) {
+                    $standar = $standarPerKelompokUmur[$demo->kelompok_umur];
 
                     $perKapitaHarian = (float) ($standar ? $standar->per_kapita_harian : 0);
                     $satuan = $standar ? $standar->satuan : $satuanKomoditas;
                     $satuanKomoditas = $satuan;
                     $faktorMusiman = 1.0; // Default faktor musiman
-
-                    if ($standar) {
-                        $standarDitemukan = true;
-                    }
 
                     // Tentukan faktor hari berdasarkan satuan_periode standar (harian: jumlahHariDalamBulan, bulanan: 1)
                     $faktorHari = ($standar && $standar->satuan_periode === 'bulanan') ? 1 : $jumlahHariDalamBulan;

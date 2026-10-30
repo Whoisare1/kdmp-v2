@@ -6,44 +6,6 @@
         || request()->routeIs('perencanaan.potensi-produksi.*')
         || request()->routeIs('perencanaan.standar-kebutuhan.*');
 
-    $tabs = [
-        [
-            'id' => 'dashboard',
-            'no' => '01',
-            'label' => 'Dashboard M2',
-            'route' => 'perencanaan.dashboard',
-            'desc' => 'Ringkasan & status komoditas',
-        ],
-        [
-            'id' => 'parameter',
-            'no' => '02',
-            'label' => 'Data & Parameter',
-            'route' => 'perencanaan.demografi.index',
-            'desc' => 'Demografi, panen & standar gizi',
-        ],
-        [
-            'id' => 'kebutuhan',
-            'no' => '03',
-            'label' => 'Kalkulasi Kebutuhan',
-            'route' => 'perencanaan.kebutuhan-komoditas.index',
-            'desc' => 'Snapshot kebutuhan konsumsi',
-        ],
-        [
-            'id' => 'neraca',
-            'no' => '04',
-            'label' => 'Neraca Komoditas',
-            'route' => 'perencanaan.neraca-komoditas.index',
-            'desc' => 'Surplus, defisit & integrasi M3',
-        ],
-        [
-            'id' => 'laporan',
-            'no' => '05',
-            'label' => 'Hasil & Laporan M2',
-            'route' => 'perencanaan.laporan.index',
-            'desc' => 'Rekapitulasi cetak & arsip',
-        ],
-    ];
-
     $activeSub = $subActive ?? (
         request()->routeIs('perencanaan.demografi.*') || $active === 'demografi' ? 'demografi' : (
             request()->routeIs('perencanaan.potensi-produksi.*') || $active === 'potensi' ? 'potensi' : (
@@ -94,36 +56,6 @@
             </p>
         </div>
     </div>
-
-    {{-- Tab Navigation --}}
-    <nav class="flex flex-wrap gap-2 pt-1" aria-label="Menu M2">
-        @foreach ($tabs as $tab)
-            @php
-                $isActive = ($tab['id'] === 'parameter' && $isParameterActive)
-                    || ($active === $tab['id'] && !($tab['id'] === 'parameter' && !$isParameterActive));
-            @endphp
-            <a href="{{ route($tab['route']) }}"
-               class="group relative flex items-center gap-2.5 border-b-2 px-4 py-2.5 text-xs font-medium transition-all
-                      {{ $isActive
-                          ? 'border-merah-500 bg-paper-100 text-ink-950 font-semibold shadow-xs'
-                          : 'border-transparent text-ink-600 hover:border-paper-300 hover:bg-paper-100/60 hover:text-ink-900' }}">
-                <span class="flex h-5 w-6 items-center justify-center rounded-[2px] font-mono text-[10px]
-                             {{ $isActive
-                                 ? 'bg-merah-500 text-paper-50'
-                                 : 'bg-paper-200 text-ink-600 group-hover:bg-paper-300 group-hover:text-ink-900' }}">
-                    {{ $tab['no'] }}
-                </span>
-                <div class="text-left">
-                    <span class="block text-sm leading-tight {{ $isActive ? 'text-ink-950 font-semibold' : 'text-ink-800' }}">
-                        {{ $tab['label'] }}
-                    </span>
-                    <span class="hidden text-[10px] text-ink-600/70 sm:block">
-                        {{ $tab['desc'] }}
-                    </span>
-                </div>
-            </a>
-        @endforeach
-    </nav>
 
     {{-- Sub Navigation untuk Data & Parameter --}}
     @if ($isParameterActive)
