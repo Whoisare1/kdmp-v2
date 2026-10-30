@@ -97,7 +97,7 @@ class M2KalkulasiTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('Neraca Komoditas (Surplus / Defisit)');
+        $response->assertSee('Surplus Defisit');
         $response->assertSee('SURPLUS');
         $response->assertSee('DEFISIT');
     }

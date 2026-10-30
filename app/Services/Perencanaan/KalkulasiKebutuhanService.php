@@ -91,11 +91,11 @@ class KalkulasiKebutuhanService
             $totalBarisKebutuhan = 0;
             $totalHasilKalkulasi = 0;
             $ringkasanHasil = [];
+            $komoditasTanpaStandar = [];
 
             foreach ($daftarKomoditas as $komoditas) {
                 $subtotalKebutuhanKomoditas = 0.0;
                 $satuanKomoditas = 'KG';
-                $standarDitemukan = true;
                 $standarPerKelompokUmur = [];
 
                 foreach ($demografi as $demo) {
@@ -119,10 +119,12 @@ class KalkulasiKebutuhanService
                     ->all();
 
                 if ($kelompokTanpaStandar !== []) {
-                    throw new RuntimeException(
-                        "Kalkulasi {$komoditas->nama} dibatalkan karena standar kebutuhan belum lengkap untuk kelompok umur: "
-                        . implode(', ', $kelompokTanpaStandar) . '.'
-                    );
+                    $komoditasTanpaStandar[] = [
+                        'id_komoditas' => $komoditas->id,
+                        'nama' => $komoditas->nama,
+                        'kelompok_umur' => $kelompokTanpaStandar,
+                    ];
+                    continue;
                 }
 
                 $satuanStandar = collect($standarPerKelompokUmur)
@@ -245,7 +247,7 @@ class KalkulasiKebutuhanService
                     'selisih' => $selisih,
                     'status' => $statusSurplusDefisit,
                     'persentase' => $persentaseKecukupan,
-                    'standar_lengkap' => $standarDitemukan,
+                    'standar_lengkap' => true,
                 ];
             }
 
@@ -258,6 +260,7 @@ class KalkulasiKebutuhanService
                 'total_komoditas' => count($daftarKomoditas),
                 'total_baris_kebutuhan' => $totalBarisKebutuhan,
                 'total_hasil_kalkulasi' => $totalHasilKalkulasi,
+                'komoditas_dilewati' => $komoditasTanpaStandar,
                 'rincian' => $ringkasanHasil,
             ];
         });

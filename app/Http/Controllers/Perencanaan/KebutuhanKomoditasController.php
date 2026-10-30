@@ -32,8 +32,8 @@ class KebutuhanKomoditasController extends ModuleCrudController
 
         $tahun = (int) $request->query('tahun', 2026);
         $bulanQuery = $request->query('bulan');
-        $periode = $request->query('periode') ?: ($bulanQuery ? PeriodeKalkulasi::fromMonth((int) $bulanQuery) : null);
-        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : null;
+        $periode = $request->query('periode');
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
 
         $query = KebutuhanKomoditas::with(['wilayah', 'komoditas', 'standar'])
@@ -116,8 +116,11 @@ class KebutuhanKomoditasController extends ModuleCrudController
             'id_komoditas' => ['nullable', 'exists:komoditas,id'],
             'redirect_to' => ['nullable', 'string', 'in:dashboard,kebutuhan,neraca'],
         ]);
-        $validated['periode'] ??= $validated['bulan'] !== null
-            ? PeriodeKalkulasi::fromMonth((int) $validated['bulan'])
+        $legacyBulan = ($validated['periode'] ?? null) === null && isset($validated['bulan'])
+            ? (int) $validated['bulan']
+            : null;
+        $validated['periode'] ??= $legacyBulan !== null
+            ? PeriodeKalkulasi::fromMonth($legacyBulan)
             : null;
         if ($validated['periode'] === null) {
             return back()->withErrors(['periode' => 'Periode perencanaan wajib dipilih.'])->withInput();
@@ -128,7 +131,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
             $hasil = $service->hitungKebutuhan(
                 $idWilayah,
                 (int) $validated['tahun'],
-                $validated['periode'],
+                $legacyBulan ?? $validated['periode'],
                 !empty($validated['id_komoditas']) ? (int) $validated['id_komoditas'] : null
             );
 

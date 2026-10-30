@@ -19,7 +19,7 @@ class NeracaKomoditasController extends ModuleCrudController
 
     protected string $model = HasilKalkulasi::class;
     protected string $view = 'perencanaan.neraca-komoditas';
-    protected string $title = 'Neraca Komoditas (Surplus / Defisit)';
+    protected string $title = 'Surplus Defisit';
     protected string $routeBase = 'perencanaan.neraca-komoditas';
     protected array $withRelations = ['wilayah', 'komoditas'];
 
@@ -29,8 +29,8 @@ class NeracaKomoditasController extends ModuleCrudController
 
         $tahun = (int) $request->query('tahun', 2026);
         $bulanQuery = $request->query('bulan');
-        $periode = $request->query('periode') ?: ($bulanQuery ? PeriodeKalkulasi::fromMonth((int) $bulanQuery) : null);
-        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : null;
+        $periode = $request->query('periode');
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
         $status = $request->query('status_surplus_defisit');
 

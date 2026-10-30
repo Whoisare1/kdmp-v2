@@ -24,8 +24,8 @@ class LaporanM2Controller extends Controller
 
         $tahun = (int) $request->query('tahun', 2026);
         $bulanQuery = $request->query('bulan');
-        $periode = $request->query('periode') ?: ($bulanQuery ? PeriodeKalkulasi::fromMonth((int) $bulanQuery) : null);
-        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : null;
+        $periode = $request->query('periode');
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $kategori = $request->query('kategori');
         $status = $request->query('status');
 
