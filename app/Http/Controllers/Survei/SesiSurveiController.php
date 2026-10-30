@@ -24,32 +24,6 @@ class SesiSurveiController extends ModuleCrudController
     protected string $routeBase = 'survei.sesi';
     protected array $withRelations = ['wilayah', 'petugas', 'jawaban'];
 
-    public function index(Request $request): View
-    {
-        $query = SesiSurvei::with(['wilayah', 'petugas', 'jawaban']);
-
-        if ($search = $request->query('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('catatan', 'like', "%{$search}%")
-                  ->orWhereHas('wilayah', fn ($qw) => $qw->where('nama', 'like', "%{$search}%"))
-                  ->orWhereHas('petugas', fn ($qp) => $qp->where('nama', 'like', "%{$search}%"));
-            });
-        }
-
-        if ($status = $request->query('status')) {
-            $query->where('status', $status);
-        }
-
-        $items = $query->latest('id')->paginate($this->perPage)->withQueryString();
-
-        return view('survei.sesi.index', [
-            'items' => $items,
-            'title' => $this->title,
-            'routeBase' => $this->routeBase,
-            'columns' => ['id', 'id_wilayah', 'tahun', 'tanggal_survei', 'status'],
-        ]);
-    }
-
     /**
      * Mengambil ID wilayah milik desa pengguna yang sedang login.
      * Return null jika pengguna adalah level Pusat / Super Admin (akses semua wilayah).
