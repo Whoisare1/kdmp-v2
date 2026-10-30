@@ -227,7 +227,10 @@ class SurveySyncBridgeTest extends TestCase
                 'sumber' => 'Survei Pola Pangan Harapan 2026',
                 'standar' => [
                     'balita' => ['laki_laki' => 1.5, 'perempuan' => 1.5], // Sum = 3.0 kg/orang/bulan
+                    'anak' => ['laki_laki' => 0.5, 'perempuan' => 0.5],
+                    'remaja' => ['laki_laki' => 0.5, 'perempuan' => 0.5],
                     'dewasa' => ['laki_laki' => 5.0, 'perempuan' => 5.0], // Sum = 10.0 kg/orang/bulan
+                    'lansia' => ['laki_laki' => 0.5, 'perempuan' => 0.5],
                 ],
             ],
             'sumber' => 'manual',
@@ -242,6 +245,12 @@ class SurveySyncBridgeTest extends TestCase
             ['id_wilayah' => $this->wilayahTest->id, 'tahun' => 2026, 'kelompok_umur' => 'dewasa'],
             ['jumlah_penduduk' => 200, 'id_sesi_survei' => $sesi->id]
         );
+        foreach (['anak', 'remaja', 'lansia'] as $kelompokUmur) {
+            DemografiDesa::updateOrCreate(
+                ['id_wilayah' => $this->wilayahTest->id, 'tahun' => 2026, 'kelompok_umur' => $kelompokUmur],
+                ['jumlah_penduduk' => 0, 'id_sesi_survei' => $sesi->id]
+            );
+        }
 
         $syncService = app(SurveySyncService::class);
         $syncService->syncSesi($sesi);
