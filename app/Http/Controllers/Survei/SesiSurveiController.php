@@ -10,6 +10,7 @@ use App\Models\Survei\Jawaban;
 use App\Models\Survei\RekamanSuara;
 use App\Models\Tenant\Wilayah;
 use App\Models\Pengguna;
+use App\Services\Survei\SurveySyncService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
@@ -31,11 +32,11 @@ class SesiSurveiController extends ModuleCrudController
     private function getUserWilayahId(): ?int
     {
         $user = auth()->user();
-        if (!$user || !$user->id_koperasi) {
+        if (!$user || !$user->id_entitas) {
             return null;
         }
 
-        return $user->koperasi?->id_wilayah;
+        return $user->entitas?->id_wilayah;
     }
 
     private function checkHakAksesSesi(SesiSurvei $sesi): void
