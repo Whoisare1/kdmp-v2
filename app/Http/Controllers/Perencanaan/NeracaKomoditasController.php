@@ -11,6 +11,7 @@ use App\Models\Perencanaan\KetersediaanKomoditas;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use App\Support\Perencanaan\PeriodeKalkulasi;
 
 class NeracaKomoditasController extends ModuleCrudController
 {
@@ -27,7 +28,9 @@ class NeracaKomoditasController extends ModuleCrudController
         $idWilayah = $this->wilayahAktifId();
 
         $tahun = (int) $request->query('tahun', 2026);
-        $bulan = $request->filled('bulan') ? (int) $request->query('bulan') : null;
+        $bulanQuery = $request->query('bulan');
+        $periode = $request->query('periode') ?: ($bulanQuery ? PeriodeKalkulasi::fromMonth((int) $bulanQuery) : null);
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : null;
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
         $status = $request->query('status_surplus_defisit');
 

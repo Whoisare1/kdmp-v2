@@ -82,7 +82,7 @@ class M2KalkulasiTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('Kebutuhan Komoditas (Hasil Kalkulasi M2)');
+        $response->assertSee('Kebutuhan Komoditas (Hasil Kalkulasi)');
         $response->assertSee('Beras');
     }
 
@@ -171,12 +171,12 @@ class M2KalkulasiTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('Dashboard M2');
+        $response->assertSee('Dashboard Kalkulasi dan Perencanaan');
         $response->assertSee('Distribusi Status Neraca Komoditas');
         $response->assertSee('Surplus');
         $response->assertSee('Defisit');
         $response->assertSee('Sumber Data M1');
-        $response->assertSee('Jalankan Kalkulasi M2');
+        $response->assertSee('Jalankan Kalkulasi');
     }
 
     public function test_laporan_m2_dapat_diakses_dan_menampilkan_rekapitulasi(): void
@@ -191,7 +191,7 @@ class M2KalkulasiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Laporan Rekapitulasi Neraca Komoditas Pangan');
-        $response->assertSee('DOKUMEN RESMI M2');
+        $response->assertSee('LAPORAN KALKULASI');
         $response->assertSee('Cetak / Ekspor PDF');
     }
 

@@ -1,5 +1,5 @@
-<x-layouts.app title="Potensi Produksi Panen" eyebrow="Modul M2 — Data & Parameter">
-    {{-- Sub Navigasi Modul M2 --}}
+<x-layouts.app title="Potensi Produksi Panen" eyebrow="Kalkulasi — Data & Parameter">
+    {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="parameter" subActive="potensi" />
 
     {{-- Flash Notifications --}}
@@ -98,7 +98,7 @@
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
             <div class="flex items-center justify-between">
                 <p class="font-mono text-[11px] uppercase tracking-wider text-ink-600/70">Catatan Panen</p>
-                <span class="rounded bg-paper-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-700">M1/M2</span>
+                <span class="rounded bg-paper-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-700">Survei/Kalkulasi</span>
             </div>
             <p class="mt-2 font-display text-3xl font-semibold text-ink-950">{{ $totalCatatan }}</p>
             <p class="mt-1 text-xs text-ink-600">
@@ -132,7 +132,7 @@
 
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
             <div class="flex items-center justify-between">
-                <p class="font-mono text-[11px] uppercase tracking-wider text-ink-600/70">Peran Dalam M2</p>
+                <p class="font-mono text-[11px] uppercase tracking-wider text-ink-600/70">Peran Dalam Kalkulasi</p>
                 <span class="rounded bg-merah-500/10 px-1.5 py-0.5 font-mono text-[10px] text-merah-600 font-semibold">Neraca</span>
             </div>
             <p class="mt-2 font-display text-base font-semibold text-ink-900">Total Ketersediaan</p>
@@ -188,7 +188,7 @@
                                     <span>&rarr;</span>
                                 </a>
                             @else
-                                <span class="text-ink-600/70">Input Mandiri M2</span>
+                                <span class="text-ink-600/70">Input Mandiri untuk Kalkulasi</span>
                             @endif
                         </td>
                         <td class="px-5 py-3.5 text-right">

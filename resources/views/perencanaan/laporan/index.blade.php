@@ -1,5 +1,5 @@
-<x-layouts.app title="Hasil & Laporan M2 — Rekapitulasi Neraca Komoditas" eyebrow="Modul M2 — Laporan Perencanaan">
-    {{-- Sub Navigasi M2 (Disembunyikan saat Print) --}}
+<x-layouts.app title="Laporan Kalkulasi — Rekapitulasi Neraca Komoditas" eyebrow="Kalkulasi dan Perencanaan">
+    {{-- Navigasi kalkulasi (disembunyikan saat print) --}}
     <div class="print:hidden">
         <x-perencanaan.nav-m2 active="laporan" />
     </div>
@@ -21,11 +21,10 @@
                 @endforeach
             </select>
 
-            <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
-                <option value="">Semua Bulan (Tahunan)</option>
-                @foreach ($namaBulanList as $num => $nama)
-                    <option value="{{ $num }}" {{ $bulan == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                @endforeach
+            <select name="periode" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">Semua Periode</option>
+                <option value="ganjil" {{ request('periode') === 'ganjil' ? 'selected' : '' }}>Periode Ganjil (Januari–Juni)</option>
+                <option value="genap" {{ request('periode') === 'genap' ? 'selected' : '' }}>Periode Genap (Juli–Desember)</option>
             </select>
 
             <select name="kategori" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
@@ -74,11 +73,11 @@
                     <h1 class="font-display text-2xl font-bold text-ink-950">Laporan Rekapitulasi Neraca Komoditas Pangan</h1>
                     <p class="mt-1 text-sm text-ink-700">
                         Wilayah: <strong>{{ $wilayah?->nama ?? 'Wilayah Desa' }}</strong>
-                        • Periode: <strong>{{ $bulan ? $namaBulanList[$bulan] . ' ' : '' }}{{ $tahun }}</strong>
+                        • Periode: <strong>{{ request('periode') ? ucfirst(request('periode')) : 'Semua Periode' }} {{ $tahun }}</strong>
                     </p>
                 </div>
                 <div class="text-right">
-                    <span class="rounded bg-paper-200 px-2 py-1 font-mono text-xs text-ink-800">DOKUMEN RESMI M2</span>
+                    <span class="rounded bg-paper-200 px-2 py-1 font-mono text-xs text-ink-800">LAPORAN KALKULASI</span>
                     <p class="mt-2 text-xs text-ink-600">Dicetak: {{ now()->format('d M Y, H:i') }} WIB</p>
                     <p class="text-xs text-ink-600">Oleh: {{ auth()->user()->nama ?? 'Sistem' }}</p>
                 </div>
@@ -119,8 +118,8 @@
                         <th class="py-2.5 px-3">Kategori</th>
                         <th class="py-2.5 px-3 text-center">Satuan</th>
                         <th class="py-2.5 px-3 text-center">Periode</th>
-                        <th class="py-2.5 px-3 text-right">Kebutuhan (M2)</th>
-                        <th class="py-2.5 px-3 text-right">Ketersediaan (M1)</th>
+                        <th class="py-2.5 px-3 text-right">Kebutuhan Kalkulasi</th>
+                        <th class="py-2.5 px-3 text-right">Ketersediaan Survei</th>
                         <th class="py-2.5 px-3 text-right">Selisih</th>
                         <th class="py-2.5 px-3 text-center">Status</th>
                         <th class="py-2.5 px-3 text-right">Kecukupan</th>
@@ -163,7 +162,7 @@
                             </td>
                             <td class="py-2 px-3 text-[11px] text-ink-700">
                                 @if ($item->status_surplus_defisit === 'defisit')
-                                    <span class="text-merah-700 font-medium">Ajukan PR Pengadaan (M3)</span>
+                                    <span class="text-merah-700 font-medium">Ajukan Permintaan Pengadaan</span>
                                 @elseif ($item->status_surplus_defisit === 'surplus')
                                     <span class="text-sawah-700">Potensi Konsinyasi Antar Desa (M7)</span>
                                 @else
@@ -187,7 +186,7 @@
             <div>
                 <p class="font-mono text-[10px] uppercase tracking-wide text-ink-600">Catatan Perencanaan:</p>
                 <p class="mt-1 text-[11px] text-ink-600 leading-relaxed">
-                    Data neraca dihitung berdasarkan estimasi konsumsi standar gizi per kapita harian dan ketersediaan panen lokal yang dilaporkan pada modul M1. Dokumen ini menjadi dasar keputusan pengadaan komoditas (M3).
+                    Data neraca dihitung berdasarkan estimasi konsumsi standar gizi per kapita dan ketersediaan panen lokal yang dilaporkan melalui survei. Dokumen ini menjadi dasar keputusan pengadaan komoditas.
                 </p>
             </div>
             <div class="text-right">

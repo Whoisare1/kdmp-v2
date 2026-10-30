@@ -44,15 +44,15 @@
         <div>
             <div class="flex items-center gap-2">
                 <span class="rounded bg-merah-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wider text-merah-600">
-                    MODUL M2
+                    KALKULASI & PERENCANAAN
                 </span>
                 <span class="text-xs text-ink-600/60">•</span>
                 <p class="font-mono text-xs uppercase tracking-wide text-ink-600/70">
-                    Kalkulasi Kebutuhan &amp; Neraca Komoditas
+                    Kalkulasi Kebutuhan &amp; Perencanaan Pengadaan
                 </p>
             </div>
             <p class="mt-1 text-xs text-ink-600">
-                Penyelarasan kebutuhan konsumsi pangan desa dengan potensi ketersediaan panen lokal (M1 &rarr; M2 &rarr; Neraca &rarr; M3).
+                Penyelarasan kebutuhan konsumsi pangan desa dengan potensi ketersediaan panen lokal.
             </p>
         </div>
     </div>

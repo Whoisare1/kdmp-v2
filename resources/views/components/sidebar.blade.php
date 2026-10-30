@@ -31,11 +31,11 @@
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>',
             'match' => 'perencanaan.*',
             'items' => [
-                ['label' => 'Dashboard M2', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard'],
+                ['label' => 'Dashboard Kalkulasi dan Perencanaan', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard'],
                 ['label' => 'Data & Parameter', 'route' => 'perencanaan.demografi.index', 'match' => 'perencanaan.demografi.*,perencanaan.potensi-produksi.*,perencanaan.standar-kebutuhan.*'],
                 ['label' => 'Kalkulasi Kebutuhan', 'route' => 'perencanaan.kebutuhan-komoditas.index', 'match' => 'perencanaan.kebutuhan-komoditas.*'],
-                ['label' => 'Neraca Komoditas', 'route' => 'perencanaan.neraca-komoditas.index', 'match' => 'perencanaan.neraca-komoditas.*'],
-                ['label' => 'Laporan M2', 'route' => 'perencanaan.laporan.index', 'match' => 'perencanaan.laporan.*'],
+                ['label' => 'Surplus Defisit', 'route' => 'perencanaan.neraca-komoditas.index', 'match' => 'perencanaan.neraca-komoditas.*'],
+                ['label' => 'Laporan Kalkulasi', 'route' => 'perencanaan.laporan.index', 'match' => 'perencanaan.laporan.*'],
                 ['label' => 'Permintaan Pengadaan', 'route' => 'perencanaan.permintaan-pengadaan.index', 'match' => 'perencanaan.permintaan-pengadaan.*'],
                 ['label' => 'Perbandingan Harga', 'route' => 'perencanaan.perbandingan-harga.index', 'match' => 'perencanaan.perbandingan-harga.*'],
             ]

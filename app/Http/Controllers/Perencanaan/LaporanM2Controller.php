@@ -9,6 +9,7 @@ use App\Models\Perencanaan\DemografiDesa;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Tenant\Wilayah;
+use App\Support\Perencanaan\PeriodeKalkulasi;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -22,7 +23,9 @@ class LaporanM2Controller extends Controller
         $wilayah = Wilayah::find($idWilayah);
 
         $tahun = (int) $request->query('tahun', 2026);
-        $bulan = $request->filled('bulan') ? (int) $request->query('bulan') : null;
+        $bulanQuery = $request->query('bulan');
+        $periode = $request->query('periode') ?: ($bulanQuery ? PeriodeKalkulasi::fromMonth((int) $bulanQuery) : null);
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : null;
         $kategori = $request->query('kategori');
         $status = $request->query('status');
 
@@ -77,6 +80,7 @@ class LaporanM2Controller extends Controller
             'wilayah' => $wilayah,
             'tahun' => $tahun,
             'bulan' => $bulan,
+            'periode' => $periode,
             'kategori' => $kategori,
             'statusFilter' => $status,
             'daftarKategori' => $daftarKategori,

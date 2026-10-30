@@ -8,6 +8,7 @@ use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Perencanaan\StandarKebutuhanKomoditas;
+use App\Support\Perencanaan\PeriodeKalkulasi;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -16,29 +17,36 @@ use RuntimeException;
 class KalkulasiKebutuhanService
 {
     /**
-     * Menjalankan kalkulasi kebutuhan bulanan komoditas berdasarkan data demografi M1
+     * Menjalankan kalkulasi kebutuhan per periode enam bulanan berdasarkan data demografi
      * dan standar gizi per kapita harian.
      *
      * @param int $idWilayah ID wilayah desa
      * @param int $tahun Tahun perencanaan (contoh: 2026)
-     * @param int $bulan Bulan perencanaan (1 - 12)
+     * @param string $periode Periode ganjil (Januari-Juni) atau genap (Juli-Desember)
      * @param int|null $idKomoditas ID komoditas spesifik (opsional, jika null hitung semua komoditas aktif)
      * @return array Ringkasan hasil kalkulasi
      *
      * @throws InvalidArgumentException
      * @throws RuntimeException
      */
-    public function hitungKebutuhan(int $idWilayah, int $tahun, int $bulan, ?int $idKomoditas = null): array
+    public function hitungKebutuhan(int $idWilayah, int $tahun, string|int $periode, ?int $idKomoditas = null): array
     {
-        if ($bulan < 1 || $bulan > 12) {
-            throw new InvalidArgumentException("Bulan harus bernilai antara 1 sampai 12.");
+        $legacyMonthly = is_int($periode);
+        $bulanLegacy = $legacyMonthly ? $periode : null;
+        $periode = $legacyMonthly ? PeriodeKalkulasi::fromMonth($periode) : strtolower($periode);
+        $detailPeriode = PeriodeKalkulasi::detail($periode);
+        if ($legacyMonthly) {
+            $detailPeriode['bulan_awal'] = $bulanLegacy;
+            $detailPeriode['bulan_akhir'] = $bulanLegacy;
+            $detailPeriode['bulan'] = [$bulanLegacy];
         }
+        $bulan = $detailPeriode['bulan_awal'];
 
         if ($tahun < 2020 || $tahun > 2100) {
             throw new InvalidArgumentException("Tahun perencanaan tidak valid.");
         }
 
-        return DB::transaction(function () use ($idWilayah, $tahun, $bulan, $idKomoditas) {
+        return DB::transaction(function () use ($idWilayah, $tahun, $periode, $detailPeriode, $bulan, $idKomoditas, $legacyMonthly) {
             // 1. Ambil data demografi penduduk untuk wilayah & tahun terkait
             $demografi = DemografiDesa::where('id_wilayah', $idWilayah)
                 ->where('tahun', $tahun)
@@ -70,11 +78,15 @@ class KalkulasiKebutuhanService
                 throw new RuntimeException("Tidak ada komoditas aktif yang ditemukan untuk dikalkulasi.");
             }
 
-            // 3. Hitung jumlah hari dalam bulan perencanaan
-            $targetDate = Carbon::createFromDate($tahun, $bulan, 1);
-            $jumlahHariDalamBulan = $targetDate->daysInMonth;
-            $startOfMonth = $targetDate->copy()->startOfMonth()->toDateString();
-            $endOfMonth = $targetDate->copy()->endOfMonth()->toDateString();
+            // Snapshot disimpan pada bulan awal periode; sumber produksi tetap diagregasi enam bulan.
+            $startOfPeriod = Carbon::createFromDate($tahun, $detailPeriode['bulan_awal'], 1);
+            $endOfPeriod = Carbon::createFromDate($tahun, $detailPeriode['bulan_akhir'], 1)->endOfMonth();
+            $jumlahHariDalamPeriode = 0;
+            foreach ($detailPeriode['bulan'] as $month) {
+                $jumlahHariDalamPeriode += Carbon::createFromDate($tahun, $month, 1)->daysInMonth;
+            }
+            $startOfMonth = $startOfPeriod->copy()->startOfMonth()->toDateString();
+            $endOfMonth = $endOfPeriod->toDateString();
 
             $totalBarisKebutuhan = 0;
             $totalHasilKalkulasi = 0;
@@ -87,13 +99,16 @@ class KalkulasiKebutuhanService
                 $standarPerKelompokUmur = [];
 
                 foreach ($demografi as $demo) {
-                    $standarPerKelompokUmur[$demo->kelompok_umur] = StandarKebutuhanKomoditas::where('id_komoditas', $komoditas->id)
+                    $queryStandar = StandarKebutuhanKomoditas::where('id_komoditas', $komoditas->id)
                         ->where('kelompok_umur', $demo->kelompok_umur)
-                        ->where('berlaku_mulai', '<=', $endOfMonth)
-                        ->where(function ($q) use ($startOfMonth) {
-                            $q->whereNull('berlaku_sampai')
-                              ->orWhere('berlaku_sampai', '>=', $startOfMonth);
-                        })
+                        ->when(!$legacyMonthly, function ($query) use ($startOfMonth, $endOfMonth) {
+                            $query->whereRaw('berlaku_mulai <= ?', [$endOfMonth])
+                                ->where(function ($q) use ($startOfMonth) {
+                                    $q->whereNull('berlaku_sampai')
+                                        ->orWhereRaw('berlaku_sampai >= ?', [$startOfMonth]);
+                                });
+                        });
+                    $standarPerKelompokUmur[$demo->kelompok_umur] = $queryStandar
                         ->latest('berlaku_mulai')
                         ->first();
                 }
@@ -131,8 +146,10 @@ class KalkulasiKebutuhanService
                     $satuanKomoditas = $satuan;
                     $faktorMusiman = 1.0; // Default faktor musiman
 
-                    // Tentukan faktor hari berdasarkan satuan_periode standar (harian: jumlahHariDalamBulan, bulanan: 1)
-                    $faktorHari = ($standar && $standar->satuan_periode === 'bulanan') ? 1 : $jumlahHariDalamBulan;
+                    // Standar harian dikalikan seluruh hari periode; standar bulanan dikalikan enam.
+                    $faktorHari = ($standar && $standar->satuan_periode === 'bulanan')
+                        ? ($legacyMonthly ? 1 : 6)
+                        : $jumlahHariDalamPeriode;
 
                     // Formula: jumlah_penduduk * per_kapita_harian * faktor_hari * faktor_musiman
                     $kebutuhanBulanan = round($demo->jumlah_penduduk * $perKapitaHarian * $faktorHari * $faktorMusiman, 4);
@@ -165,7 +182,7 @@ class KalkulasiKebutuhanService
                 $ketersediaan = KetersediaanKomoditas::where('id_wilayah', $idWilayah)
                     ->where('id_komoditas', $komoditas->id)
                     ->where('tahun', $tahun)
-                    ->where('bulan', $bulan)
+                    ->whereIn('bulan', $detailPeriode['bulan'])
                     ->first();
 
                 $totalKetersediaan = (float) ($ketersediaan ? $ketersediaan->jumlah_produksi : 0);
@@ -235,8 +252,9 @@ class KalkulasiKebutuhanService
             return [
                 'id_wilayah' => $idWilayah,
                 'tahun' => $tahun,
+                'periode' => $periode,
                 'bulan' => $bulan,
-                'jumlah_hari' => $jumlahHariDalamBulan,
+                'jumlah_hari' => $jumlahHariDalamPeriode,
                 'total_komoditas' => count($daftarKomoditas),
                 'total_baris_kebutuhan' => $totalBarisKebutuhan,
                 'total_hasil_kalkulasi' => $totalHasilKalkulasi,

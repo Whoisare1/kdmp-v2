@@ -18,7 +18,7 @@ class PermintaanPengadaan extends Model
 
     protected $fillable = [
         'id_entitas', 'kode_permintaan', 'id_pihak', 'tgl_pengajuan', 'total_nilai',
-        'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
+        'id_unit_usaha', 'id_gudang', 'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
     ];
 
     protected function casts(): array
@@ -106,4 +106,3 @@ class PermintaanPengadaan extends Model
         return $prefix . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
     }
 }
-
