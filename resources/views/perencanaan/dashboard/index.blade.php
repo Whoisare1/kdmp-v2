@@ -1,7 +1,4 @@
-<x-layouts.app title="Dashboard M2 — Kalkulasi & Neraca Komoditas" eyebrow="Modul M2 — Perencanaan Pangan">
-    {{-- Sub Navigasi Modul M2 --}}
-    <x-perencanaan.nav-m2 active="dashboard" />
-
+<x-layouts.app title="Dashboard Kalkulasi dan Perencanaan" eyebrow="Kalkulasi dan Perencanaan Pangan">
     {{-- Flash Notifications --}}
     @if (session('status'))
         <div class="mb-5 flex items-center justify-between rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">
@@ -30,6 +27,54 @@
         ];
     @endphp
 
+    <div class="mb-7">
+        <div class="mb-4">
+            <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-600/70">Kalkulasi dan Perencanaan</p>
+            <h2 class="mt-1 font-display text-2xl font-semibold text-ink-950">Dashboard Kalkulasi dan Perencanaan</h2>
+            <p class="mt-1 text-sm text-ink-600">Pilih fitur untuk mengelola data kebutuhan, neraca, dan laporan komoditas desa.</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <a href="{{ route('perencanaan.dashboard') }}" class="group rounded-sm border border-merah-500 bg-merah-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-merah-600 text-lg text-paper-50">▦</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Dashboard Kalkulasi dan Perencanaan</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Pantau status komoditas</p>
+            </a>
+
+            <a href="{{ route('perencanaan.demografi.index') }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-lg text-blue-700">⌂</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Data &amp; Parameter</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Kelola data dasar kalkulasi</p>
+            </a>
+
+            <a href="{{ route('perencanaan.kebutuhan-komoditas.index', ['tahun' => $tahun]) }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-lg text-amber-700">∑</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Kalkulasi Kebutuhan</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Proses kebutuhan per enam bulan</p>
+            </a>
+
+            <a href="{{ route('perencanaan.neraca-komoditas.index', ['tahun' => $tahun]) }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-sawah-100 text-lg text-sawah-700">⇄</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Neraca Komoditas</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Baca surplus dan defisit</p>
+            </a>
+
+            <a href="{{ route('perencanaan.laporan.index', ['tahun' => $tahun]) }}" class="group rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs transition hover:-translate-y-0.5 hover:border-merah-400 hover:shadow-md">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-lg text-purple-700">▤</span>
+                <h3 class="mt-5 font-display text-xl font-semibold text-ink-950">Laporan Kalkulasi</h3>
+                <p class="mt-2 text-xs font-medium uppercase tracking-wide text-ink-600">Rekap hasil kalkulasi</p>
+            </a>
+        </div>
+    </div>
+
+    <div class="mb-4 flex items-center justify-between border-l-4 border-merah-500 bg-paper-50 px-4 py-3">
+        <div>
+            <h2 class="font-display text-lg font-semibold text-ink-950">Ringkasan Status Kebutuhan</h2>
+            <p class="mt-0.5 text-xs text-ink-600">Surplus, seimbang, dan defisit komoditas pada periode terpilih.</p>
+        </div>
+        <span class="hidden font-mono text-[10px] uppercase tracking-wider text-ink-600/70 sm:block">Dashboard Kalkulasi</span>
+    </div>
+
     {{-- Filter & Action Header --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
         <form method="GET" action="{{ route('perencanaan.dashboard') }}" class="flex flex-wrap items-center gap-3">
@@ -56,18 +101,17 @@
                 @endforeach
             </select>
 
-            {{-- Filter Bulan --}}
-            <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
-                <option value="">Semua Bulan (Tahunan)</option>
-                @foreach ($namaBulanList as $num => $nama)
-                    <option value="{{ $num }}" {{ $bulan == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                @endforeach
+            {{-- Filter periode enam bulanan --}}
+            <select name="periode" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">Semua Periode</option>
+                <option value="ganjil" {{ request('periode') === 'ganjil' ? 'selected' : '' }}>Periode Ganjil (Januari–Juni)</option>
+                <option value="genap" {{ request('periode') === 'genap' ? 'selected' : '' }}>Periode Genap (Juli–Desember)</option>
             </select>
 
             <button type="submit" class="rounded-sm border border-paper-300 bg-paper-200/80 px-3 py-2 text-xs font-medium text-ink-800 hover:border-merah-400 hover:text-merah-600">
                 Terapkan Filter
             </button>
-            @if ($bulan || $kategori)
+            @if ($periode || $kategori)
                 <a href="{{ route('perencanaan.dashboard', ['tahun' => $tahun]) }}" class="text-xs text-ink-600 hover:text-merah-600 hover:underline">
                     Reset
                 </a>
@@ -80,7 +124,7 @@
                     onclick="document.getElementById('modal-kalkulasi').classList.remove('hidden')"
                     class="inline-flex items-center gap-2 rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
                 <span>⚡</span>
-                <span>Jalankan Kalkulasi M2</span>
+                <span>Jalankan Kalkulasi</span>
             </button>
         </div>
     </div>
@@ -90,7 +134,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <span class="font-semibold text-ink-900">Status Snapshot Terkini:</span>
             <span>
-                Periode Terpilih: <strong>{{ $bulan ? $namaBulanList[$bulan] . ' ' : '' }}{{ $tahun }}</strong>
+                Periode Terpilih: <strong>{{ $periode ? ucfirst($periode) . ' ' : 'Semua Periode ' }}{{ $tahun }}</strong>
             </span>
             <span class="text-paper-300">|</span>
             <span>
@@ -121,7 +165,7 @@
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
             <div class="flex items-center justify-between">
                 <p class="font-mono text-[11px] uppercase tracking-wider text-ink-600/70">Total Komoditas</p>
-                <span class="rounded bg-paper-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-700">M2</span>
+                <span class="rounded bg-paper-200 px-1.5 py-0.5 font-mono text-[10px] text-ink-700">Kalkulasi</span>
             </div>
             <p class="mt-2 font-display text-3xl font-semibold text-ink-950">{{ $totalKomoditasTerhitung }}</p>
             <p class="mt-1 text-xs text-ink-600">
@@ -271,7 +315,7 @@
                 <div class="flex items-center justify-between border-b border-paper-200 pb-3">
                     <div>
                         <h3 class="font-display text-base font-semibold text-merah-700">Defisit Terbesar (Prioritas Pengadaan)</h3>
-                        <p class="text-xs text-ink-600">Komoditas yang memerlukan pemenuhan pasokan luar (M3)</p>
+                        <p class="text-xs text-ink-600">Komoditas yang memerlukan pemenuhan pasokan luar</p>
                     </div>
                     <span class="rounded bg-merah-100 px-2 py-0.5 font-mono text-xs font-semibold text-merah-700">
                         {{ $komoditasDefisitTerbesar->count() }} Item
@@ -302,7 +346,7 @@
                                 </a>
                                 <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', ['hasil' => $item->id_hasil]) }}"
                                    class="inline-flex items-center gap-1 rounded-sm bg-merah-500 px-2.5 py-1 text-[11px] font-semibold text-paper-50 hover:bg-merah-600">
-                                    <span>+ Buat PR (M3)</span>
+                                    <span>+ Buat Permintaan Pengadaan</span>
                                 </a>
                             </div>
                         </div>
@@ -319,7 +363,7 @@
             <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs">
                 <div class="flex items-center justify-between border-b border-paper-200 pb-3">
                     <h3 class="font-display text-base font-semibold text-ink-900">Sumber Data M1 Lapangan</h3>
-                    <span class="rounded bg-paper-200 px-2 py-0.5 font-mono text-[10px] text-ink-700">M1 &rarr; M2</span>
+                    <span class="rounded bg-paper-200 px-2 py-0.5 font-mono text-[10px] text-ink-700">Survei &rarr; Kalkulasi</span>
                 </div>
 
                 <div class="mt-4 space-y-3 text-xs text-ink-800">
@@ -395,14 +439,14 @@
         </div>
     </div>
 
-    {{-- Modal Jalankan Kalkulasi M2 --}}
+    {{-- Modal jalankan kalkulasi --}}
     <div id="modal-kalkulasi" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-ink-950/70 p-4 backdrop-blur-xs">
         <div class="w-full max-w-md rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-2xl">
             <div class="flex items-center justify-between border-b border-paper-200 pb-3">
                 <div class="flex items-center gap-2">
                     <span class="flex h-7 w-7 items-center justify-center rounded-sm bg-merah-500 font-bold text-paper-50 text-sm">⚡</span>
                     <div>
-                        <h3 class="font-display text-base font-semibold text-ink-950">Jalankan Kalkulasi Kebutuhan M2</h3>
+                        <h3 class="font-display text-base font-semibold text-ink-950">Jalankan Kalkulasi Kebutuhan</h3>
                         <p class="text-[11px] text-ink-600">Perhitungan snapshot kebutuhan & neraca desa</p>
                     </div>
                 </div>
@@ -422,11 +466,10 @@
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-xs font-semibold text-ink-800">Bulan Perencanaan</label>
-                    <select name="bulan" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
-                        @foreach ($namaBulanList as $num => $nama)
-                            <option value="{{ $num }}" {{ ($bulan ?? date('n')) == $num ? 'selected' : '' }}>{{ $nama }} (Bulan {{ $num }})</option>
-                        @endforeach
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Periode Perencanaan</label>
+                    <select name="periode" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                        <option value="ganjil" @selected(($periode ?? (now()->month <= 6 ? 'ganjil' : 'genap')) === 'ganjil')>Periode Ganjil (Januari–Juni)</option>
+                        <option value="genap" @selected(($periode ?? (now()->month <= 6 ? 'ganjil' : 'genap')) === 'genap')>Periode Genap (Juli–Desember)</option>
                     </select>
                 </div>
 

@@ -8,8 +8,10 @@ use App\Models\Master\Komoditas;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Perencanaan\KetersediaanKomoditas;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use App\Support\Perencanaan\PeriodeKalkulasi;
 
 class NeracaKomoditasController extends ModuleCrudController
 {
@@ -17,7 +19,7 @@ class NeracaKomoditasController extends ModuleCrudController
 
     protected string $model = HasilKalkulasi::class;
     protected string $view = 'perencanaan.neraca-komoditas';
-    protected string $title = 'Neraca Komoditas (Surplus / Defisit)';
+    protected string $title = 'Surplus Defisit';
     protected string $routeBase = 'perencanaan.neraca-komoditas';
     protected array $withRelations = ['wilayah', 'komoditas'];
 
@@ -26,13 +28,17 @@ class NeracaKomoditasController extends ModuleCrudController
         $idWilayah = $this->wilayahAktifId();
 
         $tahun = (int) $request->query('tahun', 2026);
-        $bulan = $request->filled('bulan') ? (int) $request->query('bulan') : null;
+        $bulanQuery = $request->query('bulan');
+        $periode = $request->query('periode');
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
         $status = $request->query('status_surplus_defisit');
 
         $query = HasilKalkulasi::with(['wilayah', 'komoditas'])
             ->where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun);
+
+        $this->onlyLatestVersion($query);
 
         if ($bulan !== null) {
             $query->where('bulan', $bulan);
@@ -71,6 +77,8 @@ class NeracaKomoditasController extends ModuleCrudController
         $baseQuery = HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)
             ->when($bulan, fn ($q) => $q->where('bulan', $bulan));
+
+        $this->onlyLatestVersion($baseQuery);
 
         $totalSurplus = (clone $baseQuery)->where('status_surplus_defisit', 'surplus')->count();
         $totalDefisit = (clone $baseQuery)->where('status_surplus_defisit', 'defisit')->count();
@@ -113,6 +121,13 @@ class NeracaKomoditasController extends ModuleCrudController
             'kelengkapanStandarMap' => $kelengkapanStandarMap,
             'totalKomoditasKurangStandar' => $totalKomoditasKurangStandar,
         ]);
+    }
+
+    private function onlyLatestVersion(Builder $query): Builder
+    {
+        return $query->whereRaw(
+            'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
+        );
     }
 
     public function show(int|string $id): View

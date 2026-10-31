@@ -1,5 +1,5 @@
-<x-layouts.app :title="$title" eyebrow="Modul M2 — Neraca Komoditas">
-    {{-- Sub Navigasi M2 --}}
+<x-layouts.app :title="$title" eyebrow="Kalkulasi dan Perencanaan">
+    {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="neraca" />
 
     {{-- Flash Notifications --}}
@@ -71,7 +71,7 @@
                 <span class="flex h-5 w-5 items-center justify-center rounded-full bg-merah-500 text-xs text-paper-50 font-bold">!</span>
             </div>
             <p class="mt-1 font-display text-3xl font-semibold text-merah-600">{{ $totalDefisit }}</p>
-            <p class="mt-1 text-xs text-ink-700">Perlu pengadaan dari luar atau mitra desa (M3/KBR)</p>
+            <p class="mt-1 text-xs text-ink-700">Perlu pengadaan dari luar atau mitra desa</p>
         </div>
     </div>
 
@@ -84,11 +84,10 @@
                 @endforeach
             </select>
 
-            <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
-                <option value="">-- Semua Bulan --</option>
-                @foreach ($namaBulanList as $num => $nama)
-                    <option value="{{ $num }}" {{ $bulan == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                @endforeach
+            <select name="periode" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">-- Semua Periode --</option>
+                <option value="ganjil" {{ request('periode') === 'ganjil' ? 'selected' : '' }}>Ganjil (Januari–Juni)</option>
+                <option value="genap" {{ request('periode') === 'genap' ? 'selected' : '' }}>Genap (Juli–Desember)</option>
             </select>
 
             <select name="id_komoditas" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
@@ -128,16 +127,16 @@
                     onclick="document.getElementById('modal-kalkulasi').classList.remove('hidden')"
                     class="inline-flex items-center gap-1.5 rounded-sm bg-merah-500 px-3 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
                 <span>⚡</span>
-                <span>Jalankan Kalkulasi M2</span>
+                <span>Jalankan Kalkulasi</span>
             </button>
             <a href="{{ route('perencanaan.kebutuhan-komoditas.index', ['tahun' => $tahun, 'bulan' => $bulan]) }}"
                class="rounded-sm bg-paper-200 px-3 py-2 text-xs font-medium text-ink-800 hover:bg-paper-300">
-                &larr; Detail Kebutuhan M2
+                &larr; Detail Kebutuhan
             </a>
         </div>
     </div>
 
-    {{-- Tabel Neraca Komoditas (Hasil Kalkulasi M2) --}}
+    {{-- Tabel Neraca Komoditas hasil kalkulasi --}}
     <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50 shadow-2xs">
         <table class="w-full text-left text-sm">
             <thead>
@@ -247,7 +246,7 @@
                                 @if ($item->status_surplus_defisit === 'defisit')
                                     <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', ['hasil' => $item->id_hasil]) }}"
                                        class="inline-flex items-center gap-1 rounded-sm bg-merah-500 px-2.5 py-1 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600"
-                                       title="Buat Draft Permintaan Pengadaan M3 untuk menutupi kekurangan komoditas ini">
+                                       title="Buat Draft Permintaan Pengadaan untuk menutupi kekurangan komoditas ini">
                                         <span>Buat Permintaan Pengadaan</span>
                                     </a>
                                 @endif
@@ -263,7 +262,7 @@
                                 </span>
                                 <p class="mt-3 font-display text-base font-semibold text-ink-900">Belum Ada Data Neraca Komoditas</p>
                                 <p class="mt-1 text-xs text-ink-600">
-                                    Klik tombol <strong class="text-merah-600">"Jalankan Kalkulasi M2"</strong> di atas atau buka modul <a href="{{ route('perencanaan.kebutuhan-komoditas.index') }}" class="text-merah-600 underline">Kalkulasi Kebutuhan M2</a> untuk menghasilkan neraca komoditas desa secara otomatis.
+                                    Klik tombol <strong class="text-merah-600">"Jalankan Kalkulasi"</strong> di atas atau buka modul <a href="{{ route('perencanaan.kebutuhan-komoditas.index') }}" class="text-merah-600 underline">Kalkulasi Kebutuhan</a> untuk menghasilkan neraca komoditas desa secara otomatis.
                                 </p>
                             </div>
                         </td>
@@ -277,14 +276,14 @@
         {{ $items->links() }}
     </div>
 
-    {{-- Modal Jalankan Kalkulasi M2 --}}
+    {{-- Modal jalankan kalkulasi --}}
     <div id="modal-kalkulasi" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-ink-950/70 p-4 backdrop-blur-xs">
         <div class="w-full max-w-md rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-2xl">
             <div class="flex items-center justify-between border-b border-paper-200 pb-3">
                 <div class="flex items-center gap-2">
                     <span class="flex h-7 w-7 items-center justify-center rounded-sm bg-merah-500 font-bold text-paper-50 text-sm">⚡</span>
                     <div>
-                        <h3 class="font-display text-base font-semibold text-ink-950">Jalankan Kalkulasi Kebutuhan M2</h3>
+                        <h3 class="font-display text-base font-semibold text-ink-950">Jalankan Kalkulasi Kebutuhan</h3>
                         <p class="text-[11px] text-ink-600">Perhitungan snapshot kebutuhan &amp; neraca komoditas desa</p>
                     </div>
                 </div>
@@ -304,8 +303,10 @@
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-xs font-semibold text-ink-800">Bulan Perencanaan</label>
-                    <select name="bulan" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Periode Perencanaan</label>
+                    <select name="periode" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                        <option value="ganjil" @selected(request('periode', $bulan !== null && $bulan > 6 ? 'genap' : 'ganjil') === 'ganjil')>Periode Ganjil (Januari–Juni)</option>
+                        <option value="genap" @selected(request('periode', $bulan !== null && $bulan > 6 ? 'genap' : 'ganjil') === 'genap')>Periode Genap (Juli–Desember)</option>
                         @foreach ($namaBulanList as $num => $nama)
                             <option value="{{ $num }}" {{ ($bulan ?? date('n')) == $num ? 'selected' : '' }}>{{ $nama }} (Bulan {{ $num }})</option>
                         @endforeach

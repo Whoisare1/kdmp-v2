@@ -1,5 +1,5 @@
-<x-layouts.app :title="$title" eyebrow="Modul M2 — Detail Kalkulasi Kebutuhan">
-    {{-- Sub Navigasi M2 --}}
+<x-layouts.app :title="$title" eyebrow="Detail Kalkulasi Kebutuhan">
+    {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="kebutuhan" />
 
     @php
@@ -54,7 +54,7 @@
                 </div>
                 <h1 class="mt-1 font-display text-2xl font-bold text-ink-950">{{ $item->komoditas?->nama }}</h1>
                 <p class="text-xs text-ink-600">
-                    Periode Perencanaan: <strong>{{ $namaBulanList[$item->bulan] ?? 'Bulan ' . $item->bulan }} {{ $item->tahun }}</strong>
+                    Periode Perencanaan: <strong>{{ $item->bulan <= 6 ? 'Ganjil (Januari–Juni)' : 'Genap (Juli–Desember)' }} {{ $item->tahun }}</strong>
                     • Satuan Dasar: <span class="font-mono font-semibold">{{ $item->satuan }}</span>
                     • Durasi: <span class="font-mono">{{ $daysInMonth }} Hari Kalender</span>
                 </p>
@@ -172,7 +172,7 @@
                         <th class="px-4 py-3 text-right font-medium">Standar Gizi Harian</th>
                         <th class="px-4 py-3 text-center font-medium">Hari / Periode</th>
                         <th class="px-4 py-3 text-center font-medium">Faktor Musiman</th>
-                        <th class="px-4 py-3 text-right font-medium">Kebutuhan Bulanan ({{ $item->satuan }})</th>
+                        <th class="px-4 py-3 text-right font-medium">Kebutuhan Periode ({{ $item->satuan }})</th>
                         <th class="px-4 py-3 font-medium">Status Standar &amp; Sumber</th>
                     </tr>
                 </thead>
@@ -287,7 +287,7 @@
             <div class="text-xs text-ink-700">
                 <p class="font-semibold text-ink-900">Jejak Audit Snapshot &amp; Integritas Data:</p>
                 <p class="mt-0.5 text-ink-600">
-                    Snapshot tersimpan permanen untuk menjaga konsistensi rencana pengadaan M3 dan rekam jejak akuntansi koperasi desa.
+                    Snapshot tersimpan permanen untuk menjaga konsistensi rencana pengadaan dan rekam jejak akuntansi koperasi desa.
                 </p>
                 <p class="mt-1 font-mono text-[11px] text-ink-600/80">
                     Snapshot dibuat: {{ $item->created_at ? $item->created_at->format('d F Y, H:i:s') : '—' }} WIB
@@ -300,7 +300,7 @@
                 @if ($hasilNeraca && $hasilNeraca->status_surplus_defisit === 'defisit')
                     <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', ['hasil' => $hasilNeraca->id_hasil]) }}"
                        class="rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
-                        + Buat Permintaan Pengadaan (M3)
+                        + Buat Permintaan Pengadaan
                     </a>
                 @elseif ($hasilNeraca && $hasilNeraca->status_surplus_defisit === 'surplus')
                     <a href="{{ route('konsinyasi.marketplace.index') }}"
@@ -345,11 +345,10 @@
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-xs font-semibold text-ink-800">Bulan Perencanaan</label>
-                    <select name="bulan" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
-                        @foreach ($namaBulanList as $num => $nama)
-                            <option value="{{ $num }}" {{ $item->bulan == $num ? 'selected' : '' }}>{{ $nama }} (Bulan {{ $num }})</option>
-                        @endforeach
+                    <label class="mb-1 block text-xs font-semibold text-ink-800">Periode Perencanaan</label>
+                    <select name="periode" required class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
+                        <option value="ganjil" @selected($item->bulan <= 6)>Periode Ganjil (Januari–Juni)</option>
+                        <option value="genap" @selected($item->bulan > 6)>Periode Genap (Juli–Desember)</option>
                     </select>
                 </div>
 

@@ -5,7 +5,7 @@ namespace App\Models\Perencanaan;
 use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Pihak;
 use App\Models\Pengguna;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,7 +18,7 @@ class PermintaanPengadaan extends Model
 
     protected $fillable = [
         'id_entitas', 'kode_permintaan', 'id_pihak', 'tgl_pengajuan', 'total_nilai',
-        'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
+        'id_unit_usaha', 'id_gudang', 'status', 'catatan', 'created_by', 'approved_by', 'approved_at',
     ];
 
     protected function casts(): array
@@ -32,7 +32,7 @@ class PermintaanPengadaan extends Model
 
     public function koperasi()
     {
-        return $this->belongsTo(KoperasiDesa::class, 'id_koperasi', 'id_koperasi');
+        return $this->belongsTo(Entitas::class, 'id_entitas', 'id_entitas');
     }
 
     public function pihak()
@@ -90,10 +90,10 @@ class PermintaanPengadaan extends Model
     /**
      * Generate nomor rencana otomatis: PR-YYYYMM-XXXX
      */
-    public static function generateKode(int $idKoperasi): string
+    public static function generateKode(int $idEntitas): string
     {
         $prefix = 'PR-' . date('Ym') . '-';
-        $last = static::where('id_koperasi', $idKoperasi)
+        $last = static::where('id_entitas', $idEntitas)
             ->where('kode_permintaan', 'like', $prefix . '%')
             ->orderByDesc('kode_permintaan')
             ->value('kode_permintaan');
@@ -106,4 +106,3 @@ class PermintaanPengadaan extends Model
         return $prefix . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
     }
 }
-

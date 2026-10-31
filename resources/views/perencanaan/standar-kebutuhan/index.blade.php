@@ -1,5 +1,5 @@
-<x-layouts.app title="Standar Kebutuhan Komoditas" eyebrow="Modul M2 — Data & Parameter">
-    {{-- Sub Navigasi Modul M2 --}}
+    <x-layouts.app title="Standar Kebutuhan Komoditas" eyebrow="Kalkulasi — Data & Parameter">
+    {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="parameter" subActive="standar" />
 
     {{-- Flash Notifications --}}
@@ -125,7 +125,7 @@
             </div>
             <p class="mt-2 font-display text-base font-semibold text-ink-900">Histori Terlindungi</p>
             <p class="mt-1 text-xs text-ink-600">
-                Revisi standar tidak mengubah snapshot bulan lalu
+                Revisi standar tidak mengubah snapshot periode sebelumnya
             </p>
         </div>
     </div>

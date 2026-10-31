@@ -8,7 +8,7 @@ use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Perencanaan\StandarKebutuhanKomoditas;
 use App\Models\Survei\Jawaban;
 use App\Models\Survei\SesiSurvei;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -89,15 +89,14 @@ class SurveySyncService
     }
 
     /**
-     * Memvalidasi bahwa sesi survei berada dalam wilayah koperasi yang berhak (Tenant Isolation).
+     * Memvalidasi bahwa sesi survei berada dalam wilayah entitas yang berhak (Tenant Isolation).
      */
     protected function validasiTenantScope(SesiSurvei $sesi): void
     {
-        if (app()->bound('koperasi_aktif')) {
-            $idKoperasiAktif = app('koperasi_aktif');
-            $koperasi = KoperasiDesa::find($idKoperasiAktif);
-            if ($koperasi && $koperasi->id_wilayah != $sesi->id_wilayah) {
-                throw new RuntimeException("Akses ditolak: Sesi survei wilayah #{$sesi->id_wilayah} tidak berada dalam cakupan Koperasi {$koperasi->nama_koperasi} (Wilayah #{$koperasi->id_wilayah}).");
+        if (app()->bound('entitas_aktif') && ($idEntitasAktif = app('entitas_aktif'))) {
+            $entitas = Entitas::find($idEntitasAktif);
+            if ($entitas && $entitas->id_wilayah != $sesi->id_wilayah) {
+                throw new RuntimeException("Akses ditolak: Sesi survei wilayah #{$sesi->id_wilayah} tidak berada dalam cakupan entitas {$entitas->nama_entitas} (Wilayah #{$entitas->id_wilayah}).");
             }
         }
     }

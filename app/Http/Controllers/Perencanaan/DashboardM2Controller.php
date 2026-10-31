@@ -11,6 +11,7 @@ use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Survei\SesiSurvei;
 use App\Models\Tenant\Wilayah;
+use App\Support\Perencanaan\PeriodeKalkulasi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -25,10 +26,12 @@ class DashboardM2Controller extends Controller
         $wilayah = Wilayah::find($idWilayah);
 
         $tahun = (int) $request->query('tahun', 2026);
-        $bulan = $request->filled('bulan') ? (int) $request->query('bulan') : null;
+        $bulanQuery = $request->query('bulan');
+        $periode = $request->query('periode');
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $kategori = $request->query('kategori');
 
-        // Query Dasar Hasil Kalkulasi M2
+        // Query dasar hasil kalkulasi
         $queryHasil = HasilKalkulasi::with(['komoditas', 'wilayah'])
             ->where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun);
@@ -116,6 +119,7 @@ class DashboardM2Controller extends Controller
             'wilayah' => $wilayah,
             'tahun' => $tahun,
             'bulan' => $bulan,
+            'periode' => $periode,
             'kategori' => $kategori,
             'daftarHasil' => $daftarHasil,
             'totalKomoditasTerhitung' => $totalKomoditasTerhitung,
