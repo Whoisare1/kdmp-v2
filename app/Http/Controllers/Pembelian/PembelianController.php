@@ -54,7 +54,7 @@ class PembelianController extends ModuleCrudController
             ->when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))
             ->get();
         $pihaks = Pihak::when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))->get();
-        $barangs = Barang::with(['unitUsaha', 'satuanDasar', 'konversiSatuan.satuan'])
+        $barangs = Barang::with(['unitUsaha', 'satuanDasar', 'konversiSatuan.satuan'])->forEntitas($idEntitas)
             ->where('is_active', true)
             ->orderBy('nama_barang')
             ->get();
@@ -210,7 +210,7 @@ class PembelianController extends ModuleCrudController
             ?? \App\Models\Tenant\Entitas::value('id_entitas');
 
         $pihaks = Pihak::when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))->get();
-        $barangs = Barang::with(['unitUsaha', 'satuanDasar', 'konversiSatuan.satuan'])
+        $barangs = Barang::with(['unitUsaha', 'satuanDasar', 'konversiSatuan.satuan'])->forEntitas($idEntitas)
             ->where('is_active', true)
             ->orderBy('nama_barang')
             ->get();

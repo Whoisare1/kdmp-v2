@@ -7,9 +7,12 @@
             'items' => [
                 ['label' => 'Entitas', 'route' => 'master.entitas.index', 'match' => 'master.entitas.*', 'super_admin_only' => true],
                 ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
+                ['label' => 'Satuan Ukur', 'route' => 'master.satuan.index', 'match' => 'master.satuan.*'],
                 ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
                 ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
+                ['label' => 'Gudang', 'route' => 'master.gudang.index', 'match' => 'master.gudang.*'],
                 ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
+                ['label' => 'Periode Akuntansi', 'route' => 'master.periode.index', 'match' => 'master.periode.*'],
                 ['label' => 'Chart of Accounts', 'route' => 'master.coa.index', 'match' => 'master.coa.*'],
             ]
         ],
