@@ -92,7 +92,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('pihak', PihakController::class);
         Route::resource('kas-bank', KasBankController::class);
         Route::resource('gudang', MasterGudangController::class);
-        Route::resource('periode', PeriodeController::class)->only(['index', 'edit', 'update']);
+        Route::resource('periode', PeriodeController::class)->only(['index', 'store', 'edit', 'update']);
         Route::resource('coa', CoaController::class);
     });
 
