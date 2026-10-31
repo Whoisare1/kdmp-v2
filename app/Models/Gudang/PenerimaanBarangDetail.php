@@ -29,4 +29,9 @@ class PenerimaanBarangDetail extends Model
     {
         return $this->belongsTo(Satuan::class, 'id_satuan_input');
     }
+
+    public function batchDetails()
+    {
+        return $this->hasMany(PenerimaanBatchDetail::class, 'id_detail', 'id_detail');
+    }
 }

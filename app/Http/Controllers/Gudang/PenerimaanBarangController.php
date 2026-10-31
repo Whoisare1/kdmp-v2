@@ -11,14 +11,18 @@ use App\Models\Master\KonversiSatuan;
 use App\Models\Master\Pihak;
 use App\Models\Master\Satuan;
 use App\Services\StokService;
+use App\Services\StokBatchService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PenerimaanBarangController extends ModuleCrudController
 {
+    public function __construct(private StokBatchService $stokBatch) {}
+
     protected string $model = PenerimaanBarang::class;
 
     protected string $view = 'gudang.penerimaan';
@@ -52,6 +56,15 @@ class PenerimaanBarangController extends ModuleCrudController
 
     public function create(): View
     {
+        $entitasId = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+        $batchTrackingAvailable = Schema::hasColumn('barang_per_koperasi', 'lacak_batch');
+        $pelacakanBarang = $batchTrackingAvailable && $entitasId !== null
+            ? DB::table('barang_per_koperasi')
+                ->where('id_entitas', $entitasId)
+                ->pluck('lacak_batch', 'id_barang')
+            : collect();
+
         $gudang = Gudang::query()->where('is_active', true)->orderBy('nama_gudang')->get();
         $pihak = Pihak::query()->where('is_active', true)->orderBy('nama')->get();
         $barang = Barang::query()
@@ -73,6 +86,7 @@ class PenerimaanBarangController extends ModuleCrudController
                 'nama' => $item->nama_barang,
                 'satuanDasarId' => $item->id_satuan_dasar,
                 'satuanDasar' => $item->satuanDasar?->kode_satuan ?? '-',
+                'lacakBatch' => (bool) ($pelacakanBarang[$item->id_barang] ?? false),
                 'konversi' => $item->konversiSatuan
                     ->filter(fn (KonversiSatuan $konversi) => $konversi->satuan?->is_active)
                     ->map(fn (KonversiSatuan $konversi) => [
@@ -86,15 +100,18 @@ class PenerimaanBarangController extends ModuleCrudController
                 'id' => $item->id,
                 'kode' => $item->kode_satuan,
             ])->values(),
+            'batchTrackingAvailable' => $batchTrackingAvailable,
             'title' => 'Tambah '.$this->title,
         ]);
     }
 
     public function show(int|string $id): View
     {
-        $item = PenerimaanBarang::query()
-            ->with(['gudang', 'pihak', 'detail.barang.satuanDasar', 'detail.satuanInput'])
-            ->findOrFail($id);
+        $relations = ['gudang', 'pihak', 'detail.barang.satuanDasar', 'detail.satuanInput'];
+        if (Schema::hasTable('penerimaan_batch_detail')) {
+            $relations[] = 'detail.batchDetails.batch';
+        }
+        $item = PenerimaanBarang::query()->with($relations)->findOrFail($id);
 
         return view('gudang.penerimaan.show', [
             'item' => $item,
@@ -120,6 +137,12 @@ class PenerimaanBarangController extends ModuleCrudController
             'items.*.faktor_konversi' => ['required', 'regex:/^\d{1,12}(?:\.\d{1,6})?$/', 'gt:0'],
             'items.*.gunakan_faktor_aktual' => ['sometimes', 'boolean'],
             'items.*.simpan_konversi' => ['sometimes', 'boolean'],
+            'items.*.batches' => ['sometimes', 'array', 'min:1'],
+            'items.*.batches.*.kode_batch' => ['nullable', 'string', 'max:100'],
+            'items.*.batches.*.tanggal_kedaluwarsa' => ['nullable', 'date'],
+            'items.*.batches.*.qty_dasar' => ['required_with:items.*.batches', 'numeric', 'regex:/^\d{1,14}(?:\.\d{1,4})?$/', 'gt:0'],
+            'items.*.batches.*.qty_layak' => ['required_with:items.*.batches', 'numeric', 'regex:/^\d{1,14}(?:\.\d{1,4})?$/', 'gte:0'],
+            'items.*.batches.*.alasan_tidak_layak' => ['nullable', 'string'],
         ]);
 
         $kodePenerimaan = $data['kode_penerimaan'];
@@ -138,7 +161,7 @@ class PenerimaanBarangController extends ModuleCrudController
                 'created_by' => auth()->id(),
             ]);
 
-            $service = new StokService;
+            $service = app(StokService::class);
 
             // Loop setiap item dan insert detail + update stok
             foreach ($data['items'] as $index => $item) {
@@ -179,8 +202,68 @@ class PenerimaanBarangController extends ModuleCrudController
                 $qtyInput = (string) $item['qty'];
                 $hargaSatuanInput = (string) $item['harga_satuan'];
                 $qtyDasar = bcmul($qtyInput, $faktorKonversi, 4);
-                $qtyLayak = (string) $item['qty_layak'];
-                $qtyTidakLayak = bcsub($qtyDasar, $qtyLayak, 4);
+                $lacakBatch = $this->stokBatch->pelacakanAktif(
+                    (int) ($header->id_entitas ?? app('entitas_aktif')),
+                    (int) $barang->id_barang,
+                );
+                $batchInputs = $item['batches'] ?? [];
+
+                if ($lacakBatch && $batchInputs === []) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.batches" => 'Barang ini wajib dicatat per batch.',
+                    ]);
+                }
+
+                if ($lacakBatch) {
+                    $qtyBatchDasarTotal = '0';
+                    $qtyBatchDasar = '0';
+                    $qtyLayak = '0';
+                    $qtyTidakLayak = '0';
+
+                    foreach ($batchInputs as $batchIndex => $batch) {
+                        $qtyBatchDasar = (string) $batch['qty_dasar'];
+                        $qtyBatchLayak = (string) $batch['qty_layak'];
+                        $qtyBatchTidakLayak = bcsub($qtyBatchDasar, $qtyBatchLayak, 4);
+                        if (bccomp($qtyBatchTidakLayak, '0', 4) < 0) {
+                            throw ValidationException::withMessages([
+                                "items.{$index}.batches.{$batchIndex}.qty_layak" => 'Jumlah layak batch tidak boleh melebihi jumlah batch diterima.',
+                            ]);
+                        }
+                        if (
+                            bccomp($qtyBatchTidakLayak, '0', 4) > 0
+                            && trim((string) ($batch['alasan_tidak_layak'] ?? '')) === ''
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.{$index}.batches.{$batchIndex}.alasan_tidak_layak" => 'Alasan wajib diisi untuk batch yang tidak layak.',
+                            ]);
+                        }
+                        if (
+                            bccomp($qtyBatchLayak, '0', 4) > 0
+                            && ! empty($batch['tanggal_kedaluwarsa'])
+                            && $batch['tanggal_kedaluwarsa'] < now()->toDateString()
+                        ) {
+                            throw ValidationException::withMessages([
+                                "items.{$index}.batches.{$batchIndex}.tanggal_kedaluwarsa" => 'Batch yang sudah kedaluwarsa tidak dapat menambah stok layak.',
+                            ]);
+                        }
+
+                        $qtyBatchDasarTotal = bcadd($qtyBatchDasarTotal, $qtyBatchDasar, 4);
+                        $qtyLayak = bcadd($qtyLayak, $qtyBatchLayak, 4);
+                        $qtyTidakLayak = bcadd($qtyTidakLayak, $qtyBatchTidakLayak, 4);
+                        $batchInputs[$batchIndex]['qty_tidak_layak'] = $qtyBatchTidakLayak;
+                    }
+
+                    if (bccomp($qtyBatchDasarTotal, $qtyDasar, 4) !== 0) {
+                        throw ValidationException::withMessages([
+                            "items.{$index}.batches" => 'Total jumlah per batch harus sama dengan jumlah diterima dalam satuan dasar.',
+                        ]);
+                    }
+                    $alasanTidakLayak = 'Sortir tercatat per batch.';
+                } else {
+                    $qtyLayak = (string) $item['qty_layak'];
+                    $qtyTidakLayak = bcsub($qtyDasar, $qtyLayak, 4);
+                    $alasanTidakLayak = trim((string) ($item['alasan_tidak_layak'] ?? ''));
+                }
                 $hargaSatuanDasar = bcdiv($hargaSatuanInput, $faktorKonversi, 4);
                 $subtotal = bcmul($qtyInput, $hargaSatuanInput, 2);
 
@@ -196,9 +279,7 @@ class PenerimaanBarangController extends ModuleCrudController
                     ]);
                 }
 
-                $alasanTidakLayak = trim((string) ($item['alasan_tidak_layak'] ?? ''));
-
-                if (bccomp($qtyTidakLayak, '0', 4) > 0 && $alasanTidakLayak === '') {
+                if (! $lacakBatch && bccomp($qtyTidakLayak, '0', 4) > 0 && $alasanTidakLayak === '') {
                     throw ValidationException::withMessages([
                         "items.{$index}.alasan_tidak_layak" => 'Alasan wajib diisi jika ada barang tidak layak.',
                     ]);
@@ -215,7 +296,7 @@ class PenerimaanBarangController extends ModuleCrudController
                 }
 
                 // Insert detail
-                PenerimaanBarangDetail::query()->create([
+                $detail = PenerimaanBarangDetail::query()->create([
                     'id_penerimaan' => $header->id_penerimaan,
                     'id_barang' => $barang->id_barang,
                     'id_satuan_input' => $idSatuanInput,
@@ -230,8 +311,9 @@ class PenerimaanBarangController extends ModuleCrudController
                     'foto_bukti' => null,
                 ]);
 
+                $kartuStok = null;
                 if (bccomp($qtyLayak, '0', 4) > 0) {
-                    $service->masuk(
+                    $kartuStok = $service->masuk(
                         entitasId: (int) ($header->id_entitas ?? app('entitas_aktif')),
                         gudangId: (int) $data['id_gudang'],
                         barangId: (int) $barang->id_barang,
@@ -240,6 +322,16 @@ class PenerimaanBarangController extends ModuleCrudController
                         refTipe: 'PENERIMAAN',
                         refId: (int) $header->id_penerimaan,
                         createdBy: auth()->id(),
+                    );
+                }
+
+                if ($lacakBatch) {
+                    $this->stokBatch->catatPenerimaan(
+                        detailId: (int) $detail->id_detail,
+                        gudangId: (int) $data['id_gudang'],
+                        barangId: (int) $barang->id_barang,
+                        batches: $batchInputs,
+                        kartuStok: $kartuStok,
                     );
                 }
             }

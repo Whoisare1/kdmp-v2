@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Gudang\GudangDashboardController;
+use App\Http\Controllers\Gudang\BatchController;
 use App\Http\Controllers\Gudang\KartuStokController;
 use App\Http\Controllers\Gudang\KerusakanBarangController;
 use App\Http\Controllers\Gudang\OpnameController;
@@ -80,6 +81,10 @@ Route::middleware('auth')->group(function () {
         Route::resource('entitas', EntitasController::class);
         Route::resource('komoditas', KomoditasController::class);
         Route::resource('satuan', SatuanController::class);
+        Route::get('barang/stok-minimum', [\App\Http\Controllers\Master\StokMinimumBarangController::class, 'index'])
+            ->name('barang.stok-minimum.index');
+        Route::patch('barang/stok-minimum/{idBarang}', [\App\Http\Controllers\Master\StokMinimumBarangController::class, 'update'])
+            ->name('barang.stok-minimum.update');
         Route::resource('barang', BarangController::class);
         Route::resource('pihak', PihakController::class);
         Route::resource('kas-bank', KasBankController::class);
@@ -106,6 +111,7 @@ Route::middleware('auth')->group(function () {
     // ===== M4 â€” Gudang =====
     Route::prefix('gudang')->name('gudang.')->group(function () {
         Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
+        Route::get('batch', [BatchController::class, 'index'])->name('batch.index');
         Route::resource('penerimaan', PenerimaanBarangController::class);
         Route::resource('opname', OpnameController::class);
         Route::resource('kerusakan', KerusakanBarangController::class);
