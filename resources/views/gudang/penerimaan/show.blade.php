@@ -51,7 +51,23 @@
                     @forelse ($item->detail as $detail)
                         <tr class="border-b border-paper-200 last:border-0">
                             <td class="px-4 py-3 text-ink-600">{{ $loop->iteration }}</td>
-                            <td class="px-4 py-3 text-ink-800">{{ $detail->barang->nama_barang ?? '-' }}</td>
+                            <td class="px-4 py-3 text-ink-800">
+                                {{ $detail->barang->nama_barang ?? '-' }}
+                                @if ($detail->relationLoaded('batchDetails') && $detail->batchDetails->isNotEmpty())
+                                    <ul class="mt-2 space-y-1 text-xs text-ink-600">
+                                        @foreach ($detail->batchDetails as $batchDetail)
+                                            <li>
+                                                Batch {{ $batchDetail->batch->kode_batch ?? '-' }}:
+                                                {{ rtrim(rtrim(number_format((float) $batchDetail->qty_layak, 4, ',', '.'), '0'), ',') }}
+                                                layak
+                                                @if ($batchDetail->batch?->tanggal_kedaluwarsa)
+                                                    · Kedaluwarsa {{ $batchDetail->batch->tanggal_kedaluwarsa->format('d M Y') }}
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-right text-ink-800">
                                 {{ rtrim(rtrim(number_format((float) $detail->qty_input, 4, ',', '.'), '0'), ',') }}
                                 {{ $detail->satuanInput?->kode_satuan ?? '-' }}

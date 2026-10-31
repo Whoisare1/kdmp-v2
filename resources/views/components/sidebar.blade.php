@@ -48,6 +48,7 @@
                 ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
                 ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
                 ['label' => 'Penerimaan', 'route' => 'gudang.penerimaan.index', 'match' => 'gudang.penerimaan.*'],
+                ['label' => 'Batch & Kedaluwarsa', 'route' => 'gudang.batch.index', 'match' => 'gudang.batch.*'],
                 ['label' => 'Kerusakan', 'route' => 'gudang.kerusakan.index', 'match' => 'gudang.kerusakan.*'],
                 ['label' => 'Stock Opname', 'route' => 'gudang.opname.index', 'match' => 'gudang.opname.*'],
                 ['label' => 'Kartu Stok', 'route' => 'gudang.kartu-stok.index', 'match' => 'gudang.kartu-stok.*'],

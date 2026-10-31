@@ -69,7 +69,7 @@
                     Hanya jumlah layak yang menambah stok. Proses retur tetap ditangani modul Pembelian/Penjualan.
                 </p>
 
-                <div id="itemRows" class="space-y-3"></div>
+                <div id="itemRows" class="space-y-4"></div>
                 <div class="mt-4 grid gap-2 rounded-sm border border-paper-300 bg-paper-100 p-4 text-right text-sm sm:grid-cols-3">
                     <p><span class="block text-xs text-ink-600">Layak masuk stok</span><span class="font-mono font-semibold text-sawah-600" id="totalNilaiLayak">Rp 0</span></p>
                     <p><span class="block text-xs text-ink-600">Tidak layak</span><span class="font-mono font-semibold text-merah-600" id="totalNilaiTidakLayak">Rp 0</span></p>
@@ -102,21 +102,29 @@
         const barangData = {{ Illuminate\Support\Js::from($barangData) }};
         const satuanData = {{ Illuminate\Support\Js::from($satuanData) }};
         const oldItems = {{ Illuminate\Support\Js::from(old('items', [])) }};
+        const batchTrackingAvailable = {{ Illuminate\Support\Js::from($batchTrackingAvailable) }};
         let rowCount = 0;
 
         function buatBaris(item = {}) {
             const index = rowCount++;
             const row = document.createElement('div');
-            row.className = 'barangRow rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-sm';
+            row.className = 'barangRow overflow-hidden rounded-sm border border-paper-300 bg-paper-50 shadow-sm';
             row.innerHTML = `
-                <div class="mb-4 flex items-start justify-between gap-3 border-b border-paper-200 pb-3">
+                <div class="flex flex-col gap-3 border-b border-paper-300 bg-paper-100/70 p-4 sm:flex-row sm:items-end">
+                    <div class="flex items-center gap-2 sm:w-24 sm:shrink-0">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-merah-500 font-mono text-xs font-semibold text-paper-50">${index + 1}</span>
+                        <p class="text-xs font-semibold text-ink-800">Barang</p>
+                    </div>
                     <div class="min-w-0 flex-1">
-                        <label class="mb-1 block text-xs font-semibold text-ink-700">Barang</label>
+                        <label class="mb-1 block text-xs font-semibold text-ink-700">Barang diterima</label>
                         <select name="items[${index}][id_barang]" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none barangSelect"></select>
                     </div>
-                    <button type="button" class="mt-6 shrink-0 rounded-sm border border-merah-100 px-3 py-2 text-xs font-medium text-merah-600 hover:bg-merah-50 hapusBaris">Hapus</button>
+                    <button type="button" class="shrink-0 rounded-sm border border-merah-100 bg-paper-50 px-3 py-2 text-xs font-medium text-merah-600 transition hover:border-merah-300 hover:bg-merah-50 hapusBaris">Hapus barang</button>
                 </div>
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="space-y-5 p-5">
+                <section>
+                <p class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wide text-ink-600/70">Jumlah dan satuan</p>
+                <div class="grid gap-4 rounded-sm border border-paper-200 bg-paper-50 p-4 sm:grid-cols-2 xl:grid-cols-2">
                     <label class="block text-xs font-medium text-ink-700">Qty diterima
                         <input type="number" step="0.0001" name="items[${index}][qty]" value="1" required class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none qtyInput" min="0.0001">
                     </label>
@@ -143,7 +151,10 @@
                         <p class="mt-1 text-base font-semibold text-ink-900"><span class="qtyDasar">0</span> <span class="satuanDasarRingkasan"></span></p>
                     </div>
                 </div>
-                <div class="mt-4 grid gap-3 rounded-sm border border-paper-200 bg-paper-100/60 p-3 sm:grid-cols-2 xl:grid-cols-4">
+                </section>
+                <section class="batchlessSortir rounded-sm border border-paper-200 bg-paper-100/60 p-4">
+                <p class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wide text-ink-600/70">Pemeriksaan kelayakan</p>
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                     <label class="block text-xs font-medium text-ink-700">Jumlah layak (satuan dasar)
                         <input type="number" step="0.0001" name="items[${index}][qty_layak]" value="0" required min="0" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none qtyLayakInput">
                     </label>
@@ -155,7 +166,23 @@
                         <textarea name="items[${index}][alasan_tidak_layak]" rows="2" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none alasanTidakLayakInput" placeholder="Wajib diisi jika ada barang tidak layak"></textarea>
                     </label>
                 </div>
-                <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                </section>
+                <div class="batchTrackingPanel rounded-sm border border-padi-200 bg-padi-50/50 p-4" hidden>
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold text-ink-800">Rincian Batch dan Kedaluwarsa</p>
+                            <p class="mt-1 text-[11px] text-ink-600">Jumlah dasar seluruh batch harus sama dengan qty dasar penerimaan. Sortir dicatat per batch.</p>
+                        </div>
+                        <button type="button" class="tambahBatch shrink-0 rounded-sm border border-paper-300 bg-paper-50 px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-merah-400">
+                            + Batch
+                        </button>
+                    </div>
+                    <div class="batchRows space-y-4"></div>
+                    <p class="batchSummary mt-3 rounded-sm bg-paper-50 px-3 py-2 text-xs font-semibold text-ink-800"></p>
+                </div>
+                <section class="border-t border-paper-200 pt-4">
+                <p class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wide text-ink-600/70">Nilai penerimaan</p>
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                     <label class="block text-xs font-medium text-ink-700">Harga per satuan diterima
                         <input type="number" step="0.0001" name="items[${index}][harga_satuan]" value="0" required class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none hargaInput" min="0">
                     </label>
@@ -172,6 +199,8 @@
                         <p class="mt-1 font-mono text-sm font-semibold text-ink-800 nilaiBruto">Rp 0</p>
                     </div>
                 </div>
+                </section>
+                </div>
             `;
 
             const barangSelect = row.querySelector('.barangSelect');
@@ -186,6 +215,112 @@
             const tambahKonversi = row.querySelector('.tambahKonversi');
             const qtyLayakInput = row.querySelector('.qtyLayakInput');
             const alasanTidakLayakInput = row.querySelector('.alasanTidakLayakInput');
+            const batchPanel = row.querySelector('.batchTrackingPanel');
+            const batchRows = row.querySelector('.batchRows');
+            let batchRowCount = 0;
+
+            function tambahBarisBatch(batch = {}) {
+                const batchIndex = batchRowCount++;
+                const batchRow = document.createElement('div');
+                batchRow.className = 'batchRow grid gap-4 rounded-sm border border-padi-200 bg-paper-50 p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-3';
+                batchRow.innerHTML = `
+                    <label class="block text-[11px] font-medium text-ink-700">Kode batch supplier
+                        <input type="text" name="items[${index}][batches][${batchIndex}][kode_batch]" maxlength="100" class="mt-1 w-full rounded-sm border border-paper-300 px-2 py-1.5 text-xs batchKode">
+                    </label>
+                    <label class="block text-[11px] font-medium text-ink-700">Tanggal kedaluwarsa
+                        <input type="date" name="items[${index}][batches][${batchIndex}][tanggal_kedaluwarsa]" class="mt-1 w-full rounded-sm border border-paper-300 px-2 py-1.5 text-xs batchExpiry">
+                    </label>
+                    <label class="block text-[11px] font-medium text-ink-700">Qty batch (satuan dasar)
+                        <input type="number" min="0.0001" step="0.0001" name="items[${index}][batches][${batchIndex}][qty_dasar]" required class="mt-1 w-full rounded-sm border border-paper-300 px-2 py-1.5 text-xs batchQty">
+                    </label>
+                    <label class="block text-[11px] font-medium text-ink-700">Qty layak
+                        <input type="number" min="0" step="0.0001" name="items[${index}][batches][${batchIndex}][qty_layak]" required class="mt-1 w-full rounded-sm border border-paper-300 px-2 py-1.5 text-xs batchGood">
+                    </label>
+                    <div class="flex items-end gap-2">
+                        <label class="block min-w-0 flex-1 text-[11px] font-medium text-ink-700">Alasan tidak layak
+                            <input type="text" name="items[${index}][batches][${batchIndex}][alasan_tidak_layak]" class="mt-1 w-full rounded-sm border border-paper-300 px-2 py-1.5 text-xs batchReason">
+                        </label>
+                        <button type="button" class="hapusBatch rounded-sm border border-merah-100 px-2 py-1.5 text-xs text-merah-600 hover:bg-merah-50">Hapus</button>
+                    </div>
+                `;
+                batchRows.appendChild(batchRow);
+                batchRow.querySelector('.batchKode').value = batch.kode_batch ?? '';
+                batchRow.querySelector('.batchExpiry').value = batch.tanggal_kedaluwarsa ?? '';
+                batchRow.querySelector('.batchQty').value = batch.qty_dasar ?? '';
+                batchRow.querySelector('.batchGood').value = batch.qty_layak ?? '';
+                batchRow.querySelector('.batchReason').value = batch.alasan_tidak_layak ?? '';
+                batchRow.querySelector('.batchQty').addEventListener('input', perbaruiTotalBatch);
+                batchRow.querySelector('.batchGood').addEventListener('input', perbaruiTotalBatch);
+                batchRow.querySelector('.batchReason').addEventListener('input', perbaruiTotalBatch);
+                batchRow.querySelector('.hapusBatch').addEventListener('click', () => {
+                    batchRow.remove();
+                    perbaruiTotalBatch();
+                });
+                perbaruiTotalBatch();
+            }
+
+            function perbaruiTotalBatch() {
+                const rows = [...batchRows.querySelectorAll('.batchRow')];
+                let totalDasar = 0;
+                let totalLayak = 0;
+                rows.forEach(batchRow => {
+                    const qtyDasarBatch = Number(batchRow.querySelector('.batchQty').value) || 0;
+                    const qtyLayakBatch = Number(batchRow.querySelector('.batchGood').value) || 0;
+                    const alasanBatch = batchRow.querySelector('.batchReason');
+                    totalDasar += qtyDasarBatch;
+                    totalLayak += qtyLayakBatch;
+                    batchRow.querySelector('.batchGood').max = qtyDasarBatch.toFixed(4);
+                    batchRow.querySelector('.batchGood').setCustomValidity(
+                        qtyLayakBatch > qtyDasarBatch ? 'Qty layak tidak boleh melebihi qty batch.' : ''
+                    );
+                    alasanBatch.setCustomValidity(
+                        qtyDasarBatch > qtyLayakBatch && alasanBatch.value.trim() === ''
+                            ? 'Alasan wajib diisi jika batch tidak layak.'
+                            : ''
+                    );
+                });
+                const qtyDasarTarget = (Number(row.querySelector('.qtyInput').value) || 0)
+                    * (Number(row.querySelector('.faktorInput').value) || 0);
+                row.querySelector('.batchSummary').textContent =
+                    `Total batch: ${totalDasar.toLocaleString('id-ID', { maximumFractionDigits: 4 })} / ${qtyDasarTarget.toLocaleString('id-ID', { maximumFractionDigits: 4 })} satuan dasar • Layak: ${totalLayak.toLocaleString('id-ID', { maximumFractionDigits: 4 })}`;
+                row.querySelector('.qtyInput').setCustomValidity(
+                    batchPanel.hidden || Math.abs(totalDasar - qtyDasarTarget) < 0.00005
+                        ? ''
+                        : 'Total qty batch harus sama dengan qty dasar penerimaan.'
+                );
+                qtyLayakInput.value = totalLayak.toFixed(4);
+                qtyLayakInput.dataset.edited = 'true';
+                alasanTidakLayakInput.value = totalDasar > totalLayak ? 'Sortir tercatat per batch.' : '';
+                row.querySelector('.qtyTidakLayak').textContent =
+                    Math.max(0, totalDasar - totalLayak).toLocaleString('id-ID', { maximumFractionDigits: 4 });
+                hitungBaris(row);
+            }
+
+            function perbaruiModeBatch() {
+                const barang = barangData.find(entry => String(entry.id) === barangSelect.value);
+                const lacakBatch = batchTrackingAvailable && Boolean(barang?.lacakBatch);
+                batchPanel.hidden = !lacakBatch;
+                row.querySelector('.batchlessSortir').hidden = lacakBatch;
+                qtyLayakInput.required = !lacakBatch;
+                qtyLayakInput.readOnly = lacakBatch;
+                alasanTidakLayakInput.readOnly = lacakBatch;
+                batchRows.querySelectorAll('input').forEach(input => {
+                    input.disabled = !lacakBatch;
+                });
+                row.querySelector('.tambahBatch').disabled = !lacakBatch;
+                if (lacakBatch && batchRows.children.length === 0) {
+                    const qtyDefault = (Number(row.querySelector('.qtyInput').value) || 0)
+                        * (Number(row.querySelector('.faktorInput').value) || 0);
+                    tambahBarisBatch({
+                        qty_dasar: qtyDefault.toFixed(4),
+                        qty_layak: qtyDefault.toFixed(4),
+                    });
+                } else if (lacakBatch) {
+                    perbaruiTotalBatch();
+                } else {
+                    row.querySelector('.qtyInput').setCustomValidity('');
+                }
+            }
 
             function isiSatuan(preferredId = null, allowUnconfigured = false) {
                 const barang = barangData.find(item => String(item.id) === barangSelect.value);
@@ -263,11 +398,16 @@
             qtyLayakInput.dataset.edited = item.qty_layak !== undefined ? 'true' : 'false';
             alasanTidakLayakInput.value = item.alasan_tidak_layak ?? '';
             perbaruiKonversi(item.id_barang ? item : null);
+            (Array.isArray(item.batches) ? item.batches : []).forEach(tambahBarisBatch);
+            perbaruiModeBatch();
 
             barangSelect.addEventListener('change', () => {
                 qtyLayakInput.dataset.edited = 'false';
+                batchRows.replaceChildren();
+                batchRowCount = 0;
                 isiSatuan();
                 perbaruiKonversi();
+                perbaruiModeBatch();
             });
             satuanSelect.addEventListener('change', () => perbaruiKonversi());
             tambahKonversi.addEventListener('click', () => {
@@ -307,6 +447,7 @@
             });
             row.querySelector('.qtyInput').addEventListener('input', () => {
                 perbaruiSortir(row);
+                perbaruiTotalBatch();
                 hitungBaris(row);
             });
             row.querySelector('.hargaInput').addEventListener('input', () => hitungBaris(row));
@@ -323,8 +464,10 @@
                         `1 ${satuan} = ${faktorInput.value || '?'} ${barang.satuanDasar}`;
                 }
                 perbaruiSortir(row);
+                perbaruiTotalBatch();
                 hitungBaris(row);
             });
+            row.querySelector('.tambahBatch').addEventListener('click', () => tambahBarisBatch());
             row.querySelector('.hapusBaris').addEventListener('click', () => {
                 row.remove();
                 hitungTotal();
@@ -376,6 +519,15 @@
             const qtyDasar = Math.round(qty * faktor * 10000) / 10000;
             const qtyLayakInput = row.querySelector('.qtyLayakInput');
             const alasanInput = row.querySelector('.alasanTidakLayakInput');
+            if (!row.querySelector('.batchTrackingPanel').hidden) {
+                row.querySelector('.qtyDasar').textContent =
+                    qtyDasar.toLocaleString('id-ID', { maximumFractionDigits: 4 });
+                row.querySelectorAll('.satuanDasarRingkasan').forEach(element => {
+                    const barang = barangData.find(item => String(item.id) === row.querySelector('.barangSelect').value);
+                    element.textContent = barang?.satuanDasar ?? '';
+                });
+                return;
+            }
 
             row.querySelector('.qtyDasar').textContent =
                 qtyDasar.toLocaleString('id-ID', { maximumFractionDigits: 4 });
