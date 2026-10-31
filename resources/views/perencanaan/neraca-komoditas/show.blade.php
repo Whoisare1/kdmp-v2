@@ -1,5 +1,5 @@
-<x-layouts.app :title="$title" eyebrow="Modul M2 — Detail Neraca Komoditas">
-    {{-- Sub Navigasi M2 --}}
+<x-layouts.app :title="$title" eyebrow="Detail Neraca Komoditas">
+    {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="neraca" />
 
     @php
@@ -40,7 +40,7 @@
                 </div>
                 <h1 class="mt-1 font-display text-2xl font-bold text-ink-950">{{ $hasil->komoditas?->nama }}</h1>
                 <p class="text-xs text-ink-600">
-                    Periode: <strong>{{ $namaBulanList[$hasil->bulan] ?? 'Bulan ' . $hasil->bulan }} {{ $hasil->tahun }}</strong>
+                    Periode: <strong>{{ $hasil->bulan <= 6 ? 'Ganjil (Januari–Juni)' : 'Genap (Juli–Desember)' }} {{ $hasil->tahun }}</strong>
                     • Satuan: <span class="font-mono font-semibold">{{ $satuan }}</span>
                 </p>
             </div>
@@ -102,11 +102,11 @@
         </div>
     </div>
 
-    {{-- Rincian Komponen Kebutuhan M2 --}}
+    {{-- Rincian komponen kebutuhan kalkulasi --}}
     <div class="mb-6 rounded-sm border border-paper-300 bg-paper-50 shadow-2xs">
         <div class="flex items-center justify-between border-b border-paper-200 px-5 py-4">
             <div>
-                <h2 class="font-display text-base font-semibold text-ink-900">Rincian Populasi &amp; Estimasi Kebutuhan M2</h2>
+                <h2 class="font-display text-base font-semibold text-ink-900">Rincian Populasi &amp; Estimasi Kebutuhan</h2>
                 <p class="text-xs text-ink-600">Perhitungan per kelompok umur berdasarkan data survei demografi M1</p>
             </div>
             <a href="{{ route('perencanaan.kebutuhan-komoditas.index', ['tahun' => $hasil->tahun, 'bulan' => $hasil->bulan, 'id_komoditas' => $hasil->id_komoditas]) }}"
@@ -123,7 +123,7 @@
                         <th class="px-4 py-3 text-right font-medium">Populasi (Jiwa)</th>
                         <th class="px-4 py-3 text-right font-medium">Standar Harian</th>
                         <th class="px-4 py-3 text-center font-medium">Faktor Musiman</th>
-                        <th class="px-4 py-3 text-right font-medium">Kebutuhan Bulanan ({{ $satuan }})</th>
+                        <th class="px-4 py-3 text-right font-medium">Kebutuhan Periode ({{ $satuan }})</th>
                         <th class="px-4 py-3 font-medium">Standar Gizi</th>
                     </tr>
                 </thead>
@@ -163,10 +163,10 @@
         </div>
     </div>
 
-    {{-- Bagian Alur Lanjutan (M3 / KBR / Konsinyasi) --}}
+    {{-- Bagian alur lanjutan perencanaan --}}
     <div class="rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-2xs">
         <h3 class="font-display text-base font-semibold text-ink-900">Tindak Lanjut &amp; Jalur Alur Sistem</h3>
-        <p class="text-xs text-ink-600">Alur: M1 Survei &rarr; M2 Kalkulasi &rarr; Neraca Komoditas &rarr; KBR / Alternatif &rarr; M3 Pengadaan</p>
+        <p class="text-xs text-ink-600">Alur: Survei &rarr; Kalkulasi &rarr; Neraca Komoditas &rarr; Pengadaan</p>
 
         <div class="mt-4 rounded-sm border p-4
              {{ $hasil->status_surplus_defisit === 'defisit' ? 'border-merah-300 bg-merah-50/70' : ($hasil->status_surplus_defisit === 'surplus' ? 'border-sawah-300 bg-sawah-50/70' : 'border-paper-300 bg-paper-100/60') }}">
@@ -175,12 +175,12 @@
                     <div>
                         <h4 class="font-semibold text-merah-700 text-sm">Status Defisit Terdeteksi: Diperlukan Pengadaan</h4>
                         <p class="mt-0.5 text-xs text-ink-700">
-                            Komoditas ini kekurangan pasokan sebesar <strong>{{ number_format(abs((float) $hasil->selisih), 2, ',', '.') }} {{ $satuan }}</strong>. Anda dapat meneruskannya menjadi draf Permintaan Pengadaan (Purchase Requisition - PR) di Modul M3.
+                            Komoditas ini kekurangan pasokan sebesar <strong>{{ number_format(abs((float) $hasil->selisih), 2, ',', '.') }} {{ $satuan }}</strong>. Anda dapat meneruskannya menjadi draf Permintaan Pengadaan (Purchase Requisition - PR) di modul Perencanaan.
                         </p>
                     </div>
                     <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', ['hasil' => $hasil->id_hasil]) }}"
                        class="rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
-                        + Buat Permintaan Pengadaan (M3)
+                        + Buat Permintaan Pengadaan
                     </a>
                 </div>
             @elseif ($hasil->status_surplus_defisit === 'surplus')

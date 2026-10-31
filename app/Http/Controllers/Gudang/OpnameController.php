@@ -8,6 +8,7 @@ use App\Models\Gudang\OpnameHeader;
 use App\Models\Master\Barang;
 use App\Models\Master\Gudang;
 use App\Services\StokService;
+use App\Services\StokBatchService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +87,7 @@ class OpnameController extends ModuleCrudController
             ]);
 
             $stokService = app(StokService::class);
+            $stokBatchService = app(StokBatchService::class);
 
             foreach ($data['items'] as $item) {
                 $barangId = (int) $item['id_barang'];
@@ -99,7 +101,7 @@ class OpnameController extends ModuleCrudController
                     createdBy: auth()->id(),
                 );
 
-                OpnameDetail::query()->create([
+                $detail = OpnameDetail::query()->create([
                     'id_opname' => $header->id_opname,
                     'id_barang' => $barangId,
                     'qty_sistem' => $hasilOpname['qty_sistem'],
@@ -109,6 +111,15 @@ class OpnameController extends ModuleCrudController
                     'nilai_selisih' => $hasilOpname['nilai_selisih'],
                     'keterangan' => $item['keterangan'] ?? null,
                 ]);
+
+                $stokBatchService->catatPenyesuaianOpname(
+                    detailId: (int) $detail->id_detail,
+                    gudangId: (int) $data['id_gudang'],
+                    barangId: $barangId,
+                    qtySistem: $hasilOpname['qty_sistem'],
+                    qtyFisik: $qtyFisik,
+                    idKartu: $hasilOpname['id_kartu'],
+                );
             }
 
             return redirect()->route('gudang.opname.index')->with('success', 'Data opname berhasil disimpan.');

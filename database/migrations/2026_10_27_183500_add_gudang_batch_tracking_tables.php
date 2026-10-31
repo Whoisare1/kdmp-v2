@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -114,6 +115,24 @@ return new class extends Migration
                 'opname_batch_detail_unique',
             );
         });
+
+        DB::table('stok')
+            ->where('qty_on_hand', '>', 0)
+            ->orderBy('id_gudang')
+            ->orderBy('id_barang')
+            ->cursor()
+            ->each(function (object $stok): void {
+                DB::table('stok_batch')->insert([
+                    'id_gudang' => $stok->id_gudang,
+                    'id_barang' => $stok->id_barang,
+                    'kode_batch' => "AWAL-{$stok->id_gudang}-{$stok->id_barang}",
+                    'tanggal_kedaluwarsa' => null,
+                    'qty_on_hand' => $stok->qty_on_hand,
+                    'is_stok_awal' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
 
         Schema::table('kerusakan_barang', function (Blueprint $table): void {
             $table->foreignId('id_batch')

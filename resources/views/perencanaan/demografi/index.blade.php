@@ -1,5 +1,5 @@
-<x-layouts.app title="Demografi Penduduk Desa" eyebrow="Modul M2 — Data & Parameter">
-    {{-- Sub Navigasi Modul M2 --}}
+    <x-layouts.app title="Demografi Penduduk Desa" eyebrow="Kalkulasi — Data & Parameter">
+    {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="parameter" subActive="demografi" />
 
     {{-- Flash Notifications --}}
@@ -73,7 +73,7 @@
                 <span class="text-sm font-normal text-ink-600">Jiwa</span>
             </p>
             <p class="mt-1 text-xs text-ink-600">
-                Basis perhitungan seluruh komoditas M2
+                Basis perhitungan seluruh komoditas kalkulasi
             </p>
         </div>
 
@@ -199,7 +199,7 @@
                                     <span>&rarr;</span>
                                 </a>
                             @else
-                                <span class="text-ink-600/70">Tersimpan di M2</span>
+                                <span class="text-ink-600/70">Tersimpan untuk kalkulasi</span>
                             @endif
                         </td>
                         <td class="px-5 py-3.5 text-right">

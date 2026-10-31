@@ -10,6 +10,8 @@ use RuntimeException;
 
 class StokService
 {
+    public function __construct(private StokBatchService $stokBatch) {}
+
     public function masuk(
         int $entitasId,
         int $gudangId,
@@ -100,6 +102,8 @@ class StokService
         int $refId,
         ?int $createdBy = null,
         ?string $tanggal = null,
+        ?int $idBatch = null,
+        bool $izinkanBatchKedaluwarsa = false,
     ): KartuStok {
         $this->pastikanPositif($qty, 'qty');
 
@@ -112,6 +116,8 @@ class StokService
             $refId,
             $createdBy,
             $tanggal,
+            $idBatch,
+            $izinkanBatchKedaluwarsa,
         ): KartuStok {
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
@@ -122,6 +128,17 @@ class StokService
             if (! $stok || bccomp((string) $stok->qty_on_hand, $qty, 4) < 0) {
                 $tersedia = $stok?->qty_on_hand ?? '0';
                 throw new RuntimeException("Stok tidak mencukupi. Tersedia {$tersedia}, diminta {$qty}.");
+            }
+
+            $alokasiBatch = null;
+            if ($this->stokBatch->pelacakanAktif($entitasId, $barangId)) {
+                $alokasiBatch = $this->stokBatch->alokasiKeluar(
+                    gudangId: $gudangId,
+                    barangId: $barangId,
+                    qty: $qty,
+                    idBatch: $idBatch,
+                    izinkanBatchKedaluwarsa: $izinkanBatchKedaluwarsa,
+                );
             }
 
             $nilaiKeluar = bcmul($qty, (string) $stok->hpp_rata2, 2);
@@ -138,7 +155,7 @@ class StokService
                     'updated_at' => now(),
                 ]);
 
-            return KartuStok::create([
+            $kartuStok = KartuStok::create([
                 'id_entitas' => $entitasId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
@@ -155,6 +172,12 @@ class StokService
                 'hpp_rata2_setelah' => $hppTetap,
                 'created_by' => $createdBy,
             ]);
+
+            if ($alokasiBatch !== null) {
+                $this->stokBatch->catatPengeluaran($kartuStok, $alokasiBatch);
+            }
+
+            return $kartuStok;
         });
     }
 
@@ -207,6 +230,7 @@ class StokService
                     'selisih' => $selisih,
                     'hpp_rata2' => $hpp,
                     'nilai_selisih' => $nilaiSelisih,
+                    'id_kartu' => null,
                 ];
             }
 
@@ -230,7 +254,7 @@ class StokService
                 ],
             );
 
-            KartuStok::create([
+            $kartuStok = KartuStok::create([
                 'id_entitas' => $entitasId,
                 'id_gudang' => $gudangId,
                 'id_barang' => $barangId,
@@ -253,6 +277,7 @@ class StokService
                 'selisih' => $selisih,
                 'hpp_rata2' => $hpp,
                 'nilai_selisih' => $nilaiSelisih,
+                'id_kartu' => (int) $kartuStok->id_kartu,
             ];
         });
     }
@@ -336,7 +361,7 @@ class StokService
             $stok = Stok::where($where)->firstOrFail();
 
             // 4. Create kartu stok (detail mutasi)
-            KartuStok::create([
+            $kartuStok = KartuStok::create([
                 'id_entitas' => $entitasId,
                 'id_gudang' => $idGudang,
                 'id_barang' => $idBarang,
@@ -352,6 +377,17 @@ class StokService
                 'saldo_nilai' => $qtyBaru * $hppBaru,
                 'hpp_rata2_setelah' => $hppBaru,
             ]);
+
+            $stokBatch = app(StokBatchService::class);
+            if ($stokBatch->pelacakanAktif($entitasId, $idBarang)) {
+                $stokBatch->catatPenerimaanTanpaRincian(
+                    gudangId: $idGudang,
+                    barangId: $idBarang,
+                    qty: number_format($qtyMasuk, 4, '.', ''),
+                    idKartu: (int) $kartuStok->id_kartu,
+                    refId: $idReferencePenerimaan,
+                );
+            }
 
             DB::commit();
 
@@ -389,11 +425,21 @@ class StokService
         try {
             // 1. Ambil stok
             $where = ['id_gudang' => $idGudang, 'id_barang' => $idBarang];
-            $stok = DB::table('stok')->where($where)->firstOrFail();
+            $stok = DB::table('stok')->where($where)->lockForUpdate()->firstOrFail();
 
             if ($stok->qty_on_hand < $qtyKeluar) {
                 throw new \Exception(
                     "Stok tidak cukup. On hand: {$stok->qty_on_hand}, permintaan: {$qtyKeluar}"
+                );
+            }
+
+            $stokBatch = app(StokBatchService::class);
+            $alokasiBatch = null;
+            if ($stokBatch->pelacakanAktif($entitasId, $idBarang)) {
+                $alokasiBatch = $stokBatch->alokasiKeluar(
+                    gudangId: $idGudang,
+                    barangId: $idBarang,
+                    qty: number_format($qtyKeluar, 4, '.', ''),
                 );
             }
 
@@ -411,7 +457,7 @@ class StokService
             ]);
 
             // 4. Create kartu stok
-            KartuStok::create([
+            $kartuStok = KartuStok::create([
                 'id_entitas' => $entitasId,
                 'id_gudang' => $idGudang,
                 'id_barang' => $idBarang,
@@ -427,6 +473,10 @@ class StokService
                 'saldo_nilai' => $nilaiPersediaanBaru,
                 'hpp_rata2_setelah' => $hppPakai,
             ]);
+
+            if ($alokasiBatch !== null) {
+                $stokBatch->catatPengeluaran($kartuStok, $alokasiBatch);
+            }
 
             DB::commit();
 
@@ -451,6 +501,13 @@ class StokService
         DB::beginTransaction();
         try {
             $kartu = KartuStok::findOrFail($idKartuStok);
+            $stokBatch = app(StokBatchService::class);
+            if ($stokBatch->pelacakanAktif((int) $kartu->id_entitas, (int) $kartu->id_barang)) {
+                throw new RuntimeException(
+                    'Pembatalan mutasi barang dengan pelacakan batch aktif belum didukung. '
+                    .'Gunakan transaksi koreksi yang mencatat batch.',
+                );
+            }
 
             $where = ['id_gudang' => $kartu->id_gudang, 'id_barang' => $kartu->id_barang];
             $stok = Stok::query()->where($where)->lockForUpdate()->firstOrFail();
@@ -526,7 +583,19 @@ class StokService
     {
         DB::beginTransaction();
         try {
+            $entitasId = (int) DB::table('gudang')
+                ->where('id_gudang', $idGudang)
+                ->value('id_entitas');
+            $stokBatch = app(StokBatchService::class);
+
             foreach ($adjustments as $adj) {
+                if ($stokBatch->pelacakanAktif($entitasId, (int) $adj['id_barang'])) {
+                    throw new RuntimeException(
+                        'Opname melalui jalur lama tidak dapat digunakan untuk barang dengan pelacakan batch aktif. '
+                        .'Gunakan alur opname gudang yang mencatat penyesuaian batch.',
+                    );
+                }
+
                 $where = ['id_gudang' => $idGudang, 'id_barang' => $adj['id_barang']];
                 $stok = Stok::query()->where($where)->lockForUpdate()->firstOrFail();
 
@@ -569,4 +638,3 @@ class StokService
         }
     }
 }
-

@@ -13,7 +13,7 @@ use App\Models\Survei\Jawaban;
 use App\Models\Survei\ModulSurvei;
 use App\Models\Survei\Pertanyaan;
 use App\Models\Survei\SesiSurvei;
-use App\Models\Tenant\KoperasiDesa;
+use App\Models\Tenant\Entitas;
 use App\Models\Tenant\Wilayah;
 use App\Services\Perencanaan\KalkulasiKebutuhanService;
 use App\Services\Survei\SurveySyncService;
@@ -227,7 +227,10 @@ class SurveySyncBridgeTest extends TestCase
                 'sumber' => 'Survei Pola Pangan Harapan 2026',
                 'standar' => [
                     'balita' => ['laki_laki' => 1.5, 'perempuan' => 1.5], // Sum = 3.0 kg/orang/bulan
+                    'anak' => ['laki_laki' => 0.5, 'perempuan' => 0.5],
+                    'remaja' => ['laki_laki' => 0.5, 'perempuan' => 0.5],
                     'dewasa' => ['laki_laki' => 5.0, 'perempuan' => 5.0], // Sum = 10.0 kg/orang/bulan
+                    'lansia' => ['laki_laki' => 0.5, 'perempuan' => 0.5],
                 ],
             ],
             'sumber' => 'manual',
@@ -242,6 +245,12 @@ class SurveySyncBridgeTest extends TestCase
             ['id_wilayah' => $this->wilayahTest->id, 'tahun' => 2026, 'kelompok_umur' => 'dewasa'],
             ['jumlah_penduduk' => 200, 'id_sesi_survei' => $sesi->id]
         );
+        foreach (['anak', 'remaja', 'lansia'] as $kelompokUmur) {
+            DemografiDesa::updateOrCreate(
+                ['id_wilayah' => $this->wilayahTest->id, 'tahun' => 2026, 'kelompok_umur' => $kelompokUmur],
+                ['jumlah_penduduk' => 0, 'id_sesi_survei' => $sesi->id]
+            );
+        }
 
         $syncService = app(SurveySyncService::class);
         $syncService->syncSesi($sesi);
@@ -457,16 +466,16 @@ class SurveySyncBridgeTest extends TestCase
      */
     public function test_tenant_isolation_mencegah_sinkronisasi_lintas_koperasi(): void
     {
-        $koperasiA = KoperasiDesa::where('kode_koperasi', 'KDMP-A')->first();
-        $koperasiB = KoperasiDesa::where('kode_koperasi', 'KDMP-B')->first();
+        $entitasA = Entitas::where('kode_entitas', 'KDMP-A')->first();
+        $entitasB = Entitas::where('kode_entitas', 'KDMP-B')->first();
 
-        $this->assertNotNull($koperasiA);
-        $this->assertNotNull($koperasiB);
+        $this->assertNotNull($entitasA);
+        $this->assertNotNull($entitasB);
 
         // Buat sesi milik Wilayah Koperasi B
         $sesiB = SesiSurvei::create([
             'id_petugas' => $this->petugasTest->id,
-            'id_wilayah' => $koperasiB->id_wilayah,
+            'id_wilayah' => $entitasB->id_wilayah,
             'tahun' => 2026,
             'tanggal_survei' => '2026-08-25',
             'status' => 'disetujui',
@@ -487,8 +496,8 @@ class SurveySyncBridgeTest extends TestCase
             'sumber' => 'manual',
         ]);
 
-        // Pasang context koperasi aktif = Koperasi A
-        app()->instance('koperasi_aktif', $koperasiA->id_koperasi);
+        // Pasang context entitas aktif = Entitas A
+        app()->instance('entitas_aktif', $entitasA->id_entitas);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Akses ditolak: Sesi survei wilayah');
@@ -497,4 +506,3 @@ class SurveySyncBridgeTest extends TestCase
         $syncService->syncSesi($sesiB);
     }
 }
-

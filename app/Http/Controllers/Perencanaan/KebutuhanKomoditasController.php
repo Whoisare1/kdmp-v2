@@ -10,6 +10,7 @@ use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
 use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Services\Perencanaan\KalkulasiKebutuhanService;
+use App\Support\Perencanaan\PeriodeKalkulasi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -21,7 +22,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
 
     protected string $model = KebutuhanKomoditas::class;
     protected string $view = 'perencanaan.kebutuhan-komoditas';
-    protected string $title = 'Kebutuhan Komoditas (Hasil Kalkulasi M2)';
+    protected string $title = 'Kebutuhan Komoditas (Hasil Kalkulasi)';
     protected string $routeBase = 'perencanaan.kebutuhan-komoditas';
     protected array $withRelations = ['wilayah', 'komoditas', 'standar'];
 
@@ -30,7 +31,9 @@ class KebutuhanKomoditasController extends ModuleCrudController
         $idWilayah = $this->wilayahAktifId();
 
         $tahun = (int) $request->query('tahun', 2026);
-        $bulan = $request->filled('bulan') ? (int) $request->query('bulan') : null;
+        $bulanQuery = $request->query('bulan');
+        $periode = $request->query('periode');
+        $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
 
         $query = KebutuhanKomoditas::with(['wilayah', 'komoditas', 'standar'])
@@ -54,8 +57,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
         $items = $query->orderBy('id_komoditas')
             ->orderBy('bulan')
             ->orderBy('kelompok_umur')
-            ->paginate($this->perPage)
-            ->withQueryString();
+            ->get();
 
         // Data pendukung untuk filter dan kalkulasi
         $daftarKomoditas = Komoditas::where('is_active', true)->orderBy('nama')->get();
@@ -109,48 +111,53 @@ class KebutuhanKomoditasController extends ModuleCrudController
     {
         $validated = $request->validate([
             'tahun' => ['required', 'integer', 'min:2020', 'max:2100'],
-            'bulan' => ['required', 'integer', 'min:1', 'max:12'],
+            'periode' => ['nullable', 'in:ganjil,genap'],
+            'bulan' => ['nullable', 'integer', 'min:1', 'max:12'],
             'id_komoditas' => ['nullable', 'exists:komoditas,id'],
             'redirect_to' => ['nullable', 'string', 'in:dashboard,kebutuhan,neraca'],
         ]);
+        $legacyBulan = ($validated['periode'] ?? null) === null && isset($validated['bulan'])
+            ? (int) $validated['bulan']
+            : null;
+        $validated['periode'] ??= $legacyBulan !== null
+            ? PeriodeKalkulasi::fromMonth($legacyBulan)
+            : null;
+        if ($validated['periode'] === null) {
+            return back()->withErrors(['periode' => 'Periode perencanaan wajib dipilih.'])->withInput();
+        }
 
         try {
             $idWilayah = $this->wilayahAktifId();
             $hasil = $service->hitungKebutuhan(
                 $idWilayah,
                 (int) $validated['tahun'],
-                (int) $validated['bulan'],
+                $legacyBulan ?? $validated['periode'],
                 !empty($validated['id_komoditas']) ? (int) $validated['id_komoditas'] : null
             );
 
-            $namaBulan = [
-                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-            ][$validated['bulan']] ?? $validated['bulan'];
-
-            $pesan = "Kalkulasi kebutuhan berhasil dijalankan untuk {$namaBulan} {$validated['tahun']}. Terhitung {$hasil['total_baris_kebutuhan']} baris kebutuhan dan diperbarui {$hasil['total_hasil_kalkulasi']} neraca komoditas.";
+            $labelPeriode = PeriodeKalkulasi::detail($validated['periode'])['label'];
+            $pesan = "Kalkulasi kebutuhan berhasil dijalankan untuk {$labelPeriode} {$validated['tahun']}. Terhitung {$hasil['total_baris_kebutuhan']} baris kebutuhan dan diperbarui {$hasil['total_hasil_kalkulasi']} neraca komoditas.";
 
             $redirectTo = $validated['redirect_to'] ?? 'kebutuhan';
 
             if ($redirectTo === 'dashboard') {
                 return redirect()->route('perencanaan.dashboard', [
                     'tahun' => $validated['tahun'],
-                    'bulan' => $validated['bulan'],
+                    'periode' => $validated['periode'],
                 ])->with('status', $pesan);
             }
 
             if ($redirectTo === 'neraca') {
                 return redirect()->route('perencanaan.neraca-komoditas.index', [
                     'tahun' => $validated['tahun'],
-                    'bulan' => $validated['bulan'],
+                    'periode' => $validated['periode'],
                     'id_komoditas' => $validated['id_komoditas'] ?? null,
                 ])->with('status', $pesan);
             }
 
             return redirect()->route('perencanaan.kebutuhan-komoditas.index', [
                 'tahun' => $validated['tahun'],
-                'bulan' => $validated['bulan'],
+                'periode' => $validated['periode'],
                 'id_komoditas' => $validated['id_komoditas'] ?? null,
             ])->with('status', $pesan);
         } catch (Throwable $e) {
