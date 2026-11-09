@@ -80,10 +80,55 @@
                         {{ session('status') }}
                     </div>
                 @endif
+                @if (session('warning'))
+                    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>{{ session('warning') }}</span>
+                    </div>
+                @endif
+                @if (session('error'))
+                    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
+                        {{ session('error') }}
+                    </div>
+                @endif
 
                 {{ $slot }}
             </main>
         </div>
     </div>
+
+    {{-- Script Global: Pengaman Klik Ganda (Double-Submit Protection) di Sisi Klien --}}
+    <script>
+        document.addEventListener('submit', function (e) {
+            const form = e.target;
+            if (form && form.method && form.method.toUpperCase() !== 'GET') {
+                if (form.dataset.submitting === 'true') {
+                    e.preventDefault();
+                    return false;
+                }
+                const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                if (submitBtn) {
+                    form.dataset.submitting = 'true';
+                    setTimeout(() => {
+                        submitBtn.disabled = true;
+                        submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
+                    }, 50);
+                }
+            }
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            document.querySelectorAll('form[data-submitting]').forEach(f => {
+                delete f.dataset.submitting;
+                const btn = f.querySelector('button[type="submit"], input[type="submit"]');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                }
+            });
+        });
+    </script>
 </body>
 </html>

@@ -77,9 +77,14 @@ class PermintaanPengadaanController extends ModuleCrudController
                 ->first()
             : null;
         $user = auth()->user();
-        $gudangs = $user
-            ? Gudang::query()->where('id_entitas', $user->id_entitas)->where('is_active', true)->orderBy('nama_gudang')->get()
-            : collect();
+        $entitasId = $user?->id_entitas 
+            ?? session('entitas_aktif_pilihan') 
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+        $gudangs = $entitasId
+            ? Gudang::query()->where('id_entitas', $entitasId)->where('is_active', true)->orderBy('nama_gudang')->get()
+            : Gudang::query()->where('is_active', true)->orderBy('nama_gudang')->get();
 
         return view('perencanaan.permintaan-pengadaan.create', [
             'title' => 'PR - Pengadaan Defisit',
@@ -93,7 +98,7 @@ class PermintaanPengadaanController extends ModuleCrudController
                 ? $hargaService->calonSupplier((int) $hasil->id_komoditas, (int) $hasil->tahun, (int) $hasil->bulan)
                 : collect(),
             'perbandinganHarga' => $hasil
-                ? $hargaService->bandingkan((int) auth()->user()->id_entitas, (int) $hasil->id_komoditas, (int) $hasil->tahun, (int) $hasil->bulan)['items']
+                ? $hargaService->bandingkan((int) $entitasId, (int) $hasil->id_komoditas, (int) $hasil->tahun, (int) $hasil->bulan)['items']
                     ->keyBy('id_wilayah_sumber')
                 : collect(),
         ]);
@@ -112,11 +117,19 @@ class PermintaanPengadaanController extends ModuleCrudController
         $hasil = HasilKalkulasi::with('komoditas')->findOrFail((int) $validated['id_hasil']);
         $this->assertHasilBisaDiproses($hasil);
         $user = auth()->user();
+        $entitasId = $user?->id_entitas 
+            ?? session('entitas_aktif_pilihan') 
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
 
         $barang = Barang::query()->whereKey($validated['id_barang'])
             ->where('id_komoditas', $hasil->id_komoditas)->where('is_active', true)->firstOrFail();
         $gudang = Gudang::query()->whereKey($validated['id_gudang'])
-            ->where('id_entitas', $user->id_entitas)->where('is_active', true)->firstOrFail();
+            ->where(function ($q) use ($entitasId) {
+                if ($entitasId) {
+                    $q->where('id_entitas', $entitasId);
+                }
+            })->where('is_active', true)->firstOrFail();
 
         if (! $hasil->id_unit_usaha_rekomendasi) {
             return back()->withInput()->withErrors(['id_hasil' => 'Hasil kalkulasi belum memiliki unit usaha rekomendasi yang valid.']);
@@ -126,14 +139,14 @@ class PermintaanPengadaanController extends ModuleCrudController
         if ($jumlah <= 0) {
             return back()->withInput()->withErrors(['id_hasil' => 'Jumlah kebutuhan defisit tidak valid.']);
         }
-        $comparison = $hargaService->bandingkan((int) $user->id_entitas, (int) $hasil->id_komoditas, (int) $hasil->tahun, (int) $hasil->bulan);
+        $comparison = $hargaService->bandingkan((int) $entitasId, (int) $hasil->id_komoditas, (int) $hasil->tahun, (int) $hasil->bulan);
         $harga = $comparison['lowest'] ?? 0;
         $total = $jumlah * $harga;
 
-        DB::transaction(function () use ($validated, $user, $hasil, $barang, $gudang, $jumlah, $harga, $total): void {
+        DB::transaction(function () use ($validated, $entitasId, $hasil, $barang, $gudang, $jumlah, $harga, $total): void {
             $pr = PermintaanPengadaan::create([
-                'id_entitas' => $user->id_entitas,
-                'kode_permintaan' => PermintaanPengadaan::generateKode((int) $user->id_entitas),
+                'id_entitas' => $entitasId,
+                'kode_permintaan' => PermintaanPengadaan::generateKode((int) $entitasId),
                 'tgl_pengajuan' => $validated['tgl_pengajuan'],
                 'id_unit_usaha' => $hasil->id_unit_usaha_rekomendasi,
                 'id_gudang' => $gudang->id_gudang,
@@ -158,14 +171,17 @@ class PermintaanPengadaanController extends ModuleCrudController
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->id_entitas) {
-            abort(403, 'Hanya pengguna desa yang dapat membuat PR.');
+        if (! $user) {
+            abort(403, 'Silakan login terlebih dahulu.');
         }
 
-        $idWilayahUser = $user->entitas?->id_wilayah;
+        // Jika bukan Super Admin, validasi apakah hasil kalkulasi milik wilayahnya
+        if ($user->id_entitas !== null) {
+            $idWilayahUser = $user->entitas?->id_wilayah;
 
-        if ((int) $hasil->id_wilayah !== (int) $idWilayahUser) {
-            abort(403, 'Hasil kalkulasi tidak milik koperasi aktif Anda.');
+            if ((int) $hasil->id_wilayah !== (int) $idWilayahUser) {
+                abort(403, 'Hasil kalkulasi tidak milik koperasi aktif Anda.');
+            }
         }
 
         if ($hasil->status_surplus_defisit !== 'defisit') {

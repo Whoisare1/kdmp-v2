@@ -37,6 +37,7 @@ use App\Http\Controllers\Master\EntitasController;
 use App\Http\Controllers\Master\PeriodeController;
 use App\Http\Controllers\Master\PihakController;
 use App\Http\Controllers\Master\SatuanController;
+use App\Http\Controllers\Master\PenggunaKoperasiController;
 use App\Http\Controllers\Pembelian\PembelianController;
 use App\Http\Controllers\Pembelian\ReturPembelianController;
 use App\Http\Controllers\Penjualan\PenjualanController;
@@ -94,12 +95,13 @@ Route::middleware('auth')->group(function () {
         Route::resource('gudang', MasterGudangController::class);
         Route::resource('periode', PeriodeController::class)->only(['index', 'store', 'edit', 'update']);
         Route::resource('coa', CoaController::class);
+        Route::resource('pengguna', PenggunaKoperasiController::class)->middleware('peran:manajer');
     });
 
 
 
     // ===== M2/M3 â€” Kalkulasi Kebutuhan & Perencanaan =====
-    Route::prefix('perencanaan')->name('perencanaan.')->group(function () {
+    Route::prefix('perencanaan')->name('perencanaan.')->middleware('peran:manajer')->group(function () {
         Route::get('dashboard', [DashboardM2Controller::class, 'index'])->name('dashboard');
         Route::resource('demografi', DemografiController::class);
         Route::resource('potensi-produksi', PotensiProduksiController::class);
@@ -118,7 +120,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ===== M4 â€” Gudang =====
-    Route::prefix('gudang')->name('gudang.')->group(function () {
+    Route::prefix('gudang')->name('gudang.')->middleware('peran:admin_gudang')->group(function () {
         Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
         Route::get('batch', [BatchController::class, 'index'])->name('batch.index');
         Route::resource('penerimaan', PenerimaanBarangController::class);
@@ -129,7 +131,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ===== M5 Ã¢â‚¬â€ Pembelian =====
-    Route::prefix('pembelian')->name('pembelian.')->group(function () {
+    Route::prefix('pembelian')->name('pembelian.')->middleware('peran:pembelian,admin_gudang')->group(function () {
     Route::resource('pembelian', PembelianController::class);
 
     Route::patch('pembelian/{pembelian}/approve', [PembelianController::class, 'approve'])
@@ -153,7 +155,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ===== M6 â€” Penjualan =====
-    Route::prefix('penjualan')->name('penjualan.')->group(function () {
+    Route::prefix('penjualan')->name('penjualan.')->middleware('peran:kasir')->group(function () {
         Route::resource('penjualan', PenjualanController::class);
         Route::resource('retur', ReturPenjualanController::class);
     });
@@ -172,7 +174,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ===== M8/M9 â€” Keuangan & Akuntansi (fokus pendalaman besok) =====
-    Route::prefix('keuangan')->name('keuangan.')->group(function () {
+    Route::prefix('keuangan')->name('keuangan.')->middleware(['peran:akuntan,kasir', 'idempotent'])->group(function () {
         Route::resource('piutang', PiutangController::class)->only(['index', 'show']);
         Route::resource('hutang', HutangController::class)->only(['index', 'show']);
         // AJAX: ambil piutang/hutang terbuka milik pihak tertentu (harus SEBELUM resource)
@@ -184,7 +186,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('simpanan', SimpananController::class);
     });
 
-    Route::prefix('akuntansi')->name('akuntansi.')->group(function () {
+    Route::prefix('akuntansi')->name('akuntansi.')->middleware(['peran:akuntan', 'idempotent'])->group(function () {
         Route::resource('jurnal', JurnalController::class)->only(['index', 'show']);
         Route::post('jurnal/{id}/balik', [JurnalController::class, 'balik'])->name('jurnal.balik');
         Route::get('saldo-awal', [SaldoAwalController::class, 'index'])->name('saldo-awal.index');

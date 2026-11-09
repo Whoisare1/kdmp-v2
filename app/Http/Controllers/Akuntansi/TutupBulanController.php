@@ -34,7 +34,16 @@ class TutupBulanController extends Controller
             $tahun = now()->subYear()->year;
         }
 
-        $idEntitas = app('entitas_aktif');
+        $idEntitas = app()->bound('entitas_aktif') ? app('entitas_aktif') : null;
+        if ($idEntitas === null) {
+            $idEntitas = session('entitas_aktif_pilihan')
+                ?? \App\Models\Tenant\Entitas::where('status', 'APPROVED')->value('id_entitas')
+                ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+            if ($idEntitas) {
+                app()->bind('entitas_aktif', fn() => $idEntitas);
+            }
+        }
 
         if ($idEntitas === null) {
             return view('akuntansi.tutup-bulan', [
@@ -71,7 +80,17 @@ class TutupBulanController extends Controller
         $tahun = (int) $request->input('tahun');
         $bulan = (int) $request->input('bulan');
 
-        $idEntitas = app('entitas_aktif');
+        $idEntitas = app()->bound('entitas_aktif') ? app('entitas_aktif') : null;
+        if ($idEntitas === null) {
+            $idEntitas = session('entitas_aktif_pilihan')
+                ?? \App\Models\Tenant\Entitas::where('status', 'APPROVED')->value('id_entitas')
+                ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+            if ($idEntitas) {
+                app()->bind('entitas_aktif', fn() => $idEntitas);
+            }
+        }
+
         if ($idEntitas === null) {
             return back()->with('error', 'Harap pilih Entitas terlebih dahulu untuk melakukan eksekusi Tutup Bulan.');
         }

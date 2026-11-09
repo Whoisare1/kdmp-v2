@@ -21,6 +21,7 @@
 
         <form method="POST" action="{{ route('keuangan.pelunasan.store') }}" id="form-pelunasan">
             @csrf
+            @idempotency
 
             {{-- ============================================================
                  BAGIAN 1: Header Transaksi

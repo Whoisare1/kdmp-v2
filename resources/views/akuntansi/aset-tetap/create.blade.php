@@ -23,6 +23,7 @@
 
     <form method="POST" action="{{ route('akuntansi.aset-tetap.store') }}" class="rounded border border-paper-200 bg-white p-6 shadow-sm">
         @csrf
+        @idempotency
 
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
             

@@ -21,12 +21,17 @@ class PerbandinganHargaController extends ModuleCrudController
     public function index(Request $request): View
     {
         $user = auth()->user();
+        $entitasId = $user?->id_entitas 
+            ?? session('entitas_aktif_pilihan') 
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
         $service = app(PerbandinganHargaService::class);
         $selected = $request->integer('id_komoditas');
         $tahun = $request->integer('tahun', now()->year);
         $periode = $request->query('periode', PeriodeKalkulasi::fromMonth(now()->month));
-        $comparison = $selected > 0
-            ? $service->bandingkan((int) $user->id_entitas, $selected, $tahun, $periode)
+        $comparison = $selected > 0 && $entitasId
+            ? $service->bandingkan((int) $entitasId, $selected, $tahun, $periode)
             : ['items' => collect(), 'lowest' => null, 'highest' => null, 'difference' => null, 'satuan' => null];
 
         return view('perencanaan.perbandingan-harga.index', [

@@ -4,8 +4,10 @@
             'title' => 'Master Data',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>',
             'match' => 'master.*',
+            'roles' => ['manajer'],
             'items' => [
                 ['label' => 'Entitas', 'route' => 'master.entitas.index', 'match' => 'master.entitas.*', 'super_admin_only' => true],
+                ['label' => 'Kelola Staf', 'route' => 'master.pengguna.index', 'match' => 'master.pengguna.*', 'roles' => ['manajer']],
                 ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
                 ['label' => 'Satuan Ukur', 'route' => 'master.satuan.index', 'match' => 'master.satuan.*'],
                 ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
@@ -20,6 +22,7 @@
             'title' => 'Survei & Pemetaan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>',
             'match' => 'survei.*',
+            'roles' => ['surveyor', 'manajer'],
             'items' => [
                 ['label' => 'Dashboard Survei', 'route' => 'survei.dashboard.index', 'match' => 'survei.dashboard.*'],
                 ['label' => 'Sesi Survei', 'route' => 'survei.sesi.index', 'match' => 'survei.sesi.*'],
@@ -33,6 +36,7 @@
             'title' => 'Kalkulasi & Perencanaan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>',
             'match' => 'perencanaan.*',
+            'roles' => ['manajer'],
             'items' => [
                 ['label' => 'Dashboard Kalkulasi dan Perencanaan', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard'],
                 ['label' => 'Data & Parameter', 'route' => 'perencanaan.demografi.index', 'match' => 'perencanaan.demografi.*,perencanaan.potensi-produksi.*,perencanaan.standar-kebutuhan.*'],
@@ -47,6 +51,7 @@
             'title' => 'Manajemen Gudang',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>',
             'match' => 'gudang.*',
+            'roles' => ['admin_gudang', 'manajer'],
             'items' => [
                 ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
                 ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
@@ -61,17 +66,19 @@
             'title' => 'Pembelian & Penjualan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>',
             'match' => 'pembelian.*,penjualan.*',
+            'roles' => ['kasir', 'pembelian', 'admin_gudang', 'manajer'],
             'items' => [
-                ['label' => 'Order Pembelian', 'route' => 'pembelian.pembelian.index', 'match' => 'pembelian.pembelian.*'],
-                ['label' => 'Retur Pembelian', 'route' => 'pembelian.retur.index', 'match' => 'pembelian.retur.*'],
-                ['label' => 'Order Penjualan', 'route' => 'penjualan.penjualan.index', 'match' => 'penjualan.penjualan.*'],
-                ['label' => 'Retur Penjualan', 'route' => 'penjualan.retur.index', 'match' => 'penjualan.retur.*'],
+                ['label' => 'Order Pembelian', 'route' => 'pembelian.pembelian.index', 'match' => 'pembelian.pembelian.*', 'roles' => ['pembelian', 'admin_gudang', 'manajer']],
+                ['label' => 'Retur Pembelian', 'route' => 'pembelian.retur.index', 'match' => 'pembelian.retur.*', 'roles' => ['pembelian', 'admin_gudang', 'manajer']],
+                ['label' => 'Order Penjualan', 'route' => 'penjualan.penjualan.index', 'match' => 'penjualan.penjualan.*', 'roles' => ['kasir', 'manajer']],
+                ['label' => 'Retur Penjualan', 'route' => 'penjualan.retur.index', 'match' => 'penjualan.retur.*', 'roles' => ['kasir', 'manajer']],
             ]
         ],
         [
             'title' => 'Konsinyasi Antar Desa',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>',
             'match' => 'konsinyasi.*',
+            'roles' => ['admin_gudang', 'manajer'],
             'items' => [
                 ['label' => 'Marketplace', 'route' => 'konsinyasi.marketplace.index', 'match' => 'konsinyasi.marketplace.*'],
                 ['label' => 'Pengiriman', 'route' => 'konsinyasi.pengiriman.index', 'match' => 'konsinyasi.pengiriman.*'],
@@ -84,17 +91,19 @@
             'title' => 'Buku Keuangan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /></svg>',
             'match' => 'keuangan.*',
+            'roles' => ['akuntan', 'kasir', 'manajer'],
             'items' => [
-                ['label' => 'Piutang', 'route' => 'keuangan.piutang.index', 'match' => 'keuangan.piutang.*'],
-                ['label' => 'Hutang', 'route' => 'keuangan.hutang.index', 'match' => 'keuangan.hutang.*'],
-                ['label' => 'Pelunasan', 'route' => 'keuangan.pelunasan.index', 'match' => 'keuangan.pelunasan.*'],
-                ['label' => 'Kas & Transaksi', 'route' => 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*'],
+                ['label' => 'Piutang', 'route' => 'keuangan.piutang.index', 'match' => 'keuangan.piutang.*', 'roles' => ['akuntan', 'manajer']],
+                ['label' => 'Hutang', 'route' => 'keuangan.hutang.index', 'match' => 'keuangan.hutang.*', 'roles' => ['akuntan', 'manajer']],
+                ['label' => 'Pelunasan', 'route' => 'keuangan.pelunasan.index', 'match' => 'keuangan.pelunasan.*', 'roles' => ['akuntan', 'manajer']],
+                ['label' => 'Kas & Transaksi', 'route' => 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*', 'roles' => ['akuntan', 'kasir', 'manajer']],
             ]
         ],
         [
             'title' => 'Akuntansi & Laporan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
             'match' => 'akuntansi.*',
+            'roles' => ['akuntan', 'manajer'],
             'items' => [
                 ['label' => 'Saldo Awal', 'route' => 'akuntansi.saldo-awal.index', 'match' => 'akuntansi.saldo-awal.*'],
                 ['label' => 'Jurnal', 'route' => 'akuntansi.jurnal.index', 'match' => 'akuntansi.jurnal.*'],
@@ -153,8 +162,21 @@
         </p>
 
         <ul class="space-y-2">
+            @php
+                $user = auth()->user();
+                $isSuperAdmin = $user && $user->isSuperAdmin();
+                $isManajer = $user && $user->hasPeran('manajer');
+            @endphp
+
             @foreach ($sidebarGroups as $group)
                 @php
+                    // Filter grup berdasarkan peran pengguna
+                    if (!$isSuperAdmin && !$isManajer && !empty($group['roles'])) {
+                        if (!$user || !$user->hasAnyPeran($group['roles'])) {
+                            continue;
+                        }
+                    }
+
                     $isGroupActive = collect(explode(',', $group['match']))->contains(fn ($p) => request()->routeIs($p));
                 @endphp
                 
@@ -191,6 +213,13 @@
                             @foreach($group['items'] as $item)
                                 @continue(! empty($item['super_admin_only']) && auth()->user()?->id_entitas !== null)
                                 @php
+                                    // Filter sub-item berdasarkan peran
+                                    if (!$isSuperAdmin && !$isManajer && !empty($item['roles'])) {
+                                        if (!$user || !$user->hasAnyPeran($item['roles'])) {
+                                            continue;
+                                        }
+                                    }
+
                                     $hasChildren = ! empty($item['children']);
                                     $isItemActive = collect(explode(',', $item['match']))->contains(fn ($p) => request()->routeIs($p));
                                     $isChildActive = $hasChildren && collect($item['children'])->contains(function ($child) {
@@ -218,28 +247,48 @@
                                                     @foreach ($item['children'] as $child)
                                                         @php
                                                             $childHasChildren = ! empty($child['children']);
-                                                            $childActive = collect(explode(',', $child['match']))->contains(fn ($p) => request()->routeIs($p));
-                                                            $grandchildActive = $childHasChildren && collect($child['children'])->contains(fn ($grandchild) => collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p)));
+                                                            $isSubChildActive = collect(explode(',', $child['match']))->contains(fn ($p) => request()->routeIs($p))
+                                                                || ($childHasChildren && collect($child['children'])->contains(fn ($grandchild) => collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p))));
                                                         @endphp
                                                         <li>
                                                             @if ($childHasChildren)
-                                                                <div x-data="{ expanded: {{ ($childActive || $grandchildActive) ? 'true' : 'false' }} }">
-                                                                    <div class="flex items-center rounded-md {{ ($childActive || $grandchildActive) ? 'bg-ink-800 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
-                                                                        <a href="{{ route($child['route']) }}" class="min-w-0 flex-1 px-2.5 py-1.5">{{ $child['label'] }}</a>
-                                                                        <button type="button" @click="expanded = !expanded" class="px-2 py-1.5 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $child['label'] }}">
-                                                                            <svg class="h-3 w-3 transition-transform" :class="expanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7" /></svg>
+                                                                <div x-data="{ expanded: {{ $isSubChildActive ? 'true' : 'false' }} }">
+                                                                    <div class="flex items-center rounded-lg text-xs transition-colors
+                                                                        {{ $isSubChildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
+                                                                        <a href="{{ route($child['route']) }}" class="min-w-0 flex-1 px-3 py-2">
+                                                                            {{ $child['label'] }}
+                                                                        </a>
+                                                                        <button type="button" @click="expanded = !expanded" class="px-3 py-2 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $child['label'] }}">
+                                                                            <svg class="h-3.5 w-3.5 transition-transform" :class="expanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7" />
+                                                                            </svg>
                                                                         </button>
                                                                     </div>
                                                                     <div x-show="expanded" x-transition x-cloak class="ml-3 mt-1 border-l border-ink-800 pl-2">
-                                                                        @foreach ($child['children'] as $grandchild)
-                                                                            <a href="{{ route($grandchild['route']) }}" class="block rounded-md px-2.5 py-1.5 text-[11px] transition-colors {{ request()->routeIs($grandchild['match']) ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-500 hover:bg-ink-800 hover:text-white' }}">
-                                                                                {{ $grandchild['label'] }}
-                                                                            </a>
-                                                                        @endforeach
+                                                                        <ul class="space-y-1">
+                                                                            @foreach ($child['children'] as $grandchild)
+                                                                                @php
+                                                                                    $isGrandchildActive = collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p));
+                                                                                @endphp
+                                                                                <li>
+                                                                                    <a
+                                                                                        href="{{ route($grandchild['route']) }}"
+                                                                                        class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                                                                        {{ $isGrandchildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                                                                    >
+                                                                                        {{ $grandchild['label'] }}
+                                                                                    </a>
+                                                                                </li>
+                                                                            @endforeach
+                                                                        </ul>
                                                                     </div>
                                                                 </div>
                                                             @else
-                                                                <a href="{{ route($child['route']) }}" class="block rounded-md px-2.5 py-1.5 text-[11px] transition-colors {{ $childActive ? 'bg-ink-800 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
+                                                                <a
+                                                                    href="{{ route($child['route']) }}"
+                                                                    class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                                                    {{ $isSubChildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                                                >
                                                                     {{ $child['label'] }}
                                                                 </a>
                                                             @endif
@@ -249,7 +298,11 @@
                                             </div>
                                         </div>
                                     @else
-                                        <a href="{{ route($item['route']) }}" class="block rounded-lg px-3 py-2 text-xs transition-colors {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium relative before:absolute before:-left-[0.8125rem] before:top-1/2 before:-translate-y-1/2 before:w-[5px] before:h-[5px] before:rounded-full before:bg-padi-400' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
+                                        <a 
+                                            href="{{ route($item['route']) }}" 
+                                            class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                            {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                        >
                                             {{ $item['label'] }}
                                         </a>
                                     @endif
@@ -262,30 +315,26 @@
         </ul>
     </nav>
 
-    {{-- Footer Sidebar --}}
-    <div class="border-t border-ink-800 px-6 py-4 bg-ink-950/50">
+    {{-- Footer Info --}}
+    <div class="border-t border-ink-800 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-ink-800 flex items-center justify-center text-xs font-bold text-padi-400">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-ink-800 font-mono text-xs text-paper-400">
                 {{ substr(auth()->user()->nama ?? 'U', 0, 1) }}
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-xs font-medium text-white truncate">{{ auth()->user()->nama ?? 'User' }}</p>
-                <p class="text-[10px] text-paper-400 truncate">Ngobar v1.0</p>
+            </span>
+            <div class="leading-tight">
+                <p class="text-xs font-medium text-white truncate max-w-[130px]">
+                    {{ auth()->user()->nama ?? 'Guest' }}
+                </p>
+                <p class="text-[10px] text-paper-400 truncate max-w-[130px]">
+                    @if(auth()->check() && auth()->user()->isSuperAdmin())
+                        Super Admin
+                    @elseif(auth()->check() && auth()->user()->peran->isNotEmpty())
+                        {{ auth()->user()->peran->pluck('nama')->join(', ') }}
+                    @else
+                        Staf Koperasi
+                    @endif
+                </p>
             </div>
         </div>
     </div>
 </aside>
-
-<style>
-    /* Custom Scrollbar for Sidebar */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: #3f3f46;
-        border-radius: 20px;
-    }
-</style>

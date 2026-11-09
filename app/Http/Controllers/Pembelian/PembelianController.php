@@ -12,6 +12,8 @@ use App\Models\Master\UnitUsaha;
 use App\Services\PembelianService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -25,7 +27,16 @@ class PembelianController extends ModuleCrudController
 
     public function index(Request $request): View
     {
+        $idEntitas = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? session('entitas_aktif_pilihan');
+
+        $hasModalAwal = $idEntitas ? $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas) : true;
+
         $query = Pembelian::with(['pihak', 'unitUsaha', 'gudang', 'kasBank']);
+        if ($idEntitas) {
+            $query->where('id_entitas', $idEntitas);
+        }
 
         if ($search = $request->query('q')) {
             $query->where(function ($builder) use ($search) {
@@ -38,7 +49,81 @@ class PembelianController extends ModuleCrudController
             'title' => $this->title,
             'routeBase' => $this->routeBase,
             'items' => $query->latest('id_pembelian')->paginate(15)->withQueryString(),
+            'hasModalAwal' => $hasModalAwal,
         ]);
+    }
+
+    /**
+     * Memeriksa apakah koperasi telah mencatat transaksi Setoran Simpanan Pokok
+     * atau Saldo Awal Kas sebelum diizinkan membuat Order Pembelian.
+     */
+    protected function hasSimpananPokokOrSaldoAwal(int $idEntitas): bool
+    {
+        // 1. Cek apakah ada Setoran Simpanan Pokok di simpanan_anggota,
+        //    atau jurnal ber-kode SPK, atau transaksi kas masuk ke akun modal simpanan pokok (311)
+        if (Schema::hasTable('simpanan_anggota')) {
+            $adaSimpanan = DB::table('simpanan_anggota')
+                ->where('id_entitas', $idEntitas)
+                ->where('jenis', 'pokok')
+                ->exists();
+
+            if ($adaSimpanan) {
+                return true;
+            }
+        }
+
+        $adaJurnalSpk = DB::table('jurnal_header')
+            ->where('id_entitas', $idEntitas)
+            ->where('status', 'POSTED')
+            ->where('kode_transaksi', 'SPK')
+            ->exists();
+
+        if ($adaJurnalSpk) {
+            return true;
+        }
+
+        if (Schema::hasTable('kas_transaksi')) {
+            $adaKasSimpanan = DB::table('kas_transaksi')
+                ->where('id_entitas', $idEntitas)
+                ->where('jenis', 'masuk')
+                ->where('kode_akun_lawan', 'like', '311%')
+                ->exists();
+
+            if ($adaKasSimpanan) {
+                return true;
+            }
+        }
+
+        // 2. Cek apakah ada Saldo Awal Kas (Jurnal JOP / jenis SALDO_AWAL dengan debet akun kas 111%)
+        $adaSaldoAwalKas = DB::table('jurnal_header as jh')
+            ->join('jurnal_detail as jd', 'jd.id_jurnal', '=', 'jh.id_jurnal')
+            ->where('jh.id_entitas', $idEntitas)
+            ->where('jh.status', 'POSTED')
+            ->where(function ($q) {
+                $q->where('jh.jenis_jurnal', 'SALDO_AWAL')
+                  ->orWhere('jh.kode_transaksi', 'JOP');
+            })
+            ->where('jd.kode_anak', 'like', '111%')
+            ->where('jd.debet', '>', 0)
+            ->exists();
+
+        if ($adaSaldoAwalKas) {
+            return true;
+        }
+
+        // 3. Cek apakah saldo berjalan kas/bank di v_saldo_berjalan > 0
+        if (Schema::hasTable('v_saldo_berjalan')) {
+            $saldoKas = DB::table('v_saldo_berjalan')
+                ->where('id_entitas', $idEntitas)
+                ->where('kode_anak', 'like', '111%')
+                ->sum('saldo_normal');
+
+            if ($saldoKas > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -48,7 +133,15 @@ class PembelianController extends ModuleCrudController
     {
         $idEntitas = auth()->user()->id_entitas
             ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? session('entitas_aktif_pilihan')
             ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+        if ($idEntitas && ! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                redirect()->route("{$this->routeBase}.index")
+                    ->with('error', 'Koperasi baru wajib mencatat transaksi Setoran Simpanan Pokok atau Saldo Awal Kas terlebih dahulu sebelum diizinkan membuat Order Pembelian.')
+            );
+        }
 
         $prs = PermintaanPengadaan::where('status', 'disetujui')
             ->when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))
@@ -91,6 +184,11 @@ class PembelianController extends ModuleCrudController
 
             if (!$idEntitas) {
                 throw new \RuntimeException('Entitas aktif tidak ditemukan. Masuk menggunakan akun koperasi yang terhubung ke entitas.');
+            }
+
+            if (! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
+                return redirect()->route("{$this->routeBase}.index")
+                    ->with('error', 'Koperasi baru wajib mencatat transaksi Setoran Simpanan Pokok atau Saldo Awal Kas terlebih dahulu sebelum diizinkan membuat Order Pembelian.');
             }
 
             $validated = $request->validate([
