@@ -17,6 +17,10 @@ class PemisahanPeranPenggunaTest extends TestCase
     {
         parent::setUp();
 
+        if (Pengguna::where('email', 'manajer@kdmp-a.test')->doesntExist()) {
+            $this->seed();
+        }
+
         $this->manajer  = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
         $this->kasir    = Pengguna::where('email', 'kasir@kdmp-a.test')->firstOrFail();
         $this->gudang   = Pengguna::where('email', 'gudang@kdmp-a.test')->firstOrFail();

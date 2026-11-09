@@ -51,12 +51,12 @@ class Pengguna extends Authenticatable
 
     public function isSuperAdmin(): bool
     {
-        return $this->id_entitas === null;
+        return $this->id_entitas === null && ($this->peran->isEmpty() || $this->peran->contains('kode', 'super_admin'));
     }
 
     public function hasPeran(string $kode): bool
     {
-        if ($this->isSuperAdmin()) {
+        if ($this->id_entitas === null && $this->peran->contains('kode', 'super_admin')) {
             return true;
         }
 

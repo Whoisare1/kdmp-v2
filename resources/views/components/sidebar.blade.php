@@ -1,8 +1,12 @@
 @php
-    $isPurchasingUser = auth()->user()?->hasPeran('pembelian') ?? false;
-    $isSalesUser = (auth()->user()?->hasPeran('kasir') ?? false)
-        || (auth()->user()?->hasPeran('penjualan') ?? false);
-    $isModuleLimitedUser = $isPurchasingUser || $isSalesUser;
+    $user = auth()->user();
+    $isSuperAdmin = $user && $user->isSuperAdmin();
+    $isManajer = $user && $user->hasPeran('manajer');
+    $isPurchasingUser = $user?->hasPeran('pembelian') ?? false;
+    $isSalesUser = ($user?->hasPeran('kasir') ?? false)
+        || ($user?->hasPeran('penjualan') ?? false);
+    $hasOtherRoles = $user && ($user->hasPeran('admin_gudang') || $user->hasPeran('surveyor') || $user->hasPeran('akuntan'));
+    $isModuleLimitedUser = ! $isSuperAdmin && ! $isManajer && ! $hasOtherRoles && ($isPurchasingUser || $isSalesUser);
     $restrictedGroupTitle = $isPurchasingUser && $isSalesUser
         ? 'Pembelian & Penjualan'
         : ($isPurchasingUser ? 'Pembelian' : 'Penjualan');
