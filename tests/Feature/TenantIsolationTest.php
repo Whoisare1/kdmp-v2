@@ -100,6 +100,14 @@ class TenantIsolationTest extends TestCase
 
         $this->userA = Pengguna::withoutGlobalScopes()->find($idUserA);
         $this->userB = Pengguna::withoutGlobalScopes()->find($idUserB);
+
+        // Beri peran akuntan agar user dapat mengakses modul keuangan
+        $idPeranAkuntan = \DB::table('peran')->where('kode', 'akuntan')->value('id_peran')
+            ?? \DB::table('peran')->insertGetId(['kode' => 'akuntan', 'nama' => 'Akuntan']);
+        \DB::table('pengguna_peran')->insert([
+            ['id_pengguna' => $idUserA, 'id_peran' => $idPeranAkuntan],
+            ['id_pengguna' => $idUserB, 'id_peran' => $idPeranAkuntan],
+        ]);
     }
 
     // =========================================================================

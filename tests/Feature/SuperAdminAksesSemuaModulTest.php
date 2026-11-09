@@ -14,6 +14,10 @@ class SuperAdminAksesSemuaModulTest extends TestCase
     {
         parent::setUp();
 
+        if (Pengguna::whereNull('id_entitas')->doesntExist()) {
+            $this->seed();
+        }
+
         $this->superAdmin = Pengguna::whereNull('id_entitas')->firstOrFail();
     }
 
