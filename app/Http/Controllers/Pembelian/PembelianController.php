@@ -178,6 +178,7 @@ class PembelianController extends ModuleCrudController
                     'after_or_equal:today',
                     Rule::requiredIf($request->input('jenis_pembayaran') === 'kredit'),
                 ],
+                'diskon' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
                 'id_unit_usaha' => ['required', 'exists:master_unit_usaha,id_unit_usaha'],
                 'id_gudang' => [
                     'required',
@@ -272,6 +273,7 @@ class PembelianController extends ModuleCrudController
                 $validated['tgl_jatuh_tempo'] ?? null,
                 $idKasBank ? (int) $idKasBank : null,
                 $validated['source'],
+                (float) ($validated['diskon'] ?? 0),
             );
 
             if ($permintaanPembelian) {
@@ -516,6 +518,7 @@ class PembelianController extends ModuleCrudController
                 'after_or_equal:today',
                 Rule::requiredIf($request->input('jenis_pembayaran') === 'kredit'),
             ],
+            'diskon' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
             'id_unit_usaha' => 'nullable|exists:master_unit_usaha,id_unit_usaha',
             'id_gudang' => ['nullable', 'integer', new TenantOwnershipRule('gudang', 'id_gudang')],
             'items' => 'required|array|min:1',

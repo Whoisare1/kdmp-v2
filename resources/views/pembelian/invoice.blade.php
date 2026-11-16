@@ -74,6 +74,14 @@
                     </tbody>
                     <tfoot>
                         <tr>
+                            <th colspan="3" class="px-3 py-2 text-right">Subtotal</th>
+                            <th class="px-3 py-2 text-right">Rp {{ number_format((float) $item->detail->sum('subtotal'), 2, ',', '.') }}</th>
+                        </tr>
+                        <tr>
+                            <th colspan="3" class="px-3 py-2 text-right">Diskon</th>
+                            <th class="px-3 py-2 text-right">Rp {{ number_format((float) ($item->diskon ?? 0), 2, ',', '.') }}</th>
+                        </tr>
+                        <tr>
                             <th colspan="3" class="px-3 py-3 text-right">Total Pembelian</th>
                             <th class="px-3 py-3 text-right">Rp {{ number_format((float) $item->total_pembelian, 2, ',', '.') }}</th>
                         </tr>

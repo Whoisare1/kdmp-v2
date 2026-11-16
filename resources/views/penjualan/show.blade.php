@@ -151,6 +151,14 @@
                         </tbody>
                         <tfoot class="border-t border-paper-300 bg-paper-100 font-bold">
                             <tr>
+                                <th colspan="4" class="px-4 py-2 text-right">Subtotal</th>
+                                <th class="px-4 py-2 text-right font-mono">Rp {{ number_format((float) $item->total_bruto, 0, ',', '.') }}</th>
+                            </tr>
+                            <tr>
+                                <th colspan="4" class="px-4 py-2 text-right">Diskon</th>
+                                <th class="px-4 py-2 text-right font-mono">Rp {{ number_format((float) $item->diskon, 0, ',', '.') }}</th>
+                            </tr>
+                            <tr>
                                 <th colspan="4" class="px-4 py-3 text-right">Total Tagihan</th>
                                 <th class="px-4 py-3 text-right font-mono text-base text-rose-700">Rp {{ number_format((float) $item->total_bayar, 0, ',', '.') }}</th>
                             </tr>
@@ -264,6 +272,14 @@
 
                 {{-- Ringkasan Pembayaran & Kembalian --}}
                 <div class="space-y-1 text-[11px]">
+                    <div class="flex justify-between">
+                        <span>SUBTOTAL :</span>
+                        <span>Rp {{ number_format((float) $item->total_bruto, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>DISKON :</span>
+                        <span>Rp {{ number_format((float) $item->diskon, 0, ',', '.') }}</span>
+                    </div>
                     <div class="flex justify-between font-bold text-xs">
                         <span>TOTAL TAGIHAN :</span>
                         <span>Rp {{ number_format((float) $item->total_bayar, 0, ',', '.') }}</span>

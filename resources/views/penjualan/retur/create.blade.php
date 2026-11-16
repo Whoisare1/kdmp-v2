@@ -46,7 +46,7 @@
             </div>
 
             @if ($sale)
-                <div class="mt-4 grid gap-3 border-t border-paper-200 pt-3 text-sm sm:grid-cols-4">
+                <div class="mt-4 grid gap-3 border-t border-paper-200 pt-3 text-sm sm:grid-cols-2 xl:grid-cols-6">
                     <div>
                         <span class="text-xs text-ink-600 uppercase font-medium">Kode</span>
                         <p class="font-semibold text-ink-900">{{ $sale->kode_penjualan }}</p>
@@ -60,8 +60,16 @@
                         <p class="font-semibold text-ink-900">{{ $sale->nama_pembeli ?: ($sale->pihak?->nama ?? 'Pembeli Umum') }}</p>
                     </div>
                     <div>
-                        <span class="text-xs text-ink-600 uppercase font-medium">Total Belanja</span>
-                        <p class="font-semibold text-rose-700">Rp {{ number_format((float) $sale->total_bayar, 0, ',', '.') }}</p>
+                        <span class="text-xs text-ink-600 uppercase font-medium">Subtotal</span>
+                        <p class="font-semibold text-ink-900">Rp {{ number_format((float) $sale->total_bruto, 2, ',', '.') }}</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-ink-600 uppercase font-medium">Diskon</span>
+                        <p class="font-semibold text-ink-900">Rp {{ number_format((float) $sale->diskon, 2, ',', '.') }}</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-ink-600 uppercase font-medium">Total Bersih</span>
+                        <p class="font-semibold text-rose-700">Rp {{ number_format((float) $sale->total_bayar, 2, ',', '.') }}</p>
                     </div>
                 </div>
             @endif
@@ -91,7 +99,7 @@
             <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
                 <div class="border-b border-paper-300 px-4 py-3">
                     <h2 class="font-semibold text-ink-900">3. Rincian Barang yang Diretur</h2>
-                    <p class="text-xs text-ink-600">Masukkan jumlah barang yang akan dikembalikan (maksimum sebesar sisa barang yang belum diretur).</p>
+                    <p class="text-xs text-ink-600">Masukkan jumlah barang yang akan dikembalikan. Nilai retur akan memakai harga bersih setelah diskon transaksi dialokasikan secara proporsional.</p>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-[650px] w-full text-sm">
