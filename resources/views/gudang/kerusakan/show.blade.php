@@ -61,4 +61,86 @@
             <span class="font-medium">Keterangan:</span> {{ $item->keterangan ?? '-' }}
         </div>
     </div>
+
+    @if ($item->antreanJurnal->isNotEmpty())
+        <div class="mt-5 overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
+            <div class="border-b border-paper-300 px-4 py-3">
+                <h2 class="font-display text-base font-semibold text-ink-900">Status Jurnal Keuangan</h2>
+            </div>
+            <div class="divide-y divide-paper-200">
+                @foreach ($item->antreanJurnal as $antrean)
+                    <dl class="grid gap-3 p-4 text-sm md:grid-cols-3">
+                        <div>
+                            <dt class="text-ink-600">No. dokumen antrean</dt>
+                            <dd class="mt-1 font-mono font-medium text-ink-900">{{ $antrean->no_dokumen }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-ink-600">Status</dt>
+                            <dd class="mt-1 font-medium text-ink-900">{{ $antrean->status }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-ink-600">No. jurnal</dt>
+                            <dd class="mt-1 font-medium text-ink-900">{{ $antrean->no_jurnal ?? 'Belum tersedia' }}</dd>
+                        </div>
+                        @if ($antrean->pesan_error)
+                            <div class="md:col-span-3">
+                                <dt class="text-ink-600">Keterangan dari Keuangan</dt>
+                                <dd class="mt-1 text-merah-600">{{ $antrean->pesan_error }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    @if ($item->jurnal)
+        <div class="mt-5 overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
+            <div class="flex items-center justify-between border-b border-paper-300 px-4 py-3">
+                <h2 class="font-display text-base font-semibold text-ink-900">Jurnal Akuntansi Terkait</h2>
+                <a href="{{ route('akuntansi.jurnal.show', $item->jurnal->id_jurnal) }}" class="text-xs font-medium text-merah-600 hover:underline">
+                    Lihat di Modul Jurnal &rarr;
+                </a>
+            </div>
+            <div class="p-4">
+                <div class="mb-3 flex flex-wrap items-center gap-4 text-sm">
+                    <div>
+                        <span class="text-ink-600">Nomor Jurnal:</span>
+                        <span class="font-semibold text-ink-900">{{ $item->jurnal->no_jurnal }}</span>
+                    </div>
+                    <div>
+                        <span class="text-ink-600">Tanggal:</span>
+                        <span class="font-medium text-ink-800">{{ $item->jurnal->tanggal_jurnal?->format('d M Y') }}</span>
+                    </div>
+                    <div>
+                        <span class="text-ink-600">Kode Transaksi:</span>
+                        <span class="rounded bg-paper-200 px-2 py-0.5 font-mono text-xs font-semibold text-ink-800">{{ $item->jurnal->kode_transaksi }}</span>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-paper-200 font-mono text-xs uppercase text-ink-600">
+                                <th class="py-2">Kode Rekening</th>
+                                <th class="py-2">Nama Akun</th>
+                                <th class="py-2 text-right">Debet</th>
+                                <th class="py-2 text-right">Kredit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($item->jurnal->detail as $baris)
+                                <tr class="border-b border-paper-100 last:border-0">
+                                    <td class="py-2 font-mono text-xs text-ink-700">{{ $baris->kode_anak }}</td>
+                                    <td class="py-2 text-ink-900">{{ $baris->coa->nama_rekening ?? '-' }}</td>
+                                    <td class="py-2 text-right text-ink-900">{{ (float) $baris->debet > 0 ? 'Rp ' . number_format((float) $baris->debet, 2, ',', '.') : '-' }}</td>
+                                    <td class="py-2 text-right text-ink-900">{{ (float) $baris->kredit > 0 ? 'Rp ' . number_format((float) $baris->kredit, 2, ',', '.') : '-' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
 </x-layouts.app>

@@ -13,6 +13,15 @@
             <p class="mt-1 text-sm text-ink-700">Tidak ada barang yang berada di bawah ambang minimum yang sudah diatur.</p>
         </div>
     @endif
+    @if ($pelacakanBatchTersedia && $jumlahBatchKedaluwarsa > 0)
+        <a href="{{ route('gudang.batch.index', ['status' => 'kedaluwarsa']) }}" class="mb-5 flex items-center justify-between gap-4 rounded-sm border border-red-300 bg-red-50 p-4 transition hover:bg-red-100">
+            <div>
+                <p class="font-mono text-[11px] uppercase tracking-wide text-red-800">Peringatan Batch Kedaluwarsa</p>
+                <p class="mt-1 text-sm font-medium text-red-900">{{ $jumlahBatchKedaluwarsa }} batch kedaluwarsa masih memiliki saldo stok.</p>
+            </div>
+            <span class="text-sm font-medium text-red-800">Tinjau batch &rarr;</span>
+        </a>
+    @endif
     @if ($pelacakanBatchTersedia && $jumlahBatchMendekatiKedaluwarsa > 0)
         <a href="{{ route('gudang.batch.index', ['status' => 'segera']) }}" class="mb-5 flex items-center justify-between gap-4 rounded-sm border border-amber-300 bg-amber-50 p-4 transition hover:bg-amber-100">
             <div>

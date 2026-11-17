@@ -9,6 +9,25 @@
         </a>
     </div>
 
+    <div class="mb-5 rounded-sm border border-paper-300 bg-paper-50 p-4">
+        <form method="GET" class="flex flex-wrap items-end gap-3">
+            <label class="text-sm">
+                <span class="mb-1 block text-xs font-medium text-ink-700">Bulan</span>
+                <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
+                    <option value="">Semua bulan</option>
+                    @foreach ([1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'] as $angkaBulan => $namaBulan)
+                        <option value="{{ $angkaBulan }}" @selected((string) ($filters['bulan'] ?? '') === (string) $angkaBulan)>{{ $namaBulan }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="text-sm">
+                <span class="mb-1 block text-xs font-medium text-ink-700">Tahun</span>
+                <input type="number" name="tahun" min="2000" max="2100" value="{{ $filters['tahun'] ?? '' }}" placeholder="Semua tahun" class="w-32 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
+            </label>
+            <button class="rounded-sm border border-paper-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">Tampilkan</button>
+        </form>
+    </div>
+
     <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
         <div class="overflow-x-auto">
             <table class="min-w-[900px] w-full text-left text-sm">

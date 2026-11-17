@@ -40,10 +40,18 @@
         </form>
 
         @if($idEntitas)
-            <a href="{{ route('master.barang.create') }}"
-               class="inline-flex items-center justify-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600">
-                + Tambah Barang
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                @if(auth()->user()?->hasPeran('admin_gudang') || auth()->user()?->hasPeran('manajer'))
+                    <a href="{{ route('master.barang.stok-minimum.index') }}"
+                       class="inline-flex items-center justify-center rounded-sm border border-paper-300 bg-paper-50 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">
+                        Atur Stok Minimum &amp; Batch
+                    </a>
+                @endif
+                <a href="{{ route('master.barang.create') }}"
+                   class="inline-flex items-center justify-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600">
+                    + Tambah Barang
+                </a>
+            </div>
         @endif
     </div>
 

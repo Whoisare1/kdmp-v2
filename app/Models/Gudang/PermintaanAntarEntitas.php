@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Models\Gudang;
+
+use App\Models\Pengguna;
+use App\Models\Perencanaan\HasilKalkulasi;
+use App\Models\Tenant\Entitas;
+use Illuminate\Database\Eloquent\Model;
+
+class PermintaanAntarEntitas extends Model
+{
+    protected $table = 'permintaan_antar_entitas_gudang';
+    protected $primaryKey = 'id_permintaan_gudang';
+
+    protected $fillable = [
+        'id_entitas_pengaju', 'id_entitas_penerima', 'id_hasil_pengaju', 'id_hasil_penerima',
+        'jenis_permintaan', 'nama_komoditas', 'tahun', 'bulan', 'qty_rekomendasi', 'satuan',
+        'status', 'created_by',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'qty_rekomendasi' => 'decimal:4',
+            'tahun' => 'integer',
+            'bulan' => 'integer',
+        ];
+    }
+
+    public function pengaju()
+    {
+        return $this->belongsTo(Entitas::class, 'id_entitas_pengaju', 'id_entitas');
+    }
+
+    public function penerima()
+    {
+        return $this->belongsTo(Entitas::class, 'id_entitas_penerima', 'id_entitas');
+    }
+
+    public function hasilPengaju()
+    {
+        return $this->belongsTo(HasilKalkulasi::class, 'id_hasil_pengaju', 'id_hasil');
+    }
+
+    public function hasilPenerima()
+    {
+        return $this->belongsTo(HasilKalkulasi::class, 'id_hasil_penerima', 'id_hasil');
+    }
+
+    public function pembuat()
+    {
+        return $this->belongsTo(Pengguna::class, 'created_by', 'id');
+    }
+}

@@ -8,7 +8,6 @@ use App\Services\StokBatchService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -19,7 +18,7 @@ class StokMinimumBarangController extends Controller
     public function index(Request $request): View
     {
         $entitasId = $this->entitasBerwenang();
-        $pelacakanBatchTersedia = Schema::hasColumn('barang_per_koperasi', 'lacak_batch');
+        $pelacakanBatchTersedia = true;
 
         $query = DB::table('barang_per_koperasi as pengaturan')
             ->join('master_barang as barang', 'barang.id_barang', '=', 'pengaturan.id_barang')
@@ -63,9 +62,6 @@ class StokMinimumBarangController extends Controller
             'stok_minimum' => ['required', 'numeric', 'regex:/^\d{1,14}(?:\.\d{1,4})?$/', 'gte:0'],
             'lacak_batch' => ['sometimes', 'boolean'],
         ]);
-        if (array_key_exists('lacak_batch', $data) && ! Schema::hasColumn('barang_per_koperasi', 'lacak_batch')) {
-            abort(409, 'Migration pelacakan batch belum dijalankan. Tidak ada perubahan yang disimpan.');
-        }
 
         DB::transaction(function () use ($data, $entitasId, $idBarang, $request): void {
             $pengaturan = DB::table('barang_per_koperasi')

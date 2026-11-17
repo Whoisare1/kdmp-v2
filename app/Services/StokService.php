@@ -125,8 +125,11 @@ class StokService
                 ->lockForUpdate()
                 ->first();
 
-            if (! $stok || bccomp((string) $stok->qty_on_hand, $qty, 4) < 0) {
-                $tersedia = $stok?->qty_on_hand ?? '0';
+            $qtyTersedia = $stok
+                ? bcsub((string) $stok->qty_on_hand, (string) $stok->qty_reserved, 4)
+                : '0';
+            if (! $stok || bccomp($qtyTersedia, $qty, 4) < 0) {
+                $tersedia = $stok && bccomp($qtyTersedia, '0', 4) > 0 ? $qtyTersedia : '0';
                 throw new RuntimeException("Stok tidak mencukupi. Tersedia {$tersedia}, diminta {$qty}.");
             }
 
@@ -221,6 +224,12 @@ class StokService
 
             $qtySistem = (string) ($stok?->qty_on_hand ?? '0');
             $hpp = (string) ($stok?->hpp_rata2 ?? '0');
+            $qtyReserved = (string) ($stok?->qty_reserved ?? '0');
+            if (bccomp($qtyFisik, $qtyReserved, 4) < 0) {
+                throw new RuntimeException(
+                    "Jumlah fisik {$qtyFisik} tidak boleh lebih kecil dari stok yang sudah dipesan {$qtyReserved}. Lepaskan pesanan terkait sebelum menyetujui opname."
+                );
+            }
             $selisih = bcsub($qtyFisik, $qtySistem, 4);
             $nilaiSelisih = bcmul($selisih, $hpp, 2);
 

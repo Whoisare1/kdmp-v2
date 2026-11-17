@@ -3,17 +3,17 @@
 namespace App\Http\Controllers\Gudang;
 
 use App\Http\Controllers\Concerns\ModuleCrudController;
+use App\Models\Gudang\AntreanJurnalGudang;
 use App\Models\Gudang\KerusakanBarang;
 use App\Models\Gudang\Stok;
 use App\Models\Master\Barang;
 use App\Models\Master\Gudang;
 use App\Rules\TenantOwnershipRule;
-use App\Services\StokService;
 use App\Services\StokBatchService;
+use App\Services\StokService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
@@ -30,33 +30,35 @@ class KerusakanBarangController extends ModuleCrudController
 
     public function index(Request $request): View
     {
-        $relations = ['barang', 'gudang'];
-        if (Schema::hasColumn('kerusakan_barang', 'id_batch')) {
-            $relations[] = 'batch';
-        }
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'bulan' => ['nullable', 'integer', 'between:1,12'],
+            'tahun' => ['nullable', 'integer', 'between:2000,2100'],
+        ]);
+        $relations = ['barang', 'gudang', 'batch'];
         $query = KerusakanBarang::query()->with($relations);
 
-        if ($search = $request->query('q')) {
+        if ($search = $filters['q'] ?? null) {
             $query->where(function ($q) use ($search) {
                 $q->where('jenis_kejadian', 'like', "%{$search}%")
                     ->orWhereHas('barang', fn ($b) => $b->where('nama_barang', 'like', "%{$search}%"));
             });
         }
+        $query->when($filters['bulan'] ?? null, fn ($q, $bulan) => $q->whereMonth('tanggal', $bulan));
+        $query->when($filters['tahun'] ?? null, fn ($q, $tahun) => $q->whereYear('tanggal', $tahun));
 
         $items = $query->latest('id_kerusakan')->paginate(15)->withQueryString();
 
         return view('gudang.kerusakan.index', [
             'items' => $items,
             'title' => $this->title,
+            'filters' => $filters,
         ]);
     }
 
     public function show(int|string $id): View
     {
-        $relations = ['barang.satuanDasar', 'gudang'];
-        if (Schema::hasColumn('kerusakan_barang', 'id_batch')) {
-            $relations[] = 'batch';
-        }
+        $relations = ['barang.satuanDasar', 'gudang', 'jurnal.detail', 'batch', 'antreanJurnal'];
 
         return view('gudang.kerusakan.show', [
             'item' => KerusakanBarang::query()->with($relations)->findOrFail($id),
@@ -68,28 +70,26 @@ class KerusakanBarangController extends ModuleCrudController
     {
         $gudang = Gudang::query()->where('is_active', true)->orderBy('nama_gudang')->get();
         $barang = Barang::query()->where('is_active', true)->orderBy('nama_barang')->get();
-        $batchTrackingAvailable = Schema::hasColumn('barang_per_koperasi', 'lacak_batch');
+        $batchTrackingAvailable = true;
         $entitasId = auth()->user()->id_entitas
             ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
-        $pelacakanBarang = $batchTrackingAvailable && $entitasId !== null
+        $pelacakanBarang = $entitasId !== null
             ? DB::table('barang_per_koperasi')
                 ->where('id_entitas', $entitasId)
                 ->pluck('lacak_batch', 'id_barang')
                 ->map(fn ($value): bool => (bool) $value)
             : collect();
-        $batchData = Schema::hasTable('stok_batch')
-            ? DB::table('stok_batch')
-                ->whereIn('id_gudang', $gudang->pluck('id_gudang'))
-                ->where('qty_on_hand', '>', 0)
-                ->get([
-                    'id_batch',
-                    'id_gudang',
-                    'id_barang',
-                    'kode_batch',
-                    'tanggal_kedaluwarsa',
-                    'qty_on_hand',
-                ])
-            : collect();
+        $batchData = DB::table('stok_batch')
+            ->whereIn('id_gudang', $gudang->pluck('id_gudang'))
+            ->where('qty_on_hand', '>', 0)
+            ->get([
+                'id_batch',
+                'id_gudang',
+                'id_barang',
+                'kode_batch',
+                'tanggal_kedaluwarsa',
+                'qty_on_hand',
+            ]);
 
         return view('gudang.kerusakan.create', [
             'gudang' => $gudang,
@@ -110,15 +110,14 @@ class KerusakanBarangController extends ModuleCrudController
             'qty' => ['required', 'numeric', 'gt:0'],
             'jenis_kejadian' => ['required', 'in:rusak,susut,hilang,kadaluarsa'],
             'keterangan' => ['nullable', 'string'],
+            'id_batch' => ['nullable', 'integer', 'exists:stok_batch,id_batch'],
         ];
-        if (Schema::hasTable('stok_batch')) {
-            $rules['id_batch'] = ['nullable', 'integer', 'exists:stok_batch,id_batch'];
-        }
         $data = $request->validate($rules);
 
         return DB::transaction(function () use ($data) {
             $entitasId = (int) (auth()->user()->id_entitas
                 ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : 0));
+            abort_if($entitasId <= 0, 403, 'Pilih entitas aktif sebelum mencatat kerusakan barang.');
             $lacakBatch = $this->stokBatch->pelacakanAktif($entitasId, (int) $data['id_barang']);
             if ($lacakBatch && empty($data['id_batch'])) {
                 throw ValidationException::withMessages([
@@ -155,11 +154,15 @@ class KerusakanBarangController extends ModuleCrudController
             $stok = Stok::query()
                 ->where('id_gudang', $data['id_gudang'])
                 ->where('id_barang', $data['id_barang'])
+                ->lockForUpdate()
                 ->first();
 
-            if (! $stok || bccomp((string) $stok->qty_on_hand, (string) $data['qty'], 4) < 0) {
+            $qtyTersedia = $stok
+                ? bcsub((string) $stok->qty_on_hand, (string) $stok->qty_reserved, 4)
+                : '0';
+            if (! $stok || bccomp($qtyTersedia, (string) $data['qty'], 4) < 0) {
                 throw ValidationException::withMessages([
-                    'qty' => 'Stok tidak mencukupi untuk kerusakan barang.',
+                    'qty' => 'Stok tersedia setelah dikurangi jumlah yang dipesan tidak mencukupi untuk kerusakan barang.',
                 ]);
             }
 
@@ -167,7 +170,7 @@ class KerusakanBarangController extends ModuleCrudController
             $nilaiKerugian = bcmul((string) $data['qty'], $hpp, 2);
 
             $dataKerusakan = [
-                'id_entitas' => app()->bound('entitas_aktif') ? app('entitas_aktif') : null,
+                'id_entitas' => app()->bound('entitas_aktif') ? app('entitas_aktif') : $entitasId,
                 'id_gudang' => $data['id_gudang'],
                 'id_barang' => $data['id_barang'],
                 'tanggal' => $data['tanggal'],
@@ -179,15 +182,20 @@ class KerusakanBarangController extends ModuleCrudController
                 'foto_bukti' => null,
                 'status' => 'diposting',
                 'approved_by' => auth()->id(),
+                'id_batch' => $lacakBatch ? (int) $data['id_batch'] : null,
             ];
-            if (Schema::hasColumn('kerusakan_barang', 'id_batch')) {
-                $dataKerusakan['id_batch'] = $lacakBatch ? (int) $data['id_batch'] : null;
+            $barang = Barang::query()->findOrFail((int) $data['id_barang']);
+            if (! $barang->id_unit_usaha) {
+                throw ValidationException::withMessages([
+                    'id_barang' => 'Barang ini belum terhubung ke unit usaha, sehingga belum dapat dikirim ke antrean Keuangan.',
+                ]);
             }
+
             $item = KerusakanBarang::query()->create($dataKerusakan);
 
             $service = app(StokService::class);
             try {
-                $service->keluar(
+                $kartuStok = $service->keluar(
                     entitasId: (int) ($item->id_entitas ?? $entitasId),
                     gudangId: (int) $data['id_gudang'],
                     barangId: (int) $data['id_barang'],
@@ -204,8 +212,31 @@ class KerusakanBarangController extends ModuleCrudController
                 ]);
             }
 
-            return redirect()->route('gudang.kerusakan.index')->with('success', 'Data kerusakan barang berhasil disimpan.');
+            AntreanJurnalGudang::query()->create([
+                'id_entitas' => (int) ($item->id_entitas ?? $entitasId),
+                'jenis_transaksi' => 'KERUSAKAN',
+                'ref_tipe' => 'KERUSAKAN',
+                'ref_id' => (int) $item->id_kerusakan,
+                'no_dokumen' => 'KRG-' . $item->id_kerusakan,
+                'id_unit_usaha' => (int) $barang->id_unit_usaha,
+                'tanggal' => $item->tanggal,
+                'nilai' => $kartuStok->nilai_mutasi,
+                'payload' => [
+                    'id_gudang' => (int) $item->id_gudang,
+                    'jenis_kejadian' => $item->jenis_kejadian,
+                    'items' => [[
+                        'id_barang' => (int) $kartuStok->id_barang,
+                        'qty' => (string) $kartuStok->qty_keluar,
+                        'hpp_satuan' => (string) $kartuStok->harga_satuan,
+                        'nilai' => (string) $kartuStok->nilai_mutasi,
+                        'id_kartu' => (int) $kartuStok->id_kartu,
+                    ]],
+                    'id_pembelian' => null,
+                    'keterangan' => $item->keterangan,
+                ],
+            ]);
+
+            return redirect()->route('gudang.kerusakan.index')->with('success', 'Data kerusakan, mutasi stok, dan antrean jurnal berhasil dicatat. Jurnal diproses oleh modul Keuangan.');
         });
     }
-
 }

@@ -4,6 +4,7 @@ namespace App\Models\Gudang;
 
 use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Gudang as GudangModel;
+use App\Models\Pengguna;
 use Illuminate\Database\Eloquent\Model;
 
 class OpnameHeader extends Model
@@ -31,5 +32,16 @@ class OpnameHeader extends Model
     public function detail()
     {
         return $this->hasMany(OpnameDetail::class, 'id_opname', 'id_opname');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(Pengguna::class, 'approved_by', 'id');
+    }
+
+    public function antreanJurnal()
+    {
+        return $this->hasMany(AntreanJurnalGudang::class, 'ref_id', 'id_opname')
+            ->where('ref_tipe', 'OPNAME');
     }
 }

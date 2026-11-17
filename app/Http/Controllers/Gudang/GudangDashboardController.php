@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Services\StokMinimumService;
 use App\Services\StokBatchService;
 use Illuminate\View\View;
-use Illuminate\Support\Facades\Schema;
 
 class GudangDashboardController extends Controller
 {
@@ -22,7 +21,10 @@ class GudangDashboardController extends Controller
             'jumlahBatchMendekatiKedaluwarsa' => $stokBatch->jumlahBatchMendekatiKedaluwarsa(
                 $entitasId !== null ? (int) $entitasId : null,
             ),
-            'pelacakanBatchTersedia' => Schema::hasTable('stok_batch'),
+            'jumlahBatchKedaluwarsa' => $stokBatch->jumlahBatchKedaluwarsa(
+                $entitasId !== null ? (int) $entitasId : null,
+            ),
+            'pelacakanBatchTersedia' => true,
         ]);
     }
 }

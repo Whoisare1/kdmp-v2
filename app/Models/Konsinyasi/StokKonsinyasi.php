@@ -47,6 +47,11 @@ class StokKonsinyasi extends Model
         return $this->hasMany(ReturKonsinyasi::class, 'id_stok_konsinyasi', 'id_stok_konsinyasi');
     }
 
+    public function susut()
+    {
+        return $this->hasMany(SusutKonsinyasi::class, 'id_stok_konsinyasi', 'id_stok_konsinyasi');
+    }
+
     public function barang()
     {
         return $this->belongsTo(Barang::class, 'id_barang', 'id_barang');
