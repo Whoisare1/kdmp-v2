@@ -17,29 +17,6 @@ use RuntimeException;
 
 class PenjualanService
 {
-    public const DEMO_STOCK_PER_ITEM = 100.0;
-
-    public static function availableDemoStock(int $idEntitas, int $idBarang): float
-    {
-        $sold = (float) DB::table('detail_penjualan as detail')
-            ->join('penjualan as sale', 'sale.id_penjualan', '=', 'detail.id_penjualan')
-            ->where('sale.id_entitas', $idEntitas)
-            ->where('sale.status', 'selesai')
-            ->where('detail.id_barang', $idBarang)
-            ->sum('detail.qty_dasar');
-
-        $returned = (float) DB::table('retur_penjualan_detail as detail')
-            ->join('retur_penjualan as retur', 'retur.id_retur', '=', 'detail.id_retur')
-            ->join('penjualan as sale', 'sale.id_penjualan', '=', 'retur.id_penjualan')
-            ->where('sale.id_entitas', $idEntitas)
-            ->where('sale.status', 'selesai')
-            ->where('retur.status', 'selesai')
-            ->where('detail.id_barang', $idBarang)
-            ->sum('detail.qty_dasar');
-
-        return max(0, self::DEMO_STOCK_PER_ITEM - $sold + $returned);
-    }
-
     public static function createSale(
         int $idEntitas,
         ?int $idPihak,
@@ -50,9 +27,14 @@ class PenjualanService
         array $transferDetails = [],
         ?string $tglJatuhTempo = null,
         ?string $namaPembeli = null,
+        float $diskon = 0,
     ): Penjualan {
         if (! in_array($metodeBayar, ['tunai', 'transfer', 'kredit'], true)) {
             throw new RuntimeException('Metode pembayaran tidak valid.');
+        }
+
+        if ($diskon < 0) {
+            throw new RuntimeException('Diskon penjualan tidak boleh bernilai negatif.');
         }
 
         if ($metodeBayar === 'transfer' && (
@@ -77,7 +59,7 @@ class PenjualanService
             throw new RuntimeException('Keranjang penjualan masih kosong.');
         }
 
-        return DB::transaction(function () use ($idEntitas, $idPihak, $idUnitUsaha, $metodeBayar, $items, $idKasBank, $transferDetails, $tglJatuhTempo, $namaPembeli) {
+        return DB::transaction(function () use ($idEntitas, $idPihak, $idUnitUsaha, $metodeBayar, $items, $idKasBank, $transferDetails, $tglJatuhTempo, $namaPembeli, $diskon) {
             if ($idPihak === null && filled($namaPembeli)) {
                 $pembeli = Pihak::query()->firstOrCreate(
                     [
@@ -122,13 +104,15 @@ class PenjualanService
                 ->where('id_entitas', $idEntitas)
                 ->where('is_active', true)
                 ->orderBy('id_gudang')
-                ->value('id_gudang')
-                ?? Gudang::value('id_gudang')
-                ?? 1;
+                ->value('id_gudang');
+
+            if ($idGudang === null) {
+                throw new RuntimeException('Gudang aktif untuk entitas ini belum dikonfigurasi.');
+            }
 
             $itemsByBarang = collect($items)
                 ->groupBy('id_barang')
-                ->map(fn ($rows) => (float) $rows->sum('qty_dasar'));
+                ->map(fn ($rows) => round((float) $rows->sum('qty_dasar'), 4));
 
             $products = DB::table('master_barang as barang')
                 ->join('barang_per_koperasi as setting', function ($join) use ($idEntitas) {
@@ -141,6 +125,7 @@ class PenjualanService
                 ->whereIn('barang.id_barang', $itemsByBarang->keys())
                 ->select([
                     'barang.id_barang',
+                    'barang.nama_barang',
                     'barang.id_satuan_dasar',
                     'setting.harga_jual_standar',
                 ])
@@ -152,18 +137,39 @@ class PenjualanService
                 throw new RuntimeException('Barang tidak aktif, bukan milik unit usaha yang dipilih, atau tidak tersedia untuk dijual.');
             }
 
+            $stokPerBarang = DB::table('stok')
+                ->where('id_gudang', $idGudang)
+                ->whereIn('id_barang', $itemsByBarang->keys())
+                ->orderBy('id_barang')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id_barang');
+
             $total = 0.0;
             foreach ($itemsByBarang as $idBarang => $quantity) {
                 if ($quantity <= 0) {
                     throw new RuntimeException('Jumlah barang harus lebih besar dari nol.');
                 }
 
-                if ($quantity > self::availableDemoStock($idEntitas, (int) $idBarang)) {
-                    throw new RuntimeException("Stok demo {$products->get($idBarang)->id_barang} tidak mencukupi.");
+                $stok = $stokPerBarang->get($idBarang);
+                $tersedia = $stok
+                    ? bcsub((string) $stok->qty_on_hand, (string) $stok->qty_reserved, 4)
+                    : '0';
+                $qtyDiminta = number_format($quantity, 4, '.', '');
+
+                if (bccomp($tersedia, $qtyDiminta, 4) < 0) {
+                    $namaBarang = $products->get($idBarang)->nama_barang;
+                    throw new RuntimeException("Stok gudang {$namaBarang} tidak mencukupi. Tersedia {$tersedia}, diminta {$qtyDiminta}.");
                 }
 
-                $total += $quantity * (float) $products->get($idBarang)->harga_jual_standar;
+                $total += round($quantity * (float) $products->get($idBarang)->harga_jual_standar, 2);
             }
+            $total = round($total, 2);
+            $diskon = round($diskon, 2);
+            if ($diskon < 0 || $diskon > $total) {
+                throw new RuntimeException('Diskon penjualan tidak boleh melebihi total harga barang.');
+            }
+            $totalBayar = round($total - $diskon, 2);
 
             $sale = Penjualan::create([
                 'id_entitas' => $idEntitas,
@@ -187,8 +193,8 @@ class PenjualanService
                 'transfer_dikonfirmasi_pada' => $metodeBayar === 'transfer' ? now() : null,
                 'transfer_dikonfirmasi_oleh' => $metodeBayar === 'transfer' ? auth()->id() : null,
                 'total_bruto' => $total,
-                'diskon' => 0,
-                'total_bayar' => $total,
+                'diskon' => $diskon,
+                'total_bayar' => $totalBayar,
                 'total_hpp' => 0,
                 'status' => 'selesai',
                 'status_posting' => 'F',
@@ -197,20 +203,25 @@ class PenjualanService
             ]);
 
             $totalHpp = 0.0;
+            $stokService = app(StokService::class);
             foreach ($itemsByBarang as $idBarang => $quantity) {
                 $product = $products->get($idBarang);
                 $price = (float) $product->harga_jual_standar;
-
-                $hpp = (float) (DB::table('stok')
-                    ->where('id_gudang', $idGudang)
-                    ->where('id_barang', (int) $idBarang)
-                    ->value('hpp_rata2') ?? 0);
-
+                $kartuStok = $stokService->keluar(
+                    entitasId: $idEntitas,
+                    gudangId: (int) $idGudang,
+                    barangId: (int) $idBarang,
+                    qty: number_format($quantity, 4, '.', ''),
+                    refTipe: 'PENJUALAN',
+                    refId: (int) $sale->id_penjualan,
+                    createdBy: auth()->id(),
+                );
+                $hpp = (float) $kartuStok->harga_satuan;
                 if ($hpp <= 0) {
-                    $hpp = round($price * 0.7, 2);
+                    throw new RuntimeException("HPP {$product->nama_barang} belum valid. Penjualan dibatalkan.");
                 }
 
-                $lineHpp = $quantity * $hpp;
+                $lineHpp = (float) $kartuStok->nilai_mutasi;
                 $totalHpp += $lineHpp;
 
                 DetailPenjualan::create([
@@ -222,7 +233,7 @@ class PenjualanService
                     'faktor_konversi' => 1,
                     'qty_dasar' => $quantity,
                     'harga_satuan' => $price,
-                    'subtotal' => $quantity * $price,
+                    'subtotal' => round($quantity * $price, 2),
                     'hpp_satuan_dasar' => $hpp,
                     'total_hpp' => $lineHpp,
                     'harga_titip_satuan' => 0,
@@ -319,31 +330,66 @@ class PenjualanService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $returnedByBarang = $sale->returs
-                ->flatMap(fn ($retur) => $retur->detail)
+            $returnDetails = $sale->returs
+                ->flatMap(fn ($retur) => $retur->detail);
+            $returnedByBarang = $returnDetails
                 ->groupBy('id_barang')
                 ->map(fn ($details) => (float) $details->sum('qty_dasar'));
+            $returnedValueCentsByBarang = $returnDetails
+                ->groupBy('id_barang')
+                ->map(fn ($details) => self::toCents((float) $details->sum('nilai')));
             $requestedByBarang = collect($items)
                 ->groupBy('id_barang')
-                ->map(fn ($rows) => (float) $rows->sum('qty_dasar'));
+                ->map(fn ($rows) => round((float) $rows->sum('qty_dasar'), 4));
 
             foreach ($requestedByBarang as $idBarang => $quantity) {
                 $sold = (float) $sale->detail->where('id_barang', (int) $idBarang)->sum('qty_dasar');
                 $returned = (float) $returnedByBarang->get($idBarang, 0);
 
-                if ($sold <= 0 || $returned + $quantity > $sold + 0.0000001) {
+                if ($quantity <= 0 || $sold <= 0 || $returned + $quantity > $sold + 0.0000001) {
                     throw new RuntimeException('Jumlah retur melebihi sisa barang pada transaksi ini.');
                 }
             }
 
-            $itemsByBarang = $sale->detail->keyBy('id_barang');
-            $totalValue = 0.0;
+            $saleLinesByBarang = $sale->detail->groupBy('id_barang');
+            $grossValueCentsByBarang = $saleLinesByBarang
+                ->map(fn ($lines) => self::toCents((float) $lines->sum('subtotal')))
+                ->all();
+            $totalGrossCents = array_sum($grossValueCentsByBarang);
+            $discountCents = min(
+                $totalGrossCents,
+                max(0, self::toCents((float) $sale->diskon)),
+            );
+            $discountCentsByBarang = self::allocateDiscountCents(
+                $grossValueCentsByBarang,
+                $discountCents,
+            );
+
+            $returnValueCentsByBarang = [];
+            $totalValueCents = 0;
             $totalHpp = 0.0;
             foreach ($requestedByBarang as $idBarang => $quantity) {
-                $line = $itemsByBarang->get($idBarang);
-                $totalValue += $quantity * (float) $line->harga_satuan;
+                $lines = $saleLinesByBarang->get($idBarang);
+                $soldQuantity = (float) $lines->sum('qty_dasar');
+                $returnedQuantity = (float) $returnedByBarang->get($idBarang, 0);
+                $cumulativeReturnedQuantity = min($soldQuantity, $returnedQuantity + $quantity);
+                $netLineValueCents = max(
+                    0,
+                    $grossValueCentsByBarang[$idBarang] - $discountCentsByBarang[$idBarang],
+                );
+                $targetCumulativeValueCents = $cumulativeReturnedQuantity >= $soldQuantity - 0.0000001
+                    ? $netLineValueCents
+                    : (int) round($netLineValueCents * $cumulativeReturnedQuantity / $soldQuantity);
+                $returnValueCents = max(
+                    0,
+                    $targetCumulativeValueCents - (int) $returnedValueCentsByBarang->get($idBarang, 0),
+                );
+                $returnValueCentsByBarang[$idBarang] = $returnValueCents;
+                $totalValueCents += $returnValueCents;
+                $line = $lines->first();
                 $totalHpp += $quantity * (float) $line->hpp_satuan_dasar;
             }
+            $totalValue = $totalValueCents / 100;
 
             $return = ReturPenjualan::create([
                 'id_entitas' => $sale->id_entitas,
@@ -360,7 +406,7 @@ class PenjualanService
             ]);
 
             foreach ($requestedByBarang as $idBarang => $quantity) {
-                $line = $itemsByBarang->get($idBarang);
+                $line = $saleLinesByBarang->get($idBarang)->first();
                 $price = (float) $line->harga_satuan;
                 $hpp = (float) $line->hpp_satuan_dasar;
                 ReturPenjualanDetail::create([
@@ -368,9 +414,9 @@ class PenjualanService
                     'id_barang' => (int) $idBarang,
                     'qty_dasar' => $quantity,
                     'harga_satuan' => $price,
-                    'nilai' => $quantity * $price,
+                    'nilai' => $returnValueCentsByBarang[$idBarang] / 100,
                     'hpp_satuan' => $hpp,
-                    'total_hpp' => $quantity * $hpp,
+                    'total_hpp' => round($quantity * $hpp, 2),
                 ]);
             }
 
@@ -380,13 +426,37 @@ class PenjualanService
 
     public static function completeReturn(ReturPenjualan $return): ReturPenjualan
     {
-        if ($return->status !== 'diajukan') {
-            throw new RuntimeException('Hanya retur yang diajukan yang dapat diselesaikan.');
-        }
-
         return DB::transaction(function () use ($return) {
-            $return->loadMissing(['penjualan.unitUsaha', 'penjualan.pihak']);
+            $return = ReturPenjualan::query()
+                ->whereKey($return->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($return->status !== 'diajukan') {
+                throw new RuntimeException('Hanya retur yang diajukan yang dapat diselesaikan.');
+            }
+
+            $return->load(['detail', 'penjualan.unitUsaha', 'penjualan.pihak']);
             $sale = $return->penjualan;
+
+            if ($return->detail->isEmpty()) {
+                throw new RuntimeException('Retur tanpa detail barang tidak dapat diselesaikan.');
+            }
+
+            $stokService = app(StokService::class);
+            foreach ($return->detail as $line) {
+                $stokService->masuk(
+                    entitasId: (int) $return->id_entitas,
+                    gudangId: (int) $sale->id_gudang,
+                    barangId: (int) $line->id_barang,
+                    qty: number_format((float) $line->qty_dasar, 4, '.', ''),
+                    hargaSatuan: number_format((float) $line->hpp_satuan, 4, '.', ''),
+                    refTipe: 'RETUR_JUAL',
+                    refId: (int) $return->id_retur,
+                    createdBy: auth()->id(),
+                    tanggal: $return->tgl_retur->toDateString(),
+                );
+            }
 
             $jurnal = null;
             if ($return->jenis_penyelesaian === 'uang') {
@@ -424,6 +494,53 @@ class PenjualanService
 
             return $return->fresh();
         });
+    }
+
+    /**
+     * @param  array<int|string, int>  $grossValueCentsByBarang
+     * @return array<int|string, int>
+     */
+    private static function allocateDiscountCents(array $grossValueCentsByBarang, int $discountCents): array
+    {
+        $totalGrossCents = array_sum($grossValueCentsByBarang);
+        $allocations = array_fill_keys(array_keys($grossValueCentsByBarang), 0);
+
+        if ($totalGrossCents <= 0 || $discountCents <= 0) {
+            return $allocations;
+        }
+
+        $discountCents = min($discountCents, $totalGrossCents);
+        $remainders = [];
+        $allocatedCents = 0;
+
+        foreach ($grossValueCentsByBarang as $idBarang => $grossCents) {
+            $exactShare = $discountCents * ($grossCents / $totalGrossCents);
+            $shareCents = (int) floor($exactShare);
+            $allocations[$idBarang] = $shareCents;
+            $allocatedCents += $shareCents;
+            $remainders[] = [
+                'id_barang' => $idBarang,
+                'remainder' => $exactShare - $shareCents,
+            ];
+        }
+
+        usort($remainders, fn (array $left, array $right) =>
+            ($right['remainder'] <=> $left['remainder'])
+            ?: ($left['id_barang'] <=> $right['id_barang'])
+        );
+
+        $remainingCents = $discountCents - $allocatedCents;
+        for ($index = 0; $index < $remainingCents; $index++) {
+            $idBarang = $remainders[$index]['id_barang'];
+            $allocations[$idBarang]++;
+        }
+
+        return $allocations;
+    }
+
+    private static function toCents(float $amount): int
+    {
+        return (int) round($amount * 100);
     }
 
     private static function generateSaleCode(int $idEntitas): string

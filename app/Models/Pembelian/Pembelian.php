@@ -19,7 +19,7 @@ class Pembelian extends Model
     protected $fillable = [
         'id_entitas', 'kode_pembelian', 'id_permintaan', 'sumber_pembelian', 'id_pihak', 'id_unit_usaha',
         'id_gudang', 'tanggal_transaksi', 'jenis_pembayaran', 'id_kas_bank',
-        'tgl_jatuh_tempo', 'total_pembelian', 'status', 'status_posting',
+        'tgl_jatuh_tempo', 'total_pembelian', 'diskon', 'status', 'status_posting',
         'id_jurnal', 'created_by',
     ];
 
@@ -29,6 +29,7 @@ class Pembelian extends Model
             'tanggal_transaksi' => 'date',
             'tgl_jatuh_tempo' => 'date',
             'total_pembelian' => 'decimal:2',
+            'diskon' => 'decimal:2',
         ];
     }
 

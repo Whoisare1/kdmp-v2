@@ -157,6 +157,12 @@
                             </table>
                         </div>
                     </div>
+
+                    <label class="mt-4 block max-w-sm text-sm">
+                        <span class="font-medium text-ink-700">Diskon (Rp)</span>
+                        <input type="number" name="diskon" min="0" step="0.01" value="{{ old('diskon', '0') }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-white px-3 py-2">
+                        <span class="mt-1 block text-xs text-ink-500">Masukkan nominal potongan dari supplier. Isi 0 jika tidak ada diskon.</span>
+                    </label>
                 </div>
 
                 <!-- Umum -->

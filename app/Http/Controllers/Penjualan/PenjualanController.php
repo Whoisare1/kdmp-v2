@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Penjualan;
 
 use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Models\Master\Barang;
+use App\Models\Master\Gudang;
 use App\Models\Master\KasBank;
 use App\Models\Master\UnitUsaha;
 use App\Models\Penjualan\Penjualan;
@@ -11,6 +12,7 @@ use App\Services\PenjualanService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -79,6 +81,15 @@ class PenjualanController extends ModuleCrudController
 
         abort_unless($idEntitas, 403, 'Entitas aktif tidak ditemukan.');
 
+        $gudang = Gudang::query()
+            ->where('id_entitas', $idEntitas)
+            ->where('is_active', true)
+            ->orderBy('id_gudang')
+            ->first();
+
+        abort_unless($gudang, 422, 'Gudang aktif untuk entitas ini belum dikonfigurasi.');
+        $idGudang = $gudang->id_gudang;
+
         $products = Barang::query()
             ->join('barang_per_koperasi', function ($join) use ($idEntitas) {
                 $join->on('barang_per_koperasi.id_barang', '=', 'master_barang.id_barang')
@@ -90,17 +101,25 @@ class PenjualanController extends ModuleCrudController
             ->with(['satuanDasar', 'unitUsaha'])
             ->orderBy('master_barang.nama_barang')
             ->get();
-        $products->each(fn ($product) => $product->setAttribute(
-            'stok_demo',
-            PenjualanService::availableDemoStock((int) $idEntitas, (int) $product->id_barang),
-        ));
-        $warehouseRecommendations = $this->dummyWarehouseRecommendations($products, (int) $idEntitas);
+
+        $stokPerBarang = DB::table('stok')
+            ->where('id_gudang', $idGudang)
+            ->whereIn('id_barang', $products->pluck('id_barang'))
+            ->get()
+            ->keyBy('id_barang');
+        $products->each(function (Barang $product) use ($stokPerBarang): void {
+            $stok = $stokPerBarang->get($product->id_barang);
+            $tersedia = $stok
+                ? (float) $stok->qty_on_hand - (float) $stok->qty_reserved
+                : 0;
+            $product->setAttribute('stok_tersedia', max(0, $tersedia));
+        });
 
         return view('penjualan.pos', [
             'title' => 'Kasir / POS',
             'routeBase' => $this->routeBase,
             'products' => $products,
-            'warehouseRecommendations' => $warehouseRecommendations,
+            'gudang' => $gudang,
             'units' => UnitUsaha::whereIn('id_unit_usaha', $products->pluck('id_unit_usaha')->unique())
                 ->orderBy('nama_unit_usaha')
                 ->get(),
@@ -115,57 +134,6 @@ class PenjualanController extends ModuleCrudController
                 ->get(),
             'entitas' => \App\Models\Tenant\Entitas::find($idEntitas),
         ]);
-    }
-
-    /**
-     * Read-only sample recommendations until the warehouse module provides real data.
-     *
-     * @param  Collection<int, Barang>  $products
-     * @return Collection<int, object>
-     */
-    private function dummyWarehouseRecommendations(Collection $products, int $idEntitas): Collection
-    {
-        $availableProducts = $products
-            ->filter(fn (Barang $product) => (float) $product->stok_demo > 0)
-            ->values();
-
-        if ($availableProducts->isEmpty()) {
-            return collect();
-        }
-
-        $templates = [
-            [
-                'destination' => 'desa_lain',
-                'destination_label' => 'Desa lain yang mengalami defisit',
-                'quantity' => 10,
-                'reason' => 'Contoh rekomendasi gudang: stok surplus dapat ditawarkan ke desa lain yang membutuhkan.',
-            ],
-            [
-                'destination' => 'warga_lokal',
-                'destination_label' => 'Warga lokal',
-                'quantity' => 5,
-                'reason' => 'Contoh rekomendasi gudang: komoditas tersedia untuk ditawarkan kepada warga lokal.',
-            ],
-        ];
-
-        return collect($templates)
-            ->map(function (array $template, int $index) use ($availableProducts, $idEntitas) {
-                $product = $availableProducts->get($index % $availableProducts->count());
-
-                return (object) [
-                    'id_rekomendasi' => "demo-{$idEntitas}-{$template['destination']}-{$product->id_barang}",
-                    'kode_rekomendasi' => sprintf('DEMO-GUDANG-JUAL-%03d', $index + 1),
-                    'tujuan' => $template['destination'],
-                    'tujuan_label' => $template['destination_label'],
-                    'barang' => $product,
-                    'qty_rekomendasi' => min(
-                        (float) $product->stok_demo,
-                        (float) $template['quantity'],
-                    ),
-                    'alasan' => $template['reason'],
-                ];
-            })
-            ->values();
     }
 
     public function store(Request $request): RedirectResponse
@@ -203,10 +171,11 @@ class PenjualanController extends ModuleCrudController
                 'after_or_equal:today',
             ],
             'nominal_bayar' => ['nullable', 'numeric', 'min:0'],
+            'diskon' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
             'auto_print' => ['nullable', 'boolean'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id_barang' => ['required', 'integer', 'distinct', 'exists:master_barang,id_barang'],
-            'items.*.qty_dasar' => ['required', 'numeric', 'gt:0'],
+            'items.*.qty_dasar' => ['required', 'numeric', 'decimal:0,4', 'gt:0'],
         ]);
 
         try {
@@ -226,6 +195,7 @@ class PenjualanController extends ModuleCrudController
                 ],
                 $validated['tgl_jatuh_tempo'] ?? null,
                 $validated['nama_pembeli'],
+                (float) ($validated['diskon'] ?? 0),
             );
 
             $nominalBayar = $validated['metode_bayar'] === 'kredit'

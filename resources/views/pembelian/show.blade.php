@@ -136,11 +136,28 @@
 
                 <div>
                     <div class="text-sm font-medium text-ink-600">
+                        Subtotal
+                    </div>
+
+                    <div class="mt-1 font-semibold text-ink-900">
+                        Rp {{ number_format((float) $item->detail->sum('subtotal'), 2, ',', '.') }}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="text-sm font-medium text-ink-600">Diskon</div>
+                    <div class="mt-1 font-semibold text-ink-900">
+                        Rp {{ number_format((float) ($item->diskon ?? 0), 2, ',', '.') }}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="text-sm font-medium text-ink-600">
                         Total Pembelian
                     </div>
 
                     <div class="mt-1 font-semibold text-ink-900">
-                        Rp {{ number_format($item->total_pembelian, 2, ',', '.') }}
+                        Rp {{ number_format((float) $item->total_pembelian, 2, ',', '.') }}
                     </div>
                 </div>
 
