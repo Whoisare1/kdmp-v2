@@ -32,6 +32,43 @@ class PengirimanKonsinyasiController extends ModuleCrudController
         return $item->status_posting !== 'T';
     }
 
+    public function index(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'bulan' => ['nullable', 'integer', 'between:1,12'],
+            'tahun' => ['nullable', 'integer', 'between:2000,2100'],
+            'perhatian' => ['nullable', 'in:semua,perlu'],
+        ]);
+        $query = PengirimanKonsinyasi::query()
+            ->terlibat()
+            ->with(['koperasiPemilik', 'pihakPemilik', 'koperasiPenerima'])
+            ->withSum('stokKonsinyasi as qty_sisa_total', 'qty_sisa');
+
+        if ($search = trim((string) ($filters['q'] ?? ''))) {
+            $query->where(function ($builder) use ($search): void {
+                $builder->where('kode_kiriman', 'like', "%{$search}%")
+                    ->orWhereHas('koperasiPemilik', fn ($pemilik) => $pemilik->where('nama_entitas', 'like', "%{$search}%"))
+                    ->orWhereHas('pihakPemilik', fn ($pemilik) => $pemilik->where('nama', 'like', "%{$search}%"))
+                    ->orWhereHas('koperasiPenerima', fn ($penerima) => $penerima->where('nama_entitas', 'like', "%{$search}%"));
+            });
+        }
+        $query->when($filters['bulan'] ?? null, fn ($builder, $bulan) => $builder->whereMonth('tgl_kirim', $bulan));
+        $query->when($filters['tahun'] ?? null, fn ($builder, $tahun) => $builder->whereYear('tgl_kirim', $tahun));
+        if (($filters['perhatian'] ?? 'semua') === 'perlu') {
+            $query->whereNotNull('tgl_batas_titip')
+                ->whereDate('tgl_batas_titip', '<=', now()->addDays(30)->toDateString())
+                ->where('status_posting', 'T')
+                ->whereHas('stokKonsinyasi', fn ($stok) => $stok->where('qty_sisa', '>', 0));
+        }
+
+        return view('konsinyasi.pengiriman.index', [
+            'items' => $query->latest('id_kiriman')->paginate(15)->withQueryString(),
+            'filters' => $filters,
+            'title' => $this->title,
+        ]);
+    }
+
     public function create(): View
     {
         return view('konsinyasi.pengiriman.create', $this->formOptions() + [
@@ -263,16 +300,32 @@ class PengirimanKonsinyasiController extends ModuleCrudController
 
     public function show(int|string $id): View
     {
+        $entitasId = $this->entitasAktifId();
+        $item = PengirimanKonsinyasi::query()
+            ->where(function ($query) use ($entitasId): void {
+                $query->where('id_entitas_pemilik', $entitasId)
+                    ->orWhere('id_entitas_penerima', $entitasId);
+            })
+            ->with(['koperasiPemilik', 'pihakPemilik', 'koperasiPenerima', 'gudangAsal', 'gudangTujuan', 'detail.barang.satuanDasar'])
+            ->findOrFail($id);
+
         return view('konsinyasi.pengiriman.show', [
-            'item' => PengirimanKonsinyasi::query()
-                ->with(['koperasiPemilik', 'pihakPemilik', 'koperasiPenerima', 'gudangAsal', 'gudangTujuan', 'detail.barang.satuanDasar'])
-                ->findOrFail($id),
+            'item' => $item,
+            'bolehPosting' => $this->bolehPosting($item, $entitasId),
+            'bolehKonfirmasiTerima' => $item->jenis_pemilik === 'entitas'
+                && (int) $item->id_entitas_penerima === $entitasId
+                && $item->status_posting === 'T'
+                && $item->status === 'dikirim',
             'title' => 'Detail Pengiriman Konsinyasi',
         ]);
     }
 
     public function posting(int|string $id, KonsinyasiService $service): RedirectResponse
     {
+        $entitasId = $this->entitasAktifId();
+        $kiriman = PengirimanKonsinyasi::query()->findOrFail($id);
+        abort_unless($this->bolehPosting($kiriman, $entitasId), 403);
+
         try {
             $berhasil = $service->kirim((int) $id);
         } catch (RuntimeException $exception) {
@@ -290,6 +343,65 @@ class PengirimanKonsinyasiController extends ModuleCrudController
         return redirect()
             ->route('konsinyasi.pengiriman.show', $id)
             ->with('success', 'Pengiriman konsinyasi berhasil diposting.');
+    }
+
+    public function terima(Request $request, int|string $id): RedirectResponse
+    {
+        $data = $request->validate([
+            'catatan_penerimaan' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $entitasId = $this->entitasAktifId();
+
+        $diterima = DB::transaction(function () use ($id, $entitasId, $data): bool {
+            $kiriman = PengirimanKonsinyasi::query()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                $kiriman->jenis_pemilik === 'entitas'
+                    && (int) $kiriman->id_entitas_penerima === $entitasId,
+                403,
+            );
+
+            if ($kiriman->status === 'diterima') {
+                return false;
+            }
+            if ($kiriman->status_posting !== 'T' || $kiriman->status !== 'dikirim') {
+                throw ValidationException::withMessages([
+                    'penerimaan' => 'Hanya pengiriman yang sudah diposting dan berstatus dikirim yang dapat dikonfirmasi.',
+                ]);
+            }
+
+            $kiriman->update([
+                'status' => 'diterima',
+                'tgl_terima' => now()->toDateString(),
+                'catatan_penerimaan' => $data['catatan_penerimaan'] ?? null,
+            ]);
+
+            return true;
+        });
+
+        return redirect()->route('konsinyasi.pengiriman.show', $id)
+            ->with($diterima ? 'success' : 'warning', $diterima
+                ? 'Penerimaan barang berhasil dikonfirmasi.'
+                : 'Pengiriman ini sudah pernah dikonfirmasi diterima.');
+    }
+
+    private function entitasAktifId(): int
+    {
+        $entitasId = (int) (auth()->user()?->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : 0));
+        abort_if($entitasId <= 0, 403, 'Pilih entitas aktif untuk mengakses pengiriman konsinyasi.');
+
+        return $entitasId;
+    }
+
+    private function bolehPosting(PengirimanKonsinyasi $kiriman, int $entitasId): bool
+    {
+        return $kiriman->jenis_pemilik === 'entitas'
+            ? (int) $kiriman->id_entitas_pemilik === $entitasId
+            : (int) $kiriman->id_entitas_penerima === $entitasId;
     }
 
     public function postingPage(int|string $id): RedirectResponse

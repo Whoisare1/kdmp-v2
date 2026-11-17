@@ -15,7 +15,16 @@ class RekonsiliasiController extends Controller
 {
     public function index(): View
     {
-        $selisih = DB::table('v_rekonsiliasi_konsinyasi')->get();
+        $entitasId = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+        abort_if(! $entitasId, 403, 'Pilih entitas aktif untuk melihat rekonsiliasi konsinyasi.');
+
+        $selisih = DB::table('v_rekonsiliasi_konsinyasi')
+            ->where(function ($query) use ($entitasId): void {
+                $query->where('id_entitas_pemilik', $entitasId)
+                    ->orWhere('id_entitas_penerima', $entitasId);
+            })
+            ->get();
 
         return view('konsinyasi.rekonsiliasi', ['selisih' => $selisih]);
     }

@@ -44,6 +44,10 @@ class StokKonsinyasiController extends ModuleCrudController
 
     public function show(int|string $id): View
     {
+        $filters = request()->validate([
+            'bulan' => ['nullable', 'integer', 'between:1,12'],
+            'tahun' => ['nullable', 'integer', 'between:2000,2100'],
+        ]);
         $item = StokKonsinyasi::query()
             ->diKoperasi()
             ->with(['barang.satuanDasar', 'kiriman.koperasiPemilik', 'kiriman.pihakPemilik', 'kiriman.gudangTujuan'])
@@ -51,6 +55,8 @@ class StokKonsinyasiController extends ModuleCrudController
 
         $mutasi = KartuKonsinyasi::query()
             ->where('id_stok_konsinyasi', $item->id_stok_konsinyasi)
+            ->when($filters['bulan'] ?? null, fn ($query, $bulan) => $query->whereMonth('tanggal', $bulan))
+            ->when($filters['tahun'] ?? null, fn ($query, $tahun) => $query->whereYear('tanggal', $tahun))
             ->orderByDesc('tanggal')
             ->orderByDesc('id_kartu_kons')
             ->get();
@@ -58,6 +64,7 @@ class StokKonsinyasiController extends ModuleCrudController
         return view('konsinyasi.stok.show', [
             'item' => $item,
             'mutasi' => $mutasi,
+            'filters' => $filters,
             'title' => 'Detail Stok Konsinyasi',
         ]);
     }

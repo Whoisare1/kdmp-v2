@@ -1,7 +1,10 @@
 <x-layouts.app :title="$title" eyebrow="Konsinyasi">
-    <div class="mb-5">
-        <h1 class="text-2xl font-semibold text-ink-900">Stok Konsinyasi</h1>
-        <p class="mt-1 text-sm text-ink-600">Barang titipan yang berada di koperasi Anda. Barang ini bukan stok milik koperasi penerima.</p>
+    <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-semibold text-ink-900">Stok Konsinyasi</h1>
+            <p class="mt-1 text-sm text-ink-600">Barang titipan yang berada di koperasi Anda. Barang ini bukan stok milik koperasi penerima.</p>
+        </div>
+        <a href="{{ route('konsinyasi.susut.index') }}" class="rounded-sm border border-paper-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">Riwayat Susut</a>
     </div>
 
     <div class="mb-5 rounded-sm border border-paper-300 bg-paper-50 p-4">

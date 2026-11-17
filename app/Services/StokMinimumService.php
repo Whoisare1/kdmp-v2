@@ -16,7 +16,7 @@ class StokMinimumService
                 fn (Builder $query) => $query->where('gudang_stok_minimum.id_entitas', $entitasId),
             )
             ->select('gudang_stok_minimum.id_entitas', 'stok.id_barang')
-            ->selectRaw('SUM(stok.qty_on_hand - stok.qty_reserved) AS qty_tersedia')
+            ->selectRaw('SUM(GREATEST(stok.qty_on_hand - stok.qty_reserved, 0)) AS qty_tersedia')
             ->groupBy('gudang_stok_minimum.id_entitas', 'stok.id_barang');
     }
 

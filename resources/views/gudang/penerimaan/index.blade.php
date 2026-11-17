@@ -6,7 +6,7 @@
     </div>
 
     <div class="mb-5 flex items-center justify-between gap-4">
-        <form method="GET" class="flex items-center gap-2">
+        <form method="GET" class="flex flex-wrap items-center gap-2">
             <input
                 type="text"
                 name="q"
@@ -14,8 +14,15 @@
                 placeholder="Cari kode / gudang / pihak..."
                 class="w-72 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm placeholder:text-ink-600/40 focus:border-merah-400 focus:outline-none"
             >
+            <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm text-ink-700">
+                <option value="">Semua bulan</option>
+                @foreach ([1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'] as $angkaBulan => $namaBulan)
+                    <option value="{{ $angkaBulan }}" @selected((string) ($filters['bulan'] ?? '') === (string) $angkaBulan)>{{ $namaBulan }}</option>
+                @endforeach
+            </select>
+            <input type="number" name="tahun" min="2000" max="2100" value="{{ $filters['tahun'] ?? '' }}" placeholder="Tahun" class="w-24 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
             <button class="rounded-sm border border-paper-300 px-3 py-2 text-sm text-ink-700 hover:border-merah-400">
-                Cari
+                Tampilkan
             </button>
         </form>
 
