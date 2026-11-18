@@ -20,18 +20,22 @@
             <section class="mb-4 rounded-sm border border-amber-300 bg-amber-50 p-4">
                 <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <h3 class="font-semibold text-amber-950">Notifikasi Kebutuhan Gudang (Data Contoh)</h3>
+                        <h3 class="font-semibold text-amber-950">Permintaan Pengadaan (PR) Siap Diproses</h3>
                         <p class="mt-1 text-sm text-amber-900">
-                            {{ $permintaanPembelianPending->count() }} kebutuhan menunggu pembelian. Data sementara ini hanya simulasi; permintaan sebenarnya dikelola admin gudang.
+                            @if ($permintaanPembelianPending->isNotEmpty())
+                                {{ $permintaanPembelianPending->count() }} permintaan pengadaan telah disetujui dan menunggu penerbitan PO pembelian.
+                            @else
+                                Semua permintaan pengadaan telah diproses menjadi PO atau belum ada PR baru yang disetujui.
+                            @endif
                         </p>
                     </div>
                 </div>
                 @if ($permintaanPembelianPending->isEmpty())
-                    <p class="text-sm text-amber-900">Belum ada permintaan komoditas dari gudang.</p>
+                    <p class="text-xs text-amber-800">Anda tetap dapat mencatat pembelian langsung secara mandiri menggunakan formulir di bawah.</p>
                 @else
                     <form action="{{ route("$routeBase.create") }}" method="GET" class="flex flex-col gap-2 sm:flex-row">
                         <label class="sr-only" for="permintaan_pembelian_select">Pilih permintaan gudang</label>
-                        <select id="permintaan_pembelian_select" name="permintaan" required class="min-w-0 flex-1 rounded-sm border border-amber-300 bg-white px-3 py-2 text-sm">
+                        <select id="permintaan_pembelian_select" name="permintaan" required onchange="if(this.value) this.form.submit()" class="min-w-0 flex-1 rounded-sm border border-amber-300 bg-white px-3 py-2 text-sm">
                             <option value="">-- Pilih permintaan --</option>
                             @foreach ($permintaanPembelianPending as $requestItem)
                                 <option value="{{ $requestItem->id_permintaan_pembelian }}" @selected($permintaanPembelian?->id_permintaan_pembelian === $requestItem->id_permintaan_pembelian)>
@@ -52,15 +56,24 @@
                 <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
                     <h3 class="mb-3 text-sm font-semibold text-ink-900">Pilih Sumber Pembelian</h3>
                     @if ($permintaanPembelian)
-                        <input type="hidden" name="id_permintaan_pembelian" value="{{ $permintaanPembelian->id_permintaan_pembelian }}">
-                        <input type="hidden" name="source" value="{{ $permintaanPembelian->sumber_pembelian }}">
-                        <p class="text-sm text-ink-700">
-                            Kebutuhan yang dipilih: <strong>{{ $permintaanPembelian->barang->nama_barang }}</strong>,
-                            {{ number_format((float) $permintaanPembelian->qty_diminta, 2, ',', '.') }} KG,
-                            gudang {{ $permintaanPembelian->gudang->nama_gudang }}. Sumber pemasok:
-                            <strong>{{ $permintaanPembelian->sumber_pembelian === 'desa_lain' ? 'Pembelian dari Desa Lain' : 'Pembelian dari Warga Lokal' }}</strong>.
-                            Admin pembelian hanya memilih salah satu pemasok rekomendasi; permintaan tidak dapat dibuat dari halaman ini.
-                        </p>
+                        <input type="hidden" name="id_permintaan_pembelian" value="{{ $permintaanPembelian->id_permintaan_pembelian }}" id="id_permintaan_pembelian">
+                        <div class="mb-3 rounded-sm border border-sawah-300 bg-sawah-50 p-3">
+                            <p class="text-sm text-sawah-900">
+                                <strong>Kebutuhan PR Terpilih:</strong> {{ $permintaanPembelian->kode_permintaan }} — 
+                                <strong>{{ $permintaanPembelian->barang->nama_barang }}</strong> sebanyak 
+                                <strong>{{ number_format((float) $permintaanPembelian->qty_diminta, 2, ',', '.') }} KG</strong> 
+                                untuk tujuan gudang <strong>{{ $permintaanPembelian->gudang->nama_gudang }}</strong>.
+                            </p>
+                        </div>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-600">Pilih Asal Pemasok / Sumber Pembelian:</p>
+                        <label class="mb-2 flex items-center gap-2">
+                            <input type="radio" name="source" value="warga_lokal" required @checked(old('source', $permintaanPembelian->sumber_pembelian) === 'warga_lokal') onchange="toggleForm()" class="rounded">
+                            Pembelian dari Warga / Petani Lokal (Petani Desa)
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="radio" name="source" value="desa_lain" @checked(old('source', $permintaanPembelian->sumber_pembelian) === 'desa_lain') onchange="toggleForm()" class="rounded">
+                            Pembelian dari Desa Lain (Koperasi Desa Mitra)
+                        </label>
                     @else
                         <label class="flex items-center gap-2 mb-2">
                             <input type="radio" name="source" value="desa_lain" required @checked(old('source', 'warga_lokal') === 'desa_lain') onchange="toggleForm()" class="rounded">
@@ -85,9 +98,8 @@
                         <label class="block text-sm">
                             <span class="text-ink-700 font-medium">Unit Usaha *</span>
                             <select @unless ($permintaanPembelian) name="id_unit_usaha" @endunless @disabled($permintaanPembelian) data-locked="{{ $permintaanPembelian ? 'true' : 'false' }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
-                                <option value="">-- Pilih Unit --</option>
                                 @foreach ($barangs->groupBy('id_unit_usaha') as $idUnit => $unitBarang)
-                                    <option value="{{ $idUnit }}" @selected($permintaanPembelian && (int) $unitBarang->first()->id_unit_usaha === (int) $permintaanPembelian->barang->id_unit_usaha)>
+                                    <option value="{{ $idUnit }}" @selected(($permintaanPembelian && (int) $unitBarang->first()->id_unit_usaha === (int) $permintaanPembelian->barang->id_unit_usaha) || (! $permintaanPembelian && (old('id_unit_usaha') == $idUnit || $loop->first)))>
                                         {{ $unitBarang->first()->unitUsaha->nama_unit_usaha ?? 'N/A' }}
                                     </option>
                                 @endforeach
@@ -99,9 +111,10 @@
                         <label class="block text-sm">
                             <span class="text-ink-700 font-medium">Gudang *</span>
                             <select @unless ($permintaanPembelian) name="id_gudang" @endunless @disabled($permintaanPembelian) data-locked="{{ $permintaanPembelian ? 'true' : 'false' }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
-                                <option value="">-- Pilih Gudang --</option>
                                 @foreach ($gudangs as $gudang)
-                                    <option value="{{ $gudang->id_gudang }}" @selected($permintaanPembelian && (int) $gudang->id_gudang === (int) $permintaanPembelian->gudang->id_gudang)>{{ $gudang->nama_gudang }}</option>
+                                    <option value="{{ $gudang->id_gudang }}" @selected(($permintaanPembelian && (int) $gudang->id_gudang === (int) $permintaanPembelian->gudang->id_gudang) || (! $permintaanPembelian && (old('id_gudang') == $gudang->id_gudang || $loop->first)))>
+                                        {{ $gudang->nama_gudang }}
+                                    </option>
                                 @endforeach
                             </select>
                             @if ($permintaanPembelian)
@@ -171,11 +184,11 @@
                     <div class="space-y-3">
                         <label class="block text-sm">
                             <span id="supplier-label" class="text-ink-700 font-medium">Pihak Sumber Pembelian *</span>
-                            <select id="id_pihak" name="id_pihak" required @disabled($permintaanPembelian && $permintaanPembelian->supplier_recommendations->isEmpty()) class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
+                            <select id="id_pihak" name="id_pihak" required class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                                 <option value="">-- Pilih Pihak --</option>
                                 @foreach ($pihaks as $pihak)
                                     <option value="{{ $pihak->id_pihak }}" data-source="{{ $pihak->jenis_pihak === 'entitas_lain' ? 'desa_lain' : 'warga_lokal' }}" data-is-village="{{ $pihak->id_entitas_mitra ? 'true' : 'false' }}" data-request-recommended="{{ $permintaanPembelian?->supplier_recommendations->contains('id_pihak', $pihak->id_pihak) ? 'true' : 'false' }}" @selected(old('id_pihak') == $pihak->id_pihak)>
-                                        {{ $pihak->nama_pihak }}{{ $pihak->jenis_pihak === 'petani' ? ' (Petani)' : '' }}
+                                        {{ $pihak->nama_pihak }}{{ $pihak->jenis_pihak === 'petani' ? ' (Petani)' : '' }}{{ $permintaanPembelian?->supplier_recommendations->contains('id_pihak', $pihak->id_pihak) ? ' ★ Rekomendasi PR' : '' }}
                                     </option>
                                 @endforeach
                             </select>
@@ -284,13 +297,10 @@
                 : 'Pihak Sumber Pembelian *';
 
             let supplierIsAvailable = false;
-            const hasPurchaseRequest = Boolean(document.getElementById('id_permintaan_pembelian'));
             const supplierSource = isConsignment ? 'desa_lain' : source;
             Array.from(supplierSelect.options).forEach((option, index) => {
                 if (index === 0) return;
-                const isRecommended = !hasPurchaseRequest || option.dataset.requestRecommended === 'true';
                 const matchesSource = option.dataset.source === supplierSource
-                    && isRecommended
                     && (!isConsignment || option.dataset.isVillage === 'true');
                 option.hidden = !matchesSource;
                 option.disabled = !matchesSource;

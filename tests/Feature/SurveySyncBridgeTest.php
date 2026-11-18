@@ -420,7 +420,39 @@ class SurveySyncBridgeTest extends TestCase
      */
     public function test_post_sinkron_survey_via_controller_berhasil(): void
     {
-        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $entitasA = Entitas::where('id_wilayah', 1)->first() ?? Entitas::firstOrCreate(
+            ['kode_entitas' => 'KDMP-A'],
+            [
+                'nama_entitas' => 'Koperasi KDMP A Test',
+                'jenis_entitas' => 'koperasi',
+                'id_wilayah' => 1,
+                'tahun_buku_awal' => 2026,
+                'status' => 'APPROVED',
+                'is_active' => true,
+            ]
+        );
+        if ($entitasA->kode_entitas !== 'KDMP-A') {
+            $entitasA->update(['kode_entitas' => 'KDMP-A']);
+        }
+
+        $user = Pengguna::firstOrCreate(
+            ['email' => 'manajer@kdmp-a.test'],
+            [
+                'nama' => 'Manajer A Test',
+                'id_entitas' => $entitasA->id_entitas,
+                'password' => bcrypt('secret'),
+                'is_active' => true,
+            ]
+        );
+
+        $peranSurveyor = \App\Models\Peran::firstOrCreate(
+            ['kode' => 'surveyor'],
+            ['nama' => 'Surveyor']
+        );
+        $idPeran = $peranSurveyor->id_peran ?? $peranSurveyor->id;
+        if (! DB::table('pengguna_peran')->where('id_pengguna', $user->id)->where('id_peran', $idPeran)->exists()) {
+            DB::table('pengguna_peran')->insert(['id_pengguna' => $user->id, 'id_peran' => $idPeran]);
+        }
         $this->assertNotNull($user);
 
         // Buat sesi survei untuk Desa Mekar Jaya (Wilayah ID 1)
@@ -466,8 +498,35 @@ class SurveySyncBridgeTest extends TestCase
      */
     public function test_tenant_isolation_mencegah_sinkronisasi_lintas_koperasi(): void
     {
-        $entitasA = Entitas::where('kode_entitas', 'KDMP-A')->first();
-        $entitasB = Entitas::where('kode_entitas', 'KDMP-B')->first();
+        $entitasA = Entitas::where('id_wilayah', 1)->first() ?? Entitas::firstOrCreate(
+            ['kode_entitas' => 'KDMP-A'],
+            [
+                'nama_entitas' => 'Koperasi KDMP A Test',
+                'jenis_entitas' => 'koperasi',
+                'id_wilayah' => 1,
+                'tahun_buku_awal' => 2026,
+                'status' => 'APPROVED',
+                'is_active' => true,
+            ]
+        );
+        if ($entitasA->kode_entitas !== 'KDMP-A') {
+            $entitasA->update(['kode_entitas' => 'KDMP-A']);
+        }
+
+        $entitasB = Entitas::where('id_wilayah', 2)->first() ?? Entitas::firstOrCreate(
+            ['kode_entitas' => 'KDMP-B'],
+            [
+                'nama_entitas' => 'Koperasi KDMP B Test',
+                'jenis_entitas' => 'koperasi',
+                'id_wilayah' => 2,
+                'tahun_buku_awal' => 2026,
+                'status' => 'APPROVED',
+                'is_active' => true,
+            ]
+        );
+        if ($entitasB->kode_entitas !== 'KDMP-B') {
+            $entitasB->update(['kode_entitas' => 'KDMP-B']);
+        }
 
         $this->assertNotNull($entitasA);
         $this->assertNotNull($entitasB);

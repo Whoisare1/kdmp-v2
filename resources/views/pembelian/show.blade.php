@@ -30,7 +30,12 @@
                     </p>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($item->id_jurnal)
+                        <a href="{{ route('akuntansi.jurnal.show', $item->id_jurnal) }}" class="rounded-sm bg-sawah-100 border border-sawah-300 px-2 py-1 text-xs font-medium text-sawah-800 hover:bg-sawah-200">
+                            ✓ Jurnal: Terposting
+                        </a>
+                    @endif
                     <span class="rounded-sm bg-paper-200 px-2 py-1 text-xs font-medium text-ink-800">
                         {{ ucfirst($item->status) }}
                     </span>

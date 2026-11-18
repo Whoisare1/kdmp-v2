@@ -20,6 +20,9 @@ class ReturPembelianController extends ModuleCrudController
 
     public function index(Request $request): View
     {
+        $idEntitas = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+
         $filters = $request->validate([
             'archive' => ['sometimes', 'in:1'],
             'year' => ['nullable', 'integer', 'min:1900', 'max:9999'],
@@ -27,13 +30,14 @@ class ReturPembelianController extends ModuleCrudController
             'day' => ['nullable', 'integer', 'between:1,31'],
         ]);
         $purchases = $this->purchasesWithReturnQuantities();
-        $pendingReturnRequests = $this->dummyReturnRequests($purchases);
-        $query = ReturPembelian::with([
-            'pembelian.pihak',
-            'pembelian.detail',
-            'detail.barang.satuanDasar',
-            'detail.barang.konversiSatuan.satuan',
-        ]);
+        $pendingReturnRequests = $this->pendingReturnRequests($purchases);
+        $query = ReturPembelian::when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))
+            ->with([
+                'pembelian.pihak',
+                'pembelian.detail',
+                'detail.barang.satuanDasar',
+                'detail.barang.konversiSatuan.satuan',
+            ]);
 
         foreach (['year' => 'tgl_retur', 'month' => 'tgl_retur', 'day' => 'tgl_retur'] as $filter => $column) {
             if (isset($filters[$filter])) {
@@ -82,9 +86,36 @@ class ReturPembelianController extends ModuleCrudController
         $purchases = $this->purchasesWithReturnQuantities()
             ->filter(fn (Pembelian $purchase) => $purchase->returItems->contains(fn ($line) => $line->qty_sisa_retur > 0))
             ->values();
-        $pendingReturnRequests = $this->dummyReturnRequests($purchases);
-        $selectedReturnRequest = $pendingReturnRequests
-            ->firstWhere('id_permintaan_retur', request()->query('permintaan_retur'));
+
+        $pendingReturnRequests = $this->pendingReturnRequests($purchases);
+        $selectedReturnRequest = null;
+        $selectedPurchase = null;
+        $selectedLine = null;
+
+        if (request()->filled('permintaan_retur')) {
+            $selectedReturnRequest = $pendingReturnRequests
+                ->firstWhere('id_permintaan_retur', request('permintaan_retur'));
+            if ($selectedReturnRequest) {
+                $selectedPurchase = $selectedReturnRequest->pembelian;
+                $selectedLine = $selectedReturnRequest->line;
+            }
+        } elseif (request()->filled('id_pembelian') && request()->filled('id_barang')) {
+            $selectedPurchase = $purchases->firstWhere('id_pembelian', (int) request('id_pembelian'));
+            if ($selectedPurchase) {
+                $selectedLine = $selectedPurchase->returItems->firstWhere('id_barang', (int) request('id_barang'));
+            }
+        }
+
+        if (! $selectedPurchase && $purchases->isNotEmpty()) {
+            if ($pendingReturnRequests->isNotEmpty()) {
+                $selectedReturnRequest = $pendingReturnRequests->first();
+                $selectedPurchase = $selectedReturnRequest->pembelian;
+                $selectedLine = $selectedReturnRequest->line;
+            } else {
+                $selectedPurchase = $purchases->first();
+                $selectedLine = $selectedPurchase->returItems->first(fn ($l) => $l->qty_sisa_retur > 0);
+            }
+        }
 
         return view('pembelian.retur.create', [
             'title' => 'Ajukan Retur Pembelian',
@@ -92,82 +123,122 @@ class ReturPembelianController extends ModuleCrudController
             'purchases' => $purchases,
             'pendingReturnRequests' => $pendingReturnRequests,
             'selectedReturnRequest' => $selectedReturnRequest,
-            'pembelian' => $selectedReturnRequest?->pembelian,
+            'selectedPurchase' => $selectedPurchase,
+            'selectedLine' => $selectedLine,
+            'pembelian' => $selectedPurchase,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'id_permintaan_retur' => 'required|string|max:100',
+            'id_pembelian' => 'required|integer|exists:pembelian,id_pembelian',
+            'id_barang' => 'required|integer|exists:master_barang,id_barang',
+            'id_penerimaan' => 'nullable|integer|exists:penerimaan_barang,id_penerimaan',
+            'qty_retur' => 'required|numeric|min:0.001',
             'jenis_penyelesaian' => 'required|in:uang,potong_hutang,ganti_barang',
+            'alasan' => 'required|string|max:500',
         ]);
 
         try {
-            $purchases = $this->purchasesWithReturnQuantities();
-            $returnRequest = $this->dummyReturnRequests($purchases)
-                ->firstWhere('id_permintaan_retur', $validated['id_permintaan_retur']);
+            $pembelian = Pembelian::whereIn('status', ['disetujui', 'diterima', 'selesai'])
+                ->findOrFail($validated['id_pembelian']);
 
-            if (! $returnRequest) {
-                throw new \InvalidArgumentException('Permintaan retur gudang tidak ditemukan atau sudah diproses.');
-            }
-
-            PembelianService::createRetur(
-                $returnRequest->pembelian,
+            $retur = PembelianService::createRetur(
+                $pembelian,
                 [[
-                    'id_barang' => $returnRequest->id_barang,
-                    'qty_dasar' => $returnRequest->qty_diminta,
+                    'id_barang' => (int) $validated['id_barang'],
+                    'qty_dasar' => (float) $validated['qty_retur'],
                 ]],
                 $validated['jenis_penyelesaian'],
-                $returnRequest->alasan,
+                $validated['alasan'],
+                $validated['id_penerimaan'] ?? null,
             );
 
-            $processedRequests = collect(session('pembelian_dummy_return_requests_processed', []))
-                ->push($returnRequest->id_permintaan_retur)
-                ->unique()
-                ->values()
-                ->all();
-            session(['pembelian_dummy_return_requests_processed' => $processedRequests]);
-
             return redirect()->route('pembelian.retur.index')
-                ->with('success', 'Permintaan retur dari gudang berhasil diproses.');
+                ->with('success', "Pengajuan retur {$retur->kode_retur} berhasil dibuat.");
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
     }
 
     /**
-     * Read-only example requests until the warehouse module provides real requests.
+     * Permintaan retur riil dari penerimaan gudang yang mencatat barang rusak / tidak layak.
      *
      * @param  \Illuminate\Support\Collection<int, Pembelian>  $purchases
      * @return \Illuminate\Support\Collection<int, object>
      */
-    private function dummyReturnRequests($purchases)
+    private function pendingReturnRequests($purchases)
     {
-        $processed = collect(session('pembelian_dummy_return_requests_processed', []));
+        $idEntitas = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
 
-        return $purchases
-            ->flatMap(function (Pembelian $pembelian) {
-                return $pembelian->returItems
-                    ->filter(fn ($line) => (float) $line->qty_sisa_retur > 0)
-                    ->map(function ($line) use ($pembelian) {
-                        $qty = min(1.0, (float) $line->qty_sisa_retur);
+        $unfitRows = \Illuminate\Support\Facades\DB::table('penerimaan_barang_detail as pbd')
+            ->join('penerimaan_barang as pb', 'pb.id_penerimaan', '=', 'pbd.id_penerimaan')
+            ->join('master_barang as b', 'b.id_barang', '=', 'pbd.id_barang')
+            ->join('pembelian as p', 'p.id_pembelian', '=', 'pb.id_pembelian')
+            ->when($idEntitas, fn ($q) => $q->where('pb.id_entitas', $idEntitas))
+            ->where('pbd.qty_tidak_layak', '>', 0)
+            ->whereNotNull('pb.id_pembelian')
+            ->select([
+                'pb.id_penerimaan',
+                'pb.kode_penerimaan',
+                'pb.tanggal_terima',
+                'pb.id_pembelian',
+                'p.kode_pembelian',
+                'pbd.id_detail',
+                'pbd.id_barang',
+                'pbd.qty_tidak_layak',
+                'pbd.alasan_tidak_layak',
+                'b.nama_barang',
+            ])
+            ->get();
 
-                        return (object) [
-                            'id_permintaan_retur' => "demo-retur-{$pembelian->id_pembelian}-{$line->id_barang}",
-                            'kode_permintaan' => sprintf('DEMO-GUDANG-RET-%03d-%03d', $pembelian->id_pembelian, $line->id_barang),
-                            'pembelian' => $pembelian,
-                            'barang' => $line->barang,
-                            'line' => $line,
-                            'id_barang' => (int) $line->id_barang,
-                            'qty_diminta' => $qty,
-                            'alasan' => 'Kerusakan barang saat pemeriksaan/penerimaan di gudang.',
-                        ];
-                    });
-            })
-            ->take(2)
-            ->reject(fn (object $item) => $processed->contains($item->id_permintaan_retur))
-            ->values();
+        if ($unfitRows->isEmpty()) {
+            return collect();
+        }
+
+        $alreadyReturned = \Illuminate\Support\Facades\DB::table('retur_pembelian as rp')
+            ->join('retur_pembelian_detail as rpd', 'rpd.id_retur', '=', 'rp.id_retur')
+            ->whereNotNull('rp.id_penerimaan')
+            ->select('rp.id_penerimaan', 'rpd.id_barang', \Illuminate\Support\Facades\DB::raw('SUM(rpd.qty_dasar) as total_diretur'))
+            ->groupBy('rp.id_penerimaan', 'rpd.id_barang')
+            ->get()
+            ->keyBy(fn ($r) => "{$r->id_penerimaan}-{$r->id_barang}");
+
+        return $unfitRows->map(function ($row) use ($purchases, $alreadyReturned) {
+            $pembelian = $purchases->firstWhere('id_pembelian', (int) $row->id_pembelian);
+            if (! $pembelian) {
+                return null;
+            }
+
+            $line = $pembelian->returItems->firstWhere('id_barang', (int) $row->id_barang);
+            if (! $line || $line->qty_sisa_retur <= 0) {
+                return null;
+            }
+
+            $returnedKey = "{$row->id_penerimaan}-{$row->id_barang}";
+            $sudahDiretur = (float) ($alreadyReturned->get($returnedKey)->total_diretur ?? 0);
+            $sisaKebutuhanRetur = max(0, (float) $row->qty_tidak_layak - $sudahDiretur);
+
+            if ($sisaKebutuhanRetur <= 0) {
+                return null;
+            }
+
+            $qtyBisaDiretur = min($sisaKebutuhanRetur, (float) $line->qty_sisa_retur);
+
+            return (object) [
+                'id_permintaan_retur' => "penerimaan-{$row->id_penerimaan}-{$row->id_barang}",
+                'id_penerimaan' => (int) $row->id_penerimaan,
+                'kode_permintaan' => $row->kode_penerimaan,
+                'pembelian' => $pembelian,
+                'barang' => $line->barang,
+                'line' => $line,
+                'id_barang' => (int) $row->id_barang,
+                'qty_diminta' => $qtyBisaDiretur,
+                'alasan' => $row->alasan_tidak_layak ?: 'Barang rusak / tidak layak saat penerimaan di gudang.',
+            ];
+        })->filter()->values();
     }
 
     public function approve(ReturPembelian $retur): RedirectResponse
@@ -210,7 +281,11 @@ class ReturPembelianController extends ModuleCrudController
 
     private function purchasesWithReturnQuantities()
     {
+        $idEntitas = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+
         $purchases = Pembelian::whereIn('status', ['disetujui', 'diterima', 'selesai'])
+            ->when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))
             ->with(['pihak', 'detail.barang.satuanDasar', 'detail.barang.konversiSatuan.satuan', 'returs.detail'])
             ->latest('id_pembelian')
             ->get();

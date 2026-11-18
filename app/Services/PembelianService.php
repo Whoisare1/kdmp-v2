@@ -268,7 +268,7 @@ class PembelianService
                     $jurnal = app(JurnalService::class)->posting(
                         $transactionCode,
                         [
-                            'tanggal_jurnal' => $pembelian->tanggal_transaksi,
+                            'tanggal_jurnal' => \Carbon\Carbon::parse($pembelian->tanggal_transaksi)->toDateString(),
                             'nomor_nota' => $pembelian->kode_pembelian,
                             'total_pembelian' => (float) $pembelian->total_pembelian,
                             'id_kas_bank' => $idKasBank,
@@ -284,12 +284,8 @@ class PembelianService
                     $statusPosting = $idJurnal ? 'T' : 'F';
                 }
             } catch (\Throwable $e) {
-                if ($isConsignmentIntake) {
-                    throw $e;
-                }
-
-                $idJurnal = null;
-                $statusPosting = 'F';
+                \Illuminate\Support\Facades\Log::error("Gagal posting jurnal pembelian {$pembelian->kode_pembelian}: " . $e->getMessage());
+                throw $e;
             }
 
             $pembelian->update([
@@ -454,6 +450,26 @@ class PembelianService
                 return 1.0;
             }
 
+            // Fallback multi-entitas: Jika kode satuan input sama dengan kode satuan dasar barang (misal sama-sama 'KG')
+            $kodeInput = DB::table('satuan')->where('id', $idSatuan)->value('kode_satuan');
+            $kodeDasar = DB::table('satuan')->where('id', $idSatuanDasar)->value('kode_satuan');
+            if ($kodeInput && $kodeDasar && strtoupper(trim($kodeInput)) === strtoupper(trim($kodeDasar))) {
+                return 1.0;
+            }
+
+            // Fallback pencocokan konversi berdasarkan kode satuan jika ID berbeda
+            if ($kodeInput) {
+                $factorByCode = DB::table('konversi_satuan as ks')
+                    ->join('satuan as s', 's.id', '=', 'ks.id_satuan')
+                    ->where('ks.id_barang', $idBarang)
+                    ->whereRaw('UPPER(s.kode_satuan) = ?', [strtoupper(trim($kodeInput))])
+                    ->value('ks.faktor_ke_dasar');
+
+                if ($factorByCode !== null && (float) $factorByCode > 0) {
+                    return (float) $factorByCode;
+                }
+            }
+
             throw new \Exception('Konversi satuan untuk barang dan satuan yang dipilih tidak ditemukan. Pilih satuan yang tersedia untuk barang tersebut.');
         }
 
@@ -489,6 +505,7 @@ class PembelianService
         array $items,
         string $jenisPenyelesaian,
         string $alasan,
+        ?int $idPenerimaan = null,
     ): ReturPembelian {
         if (!in_array($pembelian->status, [
             'disetujui',
@@ -521,17 +538,25 @@ class PembelianService
                 ->firstOrFail();
 
             $idSatuanKg = DB::table('satuan')
+                ->where('id_entitas', $pembelian->id_entitas)
                 ->whereRaw('UPPER(kode_satuan) = ?', ['KG'])
-                ->value('id');
+                ->value('id')
+                ?? DB::table('satuan')
+                    ->whereRaw('UPPER(kode_satuan) = ?', ['KG'])
+                    ->value('id');
 
             if (! $idSatuanKg) {
                 throw new \Exception('Master satuan KG belum tersedia.');
             }
 
             $items = array_map(function (array $item) use ($idSatuanKg) {
+                $satuanId = isset($item['id_satuan']) && (int) $item['id_satuan'] > 0
+                    ? (int) $item['id_satuan']
+                    : (int) $idSatuanKg;
+
                 $factor = self::conversionFactor(
                     (int) $item['id_barang'],
-                    (int) $idSatuanKg,
+                    $satuanId,
                 );
                 $item['qty_dasar'] = (float) $item['qty_dasar'] * $factor;
 
@@ -603,6 +628,7 @@ class PembelianService
                 'id_entitas' => $pembelian->id_entitas,
                 'kode_retur' => $kodeRetur,
                 'id_pembelian' => $pembelian->id_pembelian,
+                'id_penerimaan' => $idPenerimaan,
                 'tgl_retur' => now()->toDateString(),
                 'jenis_penyelesaian' => $jenisPenyelesaian,
                 'total_nilai' => $totalNilai,

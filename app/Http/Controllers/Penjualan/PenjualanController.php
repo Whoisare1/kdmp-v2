@@ -144,20 +144,39 @@ class PenjualanController extends ModuleCrudController
 
         abort_unless($idEntitas, 403, 'Entitas aktif tidak ditemukan.');
 
+        if (blank($request->input('nama_pembeli'))) {
+            $request->merge(['nama_pembeli' => 'Pembeli Umum']);
+        }
+        if (blank($request->input('id_unit_usaha')) && $request->has('items')) {
+            $firstBarangId = $request->input('items.0.id_barang');
+            if ($firstBarangId) {
+                $unitUsahaId = DB::table('master_barang')->where('id_barang', $firstBarangId)->value('id_unit_usaha');
+                if ($unitUsahaId) {
+                    $request->merge(['id_unit_usaha' => $unitUsahaId]);
+                }
+            }
+        }
+        if (blank($request->input('id_unit_usaha'))) {
+            $request->merge(['id_unit_usaha' => 1]);
+        }
+
         $validated = $request->validate([
             'nama_pembeli' => ['required', 'string', 'max:150'],
             'id_unit_usaha' => ['required', 'integer', 'exists:master_unit_usaha,id_unit_usaha'],
             'metode_bayar' => ['required', 'in:tunai,transfer,kredit'],
             'id_kas_bank' => [
+                'exclude_unless:metode_bayar,transfer',
                 'required_if:metode_bayar,transfer',
                 'nullable',
                 'integer',
                 Rule::exists('master_kas_bank', 'id_kas_bank')
-                    ->where('id_entitas', $idEntitas)
-                    ->where('jenis', 'bank')
-                    ->where('is_active', true)
-                    ->whereNotNull('no_rekening')
-                    ->where('no_rekening', '<>', ''),
+                    ->where(function ($q) use ($idEntitas) {
+                        $q->where('id_entitas', $idEntitas)
+                            ->where('jenis', 'bank')
+                            ->where('is_active', true)
+                            ->whereNotNull('no_rekening')
+                            ->where('no_rekening', '!=', '');
+                    }),
             ],
             'transfer_pengirim_nama' => ['required_if:metode_bayar,transfer', 'nullable', 'string', 'max:150'],
             'transfer_pengirim_bank' => ['required_if:metode_bayar,transfer', 'nullable', 'string', 'max:100'],

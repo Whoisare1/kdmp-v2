@@ -1,8 +1,12 @@
 @php
-    $isPurchasingUser = auth()->user()?->hasPeran('pembelian') ?? false;
-    $isSalesUser = (auth()->user()?->hasPeran('kasir') ?? false)
-        || (auth()->user()?->hasPeran('penjualan') ?? false);
-    $isModuleLimitedUser = $isPurchasingUser || $isSalesUser;
+    $user = auth()->user();
+    $isSuperAdmin = $user && $user->isSuperAdmin();
+    $isManajer = $user && $user->hasPeran('manajer');
+    $isPurchasingUser = $user?->hasPeran('pembelian') ?? false;
+    $isSalesUser = ($user?->hasPeran('kasir') ?? false)
+        || ($user?->hasPeran('penjualan') ?? false);
+    $hasOtherRoles = $user && ($user->hasPeran('admin_gudang') || $user->hasPeran('surveyor') || $user->hasPeran('akuntan'));
+    $isModuleLimitedUser = ! $isSuperAdmin && ! $isManajer && ! $hasOtherRoles && ($isPurchasingUser || $isSalesUser);
     $restrictedGroupTitle = $isPurchasingUser && $isSalesUser
         ? 'Pembelian & Penjualan'
         : ($isPurchasingUser ? 'Pembelian' : 'Penjualan');
@@ -11,11 +15,14 @@
             'title' => 'Master Data',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>',
             'match' => 'master.*',
+            'roles' => ['manajer'],
             'items' => [
                 ['label' => 'Entitas', 'route' => 'master.entitas.index', 'match' => 'master.entitas.*', 'super_admin_only' => true],
+                ['label' => 'Kelola Staf', 'route' => 'master.pengguna.index', 'match' => 'master.pengguna.*', 'roles' => ['manajer']],
                 ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
                 ['label' => 'Satuan Ukur', 'route' => 'master.satuan.index', 'match' => 'master.satuan.*'],
-                ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
+                ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.index,master.barang.create,master.barang.edit,master.barang.show'],
+                ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*', 'roles' => ['manajer', 'admin_gudang']],
                 ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
                 ['label' => 'Gudang', 'route' => 'master.gudang.index', 'match' => 'master.gudang.*'],
                 ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
@@ -27,6 +34,7 @@
             'title' => 'Survei & Pemetaan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>',
             'match' => 'survei.*',
+            'roles' => ['surveyor', 'manajer'],
             'items' => [
                 ['label' => 'Dashboard Survei', 'route' => 'survei.dashboard.index', 'match' => 'survei.dashboard.*'],
                 ['label' => 'Sesi Survei', 'route' => 'survei.sesi.index', 'match' => 'survei.sesi.*'],
@@ -40,6 +48,7 @@
             'title' => 'Kalkulasi & Perencanaan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>',
             'match' => 'perencanaan.*',
+            'roles' => ['manajer'],
             'items' => [
                 ['label' => 'Dashboard Kalkulasi dan Perencanaan', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard'],
                 ['label' => 'Data & Parameter', 'route' => 'perencanaan.demografi.index', 'match' => 'perencanaan.demografi.*,perencanaan.potensi-produksi.*,perencanaan.standar-kebutuhan.*'],
@@ -54,10 +63,12 @@
             'title' => 'Manajemen Gudang',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>',
             'match' => 'gudang.*',
+            'roles' => ['admin_gudang', 'manajer'],
             'items' => [
                 ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
                 ['label' => 'Pencocokan Surplus-Defisit', 'route' => 'gudang.pencocokan-surplus-defisit.index', 'match' => 'gudang.pencocokan-surplus-defisit.*'],
                 ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
+                ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*'],
                 ['label' => 'Penerimaan', 'route' => 'gudang.penerimaan.index', 'match' => 'gudang.penerimaan.*'],
                 ['label' => 'Batch & Kedaluwarsa', 'route' => 'gudang.batch.index', 'match' => 'gudang.batch.*'],
                 ['label' => 'Kerusakan', 'route' => 'gudang.kerusakan.index', 'match' => 'gudang.kerusakan.*'],
@@ -69,17 +80,19 @@
             'title' => 'Pembelian & Penjualan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>',
             'match' => 'pembelian.*,penjualan.*',
+            'roles' => ['kasir', 'pembelian', 'admin_gudang', 'manajer'],
             'items' => [
-                ['label' => 'Order Pembelian', 'route' => 'pembelian.pembelian.index', 'match' => 'pembelian.pembelian.*'],
-                ['label' => 'Retur Pembelian', 'route' => 'pembelian.retur.index', 'match' => 'pembelian.retur.*'],
-                ['label' => 'Order Penjualan', 'route' => 'penjualan.penjualan.index', 'match' => 'penjualan.penjualan.*'],
-                ['label' => 'Retur Penjualan', 'route' => 'penjualan.retur.index', 'match' => 'penjualan.retur.*'],
+                ['label' => 'Order Pembelian', 'route' => 'pembelian.pembelian.index', 'match' => 'pembelian.pembelian.*', 'roles' => ['pembelian', 'admin_gudang', 'manajer']],
+                ['label' => 'Retur Pembelian', 'route' => 'pembelian.retur.index', 'match' => 'pembelian.retur.*', 'roles' => ['pembelian', 'admin_gudang', 'manajer']],
+                ['label' => 'Order Penjualan', 'route' => 'penjualan.penjualan.index', 'match' => 'penjualan.penjualan.*', 'roles' => ['kasir', 'manajer']],
+                ['label' => 'Retur Penjualan', 'route' => 'penjualan.retur.index', 'match' => 'penjualan.retur.*', 'roles' => ['kasir', 'manajer']],
             ]
         ],
         [
             'title' => 'Konsinyasi & Titipan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>',
             'match' => 'konsinyasi.*',
+            'roles' => ['admin_gudang', 'manajer'],
             'items' => [
                 ['label' => 'Pengiriman', 'route' => 'konsinyasi.pengiriman.index', 'match' => 'konsinyasi.pengiriman.*'],
                 ['label' => 'Stok Konsinyasi', 'route' => 'konsinyasi.stok.index', 'match' => 'konsinyasi.stok.*'],
@@ -92,17 +105,19 @@
             'title' => 'Buku Keuangan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /></svg>',
             'match' => 'keuangan.*',
+            'roles' => ['akuntan', 'kasir', 'manajer'],
             'items' => [
-                ['label' => 'Piutang', 'route' => 'keuangan.piutang.index', 'match' => 'keuangan.piutang.*'],
-                ['label' => 'Hutang', 'route' => 'keuangan.hutang.index', 'match' => 'keuangan.hutang.*'],
-                ['label' => 'Pelunasan', 'route' => 'keuangan.pelunasan.index', 'match' => 'keuangan.pelunasan.*'],
-                ['label' => 'Kas & Transaksi', 'route' => 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*'],
+                ['label' => 'Piutang', 'route' => 'keuangan.piutang.index', 'match' => 'keuangan.piutang.*', 'roles' => ['akuntan', 'manajer']],
+                ['label' => 'Hutang', 'route' => 'keuangan.hutang.index', 'match' => 'keuangan.hutang.*', 'roles' => ['akuntan', 'manajer']],
+                ['label' => 'Pelunasan', 'route' => 'keuangan.pelunasan.index', 'match' => 'keuangan.pelunasan.*', 'roles' => ['akuntan', 'manajer']],
+                ['label' => 'Kas & Transaksi', 'route' => 'keuangan.kas-transaksi.index', 'match' => 'keuangan.kas-transaksi.*', 'roles' => ['akuntan', 'kasir', 'manajer']],
             ]
         ],
         [
             'title' => 'Akuntansi & Laporan',
             'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
             'match' => 'akuntansi.*',
+            'roles' => ['akuntan', 'manajer'],
             'items' => [
                 ['label' => 'Saldo Awal', 'route' => 'akuntansi.saldo-awal.index', 'match' => 'akuntansi.saldo-awal.*'],
                 ['label' => 'Jurnal', 'route' => 'akuntansi.jurnal.index', 'match' => 'akuntansi.jurnal.*'],
@@ -136,60 +151,145 @@
     </a>
 
     {{-- Navigation --}}
-    <nav class="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
+    <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-4 py-5 custom-scrollbar">
+        @php
+            $user = auth()->user();
+            $isSuperAdmin = $user && $user->isSuperAdmin();
+            $isManajer = $user && $user->hasPeran('manajer');
+            $katalogPeranSidebar = \App\Services\DemoPeranService::katalogPeran();
+            $kodePeranAktifSidebar = \App\Services\DemoPeranService::kodePeranAktif($user);
+            $infoPeranSidebar = $katalogPeranSidebar[$kodePeranAktifSidebar] ?? null;
+            $grupFokusPeran = $infoPeranSidebar['grup_sidebar'] ?? [];
+        @endphp
 
-        @if(auth()->check() && auth()->user()->id_entitas === null && !$isModuleLimitedUser)
-            <div class="mb-6">
-                <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
-                    Super Admin
-                </p>
+        {{-- Navigasi Utama & Zona Publik --}}
+        <div class="mb-5 space-y-1">
+            <p class="px-2 pb-1.5 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                Navigasi Dasbor
+            </p>
+            @auth
                 <a
-                    href="{{ route('admin.dashboard') }}"
-                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors
-                    {{ request()->routeIs('admin.*') ? 'bg-padi-500/10 text-padi-400' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    href="{{ route('dashboard') }}"
+                    class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors
+                    {{ request()->routeIs('dashboard') && (!request('tab') || request('tab') === 'alur') ? 'bg-padi-500/15 text-padi-300 border border-padi-500/30' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    @if(request()->routeIs('dashboard') && (!request('tab') || request('tab') === 'alur')) data-sidebar-active="true" @endif
                 >
-                    <span class="text-padi-500">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                    <span class="flex items-center gap-2.5">
+                        <span>🎯</span>
+                        <span>Dasbor Alur &amp; Demo</span>
                     </span>
-                    <span class="font-medium">Persetujuan Entitas</span>
                 </a>
-            </div>
-        @endif
+                <a
+                    href="{{ route('dashboard', ['tab' => 'katalog']) }}"
+                    class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors
+                    {{ request()->routeIs('dashboard') && request('tab') === 'katalog' ? 'bg-padi-500/15 text-padi-300 border border-padi-500/30' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    @if(request()->routeIs('dashboard') && request('tab') === 'katalog') data-sidebar-active="true" @endif
+                >
+                    <span class="flex items-center gap-2.5">
+                        <span>🌾</span>
+                        <span>Katalog Komoditas Desa</span>
+                    </span>
+                </a>
+                <a
+                    href="{{ route('dashboard', ['tab' => 'neraca']) }}"
+                    class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors
+                    {{ request()->routeIs('dashboard') && request('tab') === 'neraca' ? 'bg-padi-500/15 text-padi-300 border border-padi-500/30' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    @if(request()->routeIs('dashboard') && request('tab') === 'neraca') data-sidebar-active="true" @endif
+                >
+                    <span class="flex items-center gap-2.5">
+                        <span>⚖️</span>
+                        <span>Ketahanan Pangan Antar-Desa</span>
+                    </span>
+                </a>
+            @endauth
+        </div>
 
-        <p class="px-2 pb-3 font-mono text-[10px] uppercase tracking-widest text-paper-400">
-            Modul Sistem
-        </p>
+        @auth
+            {{-- Indikator Peran Aktif yang Tersinkronisasi --}}
+            @if($infoPeranSidebar)
+                <div class="mb-5 rounded-xl bg-ink-900 border border-ink-800 p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="font-mono text-[9px] uppercase tracking-wider text-padi-400">Peran Aktif</span>
+                        <span class="font-mono text-[9px] text-paper-400">Alur #{{ $infoPeranSidebar['urutan'] }}</span>
+                    </div>
+                    <p class="text-xs font-semibold text-white mt-1 flex items-center gap-1.5">
+                        <span>{{ $infoPeranSidebar['ikon'] }}</span>
+                        <span>{{ $infoPeranSidebar['nama'] }}</span>
+                    </p>
+                    <p class="text-[10px] text-paper-400 mt-0.5 leading-snug">
+                        {{ $infoPeranSidebar['tahap'] }}
+                    </p>
+                </div>
+            @endif
 
-        <ul class="space-y-2">
-            @foreach ($sidebarGroups as $group)
-                @if ($isModuleLimitedUser && $group['title'] !== 'Pembelian & Penjualan')
-                    @continue
-                @endif
-                @php
-                    $isGroupActive = collect(explode(',', $group['match']))->contains(fn ($p) => request()->routeIs($p));
-                @endphp
-                
-                <li x-data="{ expanded: {{ $isGroupActive ? 'true' : 'false' }} }">
-                    {{-- Accordion Header --}}
-                    <button 
-                        @click="expanded = !expanded" 
-                        class="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-padi-500/50
-                        {{ $isGroupActive ? 'bg-ink-800 text-white shadow-sm' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+            @if($user->id_entitas === null && !$isModuleLimitedUser)
+                <div class="mb-5">
+                    <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                        Super Admin
+                    </p>
+                    <a
+                        href="{{ route('admin.dashboard') }}"
+                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors
+                        {{ request()->routeIs('admin.*') ? 'bg-padi-500/10 text-padi-400' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                        @if(request()->routeIs('admin.*')) data-sidebar-active="true" @endif
                     >
-                        <div class="flex items-center gap-3">
-                            <span class="{{ $isGroupActive ? 'text-padi-400' : 'text-paper-500 group-hover:text-paper-300' }}">
-                                {!! $group['icon'] !!}
-                            </span>
-                            <span class="font-medium">{{ $isModuleLimitedUser ? $restrictedGroupTitle : $group['title'] }}</span>
-                        </div>
-                        <svg 
-                            class="w-4 h-4 text-paper-500 transition-transform duration-200" 
-                            :class="expanded ? 'rotate-180' : ''"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        <span class="text-padi-500">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        </span>
+                        <span class="font-medium">Persetujuan Entitas</span>
+                    </a>
+                </div>
+            @endif
+
+            <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                Modul Internal Entitas
+            </p>
+
+            @php
+                $anyGroupActive = collect($sidebarGroups)->contains(function ($g) {
+                    return collect(explode(',', $g['match']))->contains(fn ($p) => request()->routeIs($p));
+                });
+            @endphp
+
+            <ul class="space-y-2">
+                @foreach ($sidebarGroups as $group)
+                    @if ($isModuleLimitedUser && $group['title'] !== 'Pembelian & Penjualan')
+                        @continue
+                    @endif
+                    @php
+                        // Filter grup berdasarkan peran pengguna
+                        if (!$isSuperAdmin && !$isManajer && !empty($group['roles'])) {
+                            if (!$user || !$user->hasAnyPeran($group['roles'])) {
+                                continue;
+                            }
+                        }
+
+                        $isGroupActive = collect(explode(',', $group['match']))->contains(fn ($p) => request()->routeIs($p));
+                        $isRoleFocusGroup = ! $isSuperAdmin && in_array($group['title'], $grupFokusPeran, true);
+                        $shouldExpand = $isGroupActive || (! $anyGroupActive && $isRoleFocusGroup);
+                    @endphp
+                    
+                    <li x-data="{ expanded: {{ $shouldExpand ? 'true' : 'false' }} }">
+                        {{-- Accordion Header --}}
+                        <button 
+                            @click="expanded = !expanded" 
+                            class="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-padi-500/50
+                            {{ $isGroupActive ? 'bg-ink-800 text-white shadow-sm' : ($isRoleFocusGroup ? 'bg-ink-900/90 text-paper-100 border border-ink-800' : 'text-paper-300 hover:bg-ink-800 hover:text-white') }}"
                         >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="{{ ($isGroupActive || $isRoleFocusGroup) ? 'text-padi-400' : 'text-paper-500 group-hover:text-paper-300' }}">
+                                    {!! $group['icon'] !!}
+                                </span>
+                                <span class="font-medium truncate">{{ $isModuleLimitedUser ? $restrictedGroupTitle : $group['title'] }}</span>
+                            </div>
+                            <svg 
+                                class="w-4 h-4 text-paper-500 transition-transform duration-200 shrink-0" 
+                                :class="expanded ? 'rotate-180' : ''"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
 
                     {{-- Accordion Body --}}
                     <div 
@@ -202,6 +302,13 @@
                             @foreach($group['items'] as $item)
                                 @continue(! empty($item['super_admin_only']) && auth()->user()?->id_entitas !== null)
                                 @php
+                                    // Filter sub-item berdasarkan peran
+                                    if (!$isSuperAdmin && !$isManajer && !empty($item['roles'])) {
+                                        if (!$user || !$user->hasAnyPeran($item['roles'])) {
+                                            continue;
+                                        }
+                                    }
+
                                     $hasChildren = ! empty($item['children']);
                                     $isItemActive = collect(explode(',', $item['match']))->contains(fn ($p) => request()->routeIs($p));
                                     $isChildActive = $hasChildren && collect($item['children'])->contains(function ($child) {
@@ -214,7 +321,7 @@
                                         <div x-data="{ expanded: {{ ($isChildActive || $isItemActive) ? 'true' : 'false' }} }">
                                             <div class="flex items-center rounded-lg text-xs transition-colors
                                                 {{ ($isChildActive || $isItemActive) ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
-                                                <a href="{{ route($item['route']) }}" class="min-w-0 flex-1 px-3 py-2">
+                                                <a href="{{ route($item['route']) }}" class="min-w-0 flex-1 px-3 py-2" @if($isItemActive) data-sidebar-active="true" @endif>
                                                     {{ $item['label'] }}
                                                 </a>
                                                 <button type="button" @click="expanded = !expanded" class="px-3 py-2 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $item['label'] }}">
@@ -229,28 +336,52 @@
                                                     @foreach ($item['children'] as $child)
                                                         @php
                                                             $childHasChildren = ! empty($child['children']);
-                                                            $childActive = collect(explode(',', $child['match']))->contains(fn ($p) => request()->routeIs($p));
-                                                            $grandchildActive = $childHasChildren && collect($child['children'])->contains(fn ($grandchild) => collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p)));
+                                                            $isSubChildActive = collect(explode(',', $child['match']))->contains(fn ($p) => request()->routeIs($p))
+                                                                || ($childHasChildren && collect($child['children'])->contains(function ($grandchild) {
+                                                                    return collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p));
+                                                                }));
                                                         @endphp
                                                         <li>
                                                             @if ($childHasChildren)
-                                                                <div x-data="{ expanded: {{ ($childActive || $grandchildActive) ? 'true' : 'false' }} }">
-                                                                    <div class="flex items-center rounded-md {{ ($childActive || $grandchildActive) ? 'bg-ink-800 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
-                                                                        <a href="{{ route($child['route']) }}" class="min-w-0 flex-1 px-2.5 py-1.5">{{ $child['label'] }}</a>
-                                                                        <button type="button" @click="expanded = !expanded" class="px-2 py-1.5 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $child['label'] }}">
-                                                                            <svg class="h-3 w-3 transition-transform" :class="expanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7" /></svg>
+                                                                <div x-data="{ expanded: {{ $isSubChildActive ? 'true' : 'false' }} }">
+                                                                    <div class="flex items-center rounded-lg text-xs transition-colors
+                                                                        {{ $isSubChildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
+                                                                        <a href="{{ route($child['route']) }}" class="min-w-0 flex-1 px-3 py-2" @if($isSubChildActive) data-sidebar-active="true" @endif>
+                                                                            {{ $child['label'] }}
+                                                                        </a>
+                                                                        <button type="button" @click="expanded = !expanded" class="px-3 py-2 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $child['label'] }}">
+                                                                            <svg class="h-3.5 w-3.5 transition-transform" :class="expanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7" />
+                                                                            </svg>
                                                                         </button>
                                                                     </div>
                                                                     <div x-show="expanded" x-transition x-cloak class="ml-3 mt-1 border-l border-ink-800 pl-2">
-                                                                        @foreach ($child['children'] as $grandchild)
-                                                                            <a href="{{ route($grandchild['route']) }}" class="block rounded-md px-2.5 py-1.5 text-[11px] transition-colors {{ request()->routeIs($grandchild['match']) ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-500 hover:bg-ink-800 hover:text-white' }}">
-                                                                                {{ $grandchild['label'] }}
-                                                                            </a>
-                                                                        @endforeach
+                                                                        <ul class="space-y-1">
+                                                                            @foreach ($child['children'] as $grandchild)
+                                                                                @php
+                                                                                    $isGrandchildActive = collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p));
+                                                                                @endphp
+                                                                                <li>
+                                                                                    <a
+                                                                                        href="{{ route($grandchild['route']) }}"
+                                                                                        class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                                                                        {{ $isGrandchildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                                                                        @if($isGrandchildActive) data-sidebar-active="true" @endif
+                                                                                    >
+                                                                                        {{ $grandchild['label'] }}
+                                                                                    </a>
+                                                                                </li>
+                                                                            @endforeach
+                                                                        </ul>
                                                                     </div>
                                                                 </div>
                                                             @else
-                                                                <a href="{{ route($child['route']) }}" class="block rounded-md px-2.5 py-1.5 text-[11px] transition-colors {{ $childActive ? 'bg-ink-800 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
+                                                                <a
+                                                                    href="{{ route($child['route']) }}"
+                                                                    class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                                                    {{ $isSubChildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                                                    @if($isSubChildActive) data-sidebar-active="true" @endif
+                                                                >
                                                                     {{ $child['label'] }}
                                                                 </a>
                                                             @endif
@@ -260,8 +391,13 @@
                                             </div>
                                         </div>
                                     @else
-                                        <a href="{{ route($item['route']) }}" class="block rounded-lg px-3 py-2 text-xs transition-colors {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium relative before:absolute before:-left-[0.8125rem] before:top-1/2 before:-translate-y-1/2 before:w-[5px] before:h-[5px] before:rounded-full before:bg-padi-400' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
-                                            {{ $item['label'] }}
+                                        <a 
+                                            href="{{ route($item['route']) }}" 
+                                            class="block rounded-lg px-3 py-2 text-xs transition-colors
+                                            {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                            @if($isItemActive) data-sidebar-active="true" @endif
+                                        >
+                                            {{ ($item['route'] === 'master.pengguna.index' && $isSuperAdmin) ? 'Manajemen Pengguna' : $item['label'] }}
                                         </a>
                                     @endif
                                 </li>
@@ -271,32 +407,84 @@
                 </li>
             @endforeach
         </ul>
+        @endauth
     </nav>
 
-    {{-- Footer Sidebar --}}
-    <div class="border-t border-ink-800 px-6 py-4 bg-ink-950/50">
+    {{-- Footer Info --}}
+    <div class="border-t border-ink-800 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-ink-800 flex items-center justify-center text-xs font-bold text-padi-400">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-ink-800 font-mono text-xs text-paper-400">
                 {{ substr(auth()->user()->nama ?? 'U', 0, 1) }}
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-xs font-medium text-white truncate">{{ auth()->user()->nama ?? 'User' }}</p>
-                <p class="text-[10px] text-paper-400 truncate">Ngobar v1.0</p>
+            </span>
+            <div class="leading-tight">
+                <p class="text-xs font-medium text-white truncate max-w-[130px]">
+                    {{ auth()->user()->nama ?? 'Guest' }}
+                </p>
+                <p class="text-[10px] text-paper-400 truncate max-w-[130px]">
+                    @if(auth()->check() && auth()->user()->isSuperAdmin())
+                        Super Admin
+                    @elseif(auth()->check() && auth()->user()->peran->isNotEmpty())
+                        {{ auth()->user()->peran->pluck('nama')->join(', ') }}
+                    @else
+                        Staf Koperasi
+                    @endif
+                </p>
             </div>
         </div>
     </div>
-</aside>
 
-<style>
-    /* Custom Scrollbar for Sidebar */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: #3f3f46;
-        border-radius: 20px;
-    }
-</style>
+    {{-- Sidebar Scroll Position & Active Focus Script --}}
+    <script>
+        (function() {
+            const nav = document.getElementById('sidebar-nav');
+            if (!nav) return;
+
+            function restoreSidebarScroll() {
+                const activeItems = nav.querySelectorAll('[data-sidebar-active="true"]');
+                const activeItem = activeItems.length > 0 ? activeItems[activeItems.length - 1] : null;
+                const savedPos = sessionStorage.getItem('sidebar_scroll_pos');
+
+                if (savedPos !== null) {
+                    nav.scrollTop = parseInt(savedPos, 10);
+                }
+
+                if (activeItem) {
+                    const navRect = nav.getBoundingClientRect();
+                    const itemRect = activeItem.getBoundingClientRect();
+                    
+                    // Jika elemen aktif berada di luar batas pandang nav scroll (terlalu atas / terlalu bawah)
+                    if (itemRect.top < navRect.top + 20 || itemRect.bottom > navRect.bottom - 20) {
+                        activeItem.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+                        sessionStorage.setItem('sidebar_scroll_pos', nav.scrollTop);
+                    }
+                }
+            }
+
+            // Restore saat DOM siap dan setelah transisi render Alpine selesai
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(restoreSidebarScroll, 60);
+                });
+            } else {
+                setTimeout(restoreSidebarScroll, 60);
+            }
+
+            // Simpan scroll position saat user klik link apapun di dalam sidebar
+            nav.addEventListener('click', function(e) {
+                const link = e.target.closest('a');
+                if (link) {
+                    sessionStorage.setItem('sidebar_scroll_pos', nav.scrollTop);
+                }
+            });
+
+            // Debounced scroll listener untuk menyimpan posisi scroll sidebar saat digeser
+            let scrollTimer;
+            nav.addEventListener('scroll', function() {
+                clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(function() {
+                    sessionStorage.setItem('sidebar_scroll_pos', nav.scrollTop);
+                }, 100);
+            }, { passive: true });
+        })();
+    </script>
+</aside>

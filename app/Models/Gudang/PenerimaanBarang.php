@@ -5,6 +5,7 @@ namespace App\Models\Gudang;
 use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Gudang as GudangModel;
 use App\Models\Master\Pihak;
+use App\Models\Pembelian\Pembelian;
 use Illuminate\Database\Eloquent\Model;
 
 class PenerimaanBarang extends Model
@@ -38,6 +39,17 @@ class PenerimaanBarang extends Model
     public function detail()
     {
         return $this->hasMany(PenerimaanBarangDetail::class, 'id_penerimaan', 'id_penerimaan');
+    }
+
+    public function pembelian()
+    {
+        return $this->belongsTo(Pembelian::class, 'id_pembelian', 'id_pembelian');
+    }
+
+    public function antreanJurnal()
+    {
+        return $this->hasMany(AntreanJurnalGudang::class, 'ref_id', 'id_penerimaan')
+            ->where('ref_tipe', 'PENERIMAAN');
     }
 }
 

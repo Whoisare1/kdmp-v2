@@ -4,6 +4,7 @@ namespace App\Models\Master;
 
 use App\Models\Concerns\BelongsToEntitas;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class AsetTetap extends Model
 {
@@ -27,6 +28,24 @@ class AsetTetap extends Model
             'nilai_residu' => 'decimal:2',
             'akum_penyusutan' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Cek apakah aset sudah pernah disusutkan sehingga tanggal dan nilai perolehan harus dikunci.
+     */
+    public function sudahDisusutkan(): bool
+    {
+        if ((float) $this->akum_penyusutan > 0) {
+            return true;
+        }
+
+        return DB::table('jurnal_header')
+            ->where('id_entitas', $this->id_entitas)
+            ->where('kode_transaksi', 'PNY')
+            ->where('source_id', $this->id_aset)
+            ->where('source_type', 'like', 'ASET_TETAP%')
+            ->where('status', 'POSTED')
+            ->exists();
     }
 }
 

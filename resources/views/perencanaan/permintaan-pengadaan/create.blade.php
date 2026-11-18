@@ -93,19 +93,33 @@
                         <p class="mt-1 text-xs text-merah-600">Belum ada gudang aktif untuk entitas ini.</p>
                     @endif
                 </div>
+                <div>
+                    <label for="aksi_select" class="block text-sm font-medium text-ink-700">Tindakan / Status Pengajuan</label>
+                    <select id="aksi_select" name="aksi" class="mt-1 block w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-800 focus:border-merah-400 focus:outline-none">
+                        <option value="setujui" @selected(old('aksi') === 'setujui')>✓ Langsung Disetujui (Siap diproses ke Order Pembelian)</option>
+                        <option value="draft" @selected(old('aksi') === 'draft')>Simpan sebagai Draft (Ditinjau nanti)</option>
+                    </select>
+                    <p class="mt-1 text-xs text-ink-500">Pilih "Langsung Disetujui" agar PR langsung masuk ke antrean pengadaan barang.</p>
+                </div>
             </div>
 
-            <div class="mt-6 flex items-center justify-between gap-4 border-t border-paper-300 pt-4">
+            <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-paper-300 pt-4">
                 <a href="{{ route('perencanaan.neraca-komoditas.index', ['tahun' => $hasil?->tahun ?? now()->year, 'bulan' => $hasil?->bulan]) }}" class="rounded-sm border border-paper-300 bg-paper-50 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">
                     ← Kembali ke Neraca
                 </a>
-                <button type="submit" class="rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600" @disabled(!$hasil || !$barang || $gudangs->isEmpty())>
-                    Simpan Draft PR
-                </button>
-                @if ($errors->any())
-                    <div class="mt-4 rounded-sm border border-merah-200 bg-merah-50 p-3 text-sm text-merah-700">{{ $errors->first() }}</div>
-                @endif
-            </form>
+                <div class="flex items-center gap-3">
+                    <button type="submit" name="aksi" value="draft" class="rounded-sm border border-paper-300 bg-white px-4 py-2 text-sm font-medium text-ink-800 hover:bg-paper-100 shadow-sm" @disabled(!$hasil || !$barang || $gudangs->isEmpty())>
+                        Simpan Draft PR
+                    </button>
+                    <button type="submit" name="aksi" value="setujui" class="rounded-sm bg-sawah-600 px-4 py-2 text-sm font-medium text-white hover:bg-sawah-700 shadow-sm transition" @disabled(!$hasil || !$barang || $gudangs->isEmpty())>
+                        ✓ Simpan & Langsung Setujui
+                    </button>
+                </div>
+            </div>
+            @if ($errors->any())
+                <div class="mt-4 rounded-sm border border-merah-200 bg-merah-50 p-3 text-sm text-merah-700">{{ $errors->first() }}</div>
+            @endif
+        </form>
         </div>
     </div>
 </x-layouts.app>

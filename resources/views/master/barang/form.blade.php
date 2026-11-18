@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data">
+<x-layouts.app :title="$title" eyebrow="Master Data">
     <div class="mb-5">
         <a href="{{ route('master.barang.index') }}" class="inline-flex items-center gap-1 text-sm text-ink-600 hover:text-ink-900">
             &larr; Kembali ke Daftar Barang
@@ -55,7 +55,7 @@
             </div>
 
             <div>
-                <label class="block text-xs font-medium text-ink-800 mb-1">Komoditas Terkait (M2/M3)</label>
+                <label class="block text-xs font-medium text-ink-800 mb-1">Komoditas Terkait (Perencanaan)</label>
                 <select name="id_komoditas"
                         class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
                     <option value="">-- Pilih Komoditas --</option>
@@ -65,7 +65,7 @@
                         </option>
                     @endforeach
                 </select>
-                <p class="mt-1 text-[11px] text-ink-500">Hubungkan ke Komoditas agar PR Defisit (M3) otomatis memilih barang ini.</p>
+                <p class="mt-1 text-[11px] text-ink-500">Hubungkan ke Komoditas agar PR Defisit otomatis memilih barang ini.</p>
             </div>
 
             <div>

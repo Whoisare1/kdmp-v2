@@ -9,21 +9,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * LaporanController Ã¢â‚¬â€ Menyajikan 4 laporan keuangan standar:
+ * LaporanController â€” Menyajikan 4 laporan keuangan standar:
  *
- *   1. neracaSaldo()  Ã¢â‚¬â€ Trial Balance: semua akun + saldo D/K per bulan
- *   2. bukuBesar()    Ã¢â‚¬â€ Ledger: mutasi per akun + running balance (dihitung PHP)
- *   3. labaRugi()     Ã¢â‚¬â€ Income Statement: Pendapatan Ã¢Ë†â€™ HPP Ã¢Ë†â€™ Biaya = Laba Bersih
- *   4. neraca()       Ã¢â‚¬â€ Balance Sheet: Aset = Kewajiban + Modal
+ *   1. neracaSaldo()  â€” Trial Balance: semua akun + saldo D/K per bulan
+ *   2. bukuBesar()    â€” Ledger: mutasi per akun + running balance (dihitung PHP)
+ *   3. labaRugi()     â€” Income Statement: Pendapatan âˆ’ HPP âˆ’ Biaya = Laba Bersih
+ *   4. neraca()       â€” Balance Sheet: Aset = Kewajiban + Modal
  *
  * Semua bersumber dari buku_besar_periode (sudah teragregasi per bulan)
  * dan jurnal_header/detail (untuk detail buku besar).
- * Tidak ada tabel laporan terpisah Ã¢â‚¬â€ single source of truth = jurnal.
+ * Tidak ada tabel laporan terpisah â€” single source of truth = jurnal.
  */
 class LaporanController extends Controller
 {
     // =========================================================================
-    // HELPER Ã¢â‚¬â€ parse filter tahun/bulan dari request
+    // HELPER â€” parse filter tahun/bulan dari request
     // =========================================================================
 
     private function parsePeriode(Request $request): array
@@ -51,7 +51,7 @@ class LaporanController extends Controller
 
     /**
      * Tampilkan semua akun dengan saldo Debet / Kredit per bulan yang dipilih.
-     * Total Debet harus = Total Kredit Ã¢â‚¬â€ jika tidak, ada posting yang salah.
+     * Total Debet harus = Total Kredit â€” jika tidak, ada posting yang salah.
      *
      * Sumber data: buku_besar_periode JOIN master_coa
      * Dua tambahan Plan A:
@@ -118,12 +118,95 @@ class LaporanController extends Controller
         ));
     }
 
+    public function exportNeracaSaldoCsv(Request $request)
+    {
+        $idEntitas = app('entitas_aktif');
+        [$tahun, $bulan] = $this->parsePeriode($request);
+
+        $latestPeriode = DB::table('buku_besar_periode as b2')
+            ->select('b2.kode_anak', DB::raw('MAX(b2.periode_bulan) as max_bulan'))
+            ->when($idEntitas, fn($q) => $q->where('b2.id_entitas', $idEntitas))
+            ->where('b2.periode_tahun', $tahun)
+            ->where('b2.periode_bulan', '<=', $bulan)
+            ->groupBy('b2.kode_anak');
+
+        $rows = DB::table('buku_besar_periode as bbp')
+            ->joinSub($latestPeriode, 'latest', function ($join) {
+                $join->on('bbp.kode_anak', '=', 'latest.kode_anak')
+                     ->on('bbp.periode_bulan', '=', 'latest.max_bulan');
+            })
+            ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
+            ->where('bbp.periode_tahun', $tahun)
+            ->orderBy('c.urutan_laporan')
+            ->orderBy('c.kode_anak')
+            ->select([
+                'bbp.kode_anak',
+                'c.nama_rekening',
+                'c.kelompok',
+                'c.posisi_normal',
+                'bbp.saldo_akhir_debet',
+                'bbp.saldo_akhir_kredit',
+            ])
+            ->get();
+
+        $bankMap = Coa::bankMapForEntitas($idEntitas);
+        $rows = $rows->map(function ($row) use ($bankMap) {
+            if (isset($bankMap[$row->kode_anak])) {
+                $row->nama_rekening = $bankMap[$row->kode_anak]->nama;
+            }
+            if ($row->posisi_normal === 'D') {
+                $row->saldo_normal = $row->saldo_akhir_debet - $row->saldo_akhir_kredit;
+                $row->saldo_d = max(0, $row->saldo_normal);
+                $row->saldo_k = max(0, -$row->saldo_normal);
+            } else {
+                $row->saldo_normal = $row->saldo_akhir_kredit - $row->saldo_akhir_debet;
+                $row->saldo_d = max(0, -$row->saldo_normal);
+                $row->saldo_k = max(0, $row->saldo_normal);
+            }
+            return $row;
+        });
+
+        $namaBulan = $this->bulanLabel($bulan);
+        $filename = "Neraca_Saldo_{$namaBulan}_{$tahun}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        return response()->stream(function () use ($rows, $namaBulan, $tahun) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['LAPORAN NERACA SALDO']);
+            fputcsv($handle, ["Periode: {$namaBulan} {$tahun}"]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['Kode Akun', 'Nama Rekening', 'Kelompok', 'Debet (Rp)', 'Kredit (Rp)']);
+
+            $totalD = 0;
+            $totalK = 0;
+            foreach ($rows as $r) {
+                $totalD += (float) $r->saldo_d;
+                $totalK += (float) $r->saldo_k;
+                fputcsv($handle, [
+                    $r->kode_anak,
+                    $r->nama_rekening,
+                    $r->kelompok,
+                    number_format((float) $r->saldo_d, 2, '.', ''),
+                    number_format((float) $r->saldo_k, 2, '.', ''),
+                ]);
+            }
+            fputcsv($handle, ['TOTAL', '', '', number_format($totalD, 2, '.', ''), number_format($totalK, 2, '.', '')]);
+            fclose($handle);
+        }, 200, $headers);
+    }
+
     // =========================================================================
     // 2. BUKU BESAR (General Ledger)
     // =========================================================================
 
     /**
-     * Tampilkan mutasi per akun: saldo awal Ã¢â€ â€™ baris transaksi Ã¢â€ â€™ saldo akhir.
+     * Tampilkan mutasi per akun: saldo awal â†’ baris transaksi â†’ saldo akhir.
      * Running balance dihitung di PHP (Plan A tambahan #1).
      *
      * Sumber: jurnal_detail JOIN jurnal_header WHERE status = POSTED
@@ -219,7 +302,7 @@ class LaporanController extends Controller
     // =========================================================================
 
     /**
-     * Tampilkan Pendapatan Ã¢Ë†â€™ HPP Ã¢Ë†â€™ Biaya = Laba Bersih untuk periode yang dipilih.
+     * Tampilkan Pendapatan âˆ’ HPP âˆ’ Biaya = Laba Bersih untuk periode yang dipilih.
      *
      * Filter: tahun + bulan_dari s.d. bulan_sampai
      * Sumber: SUM(mutasi) dari buku_besar_periode (bukan saldo_akhir, agar
@@ -289,6 +372,104 @@ class LaporanController extends Controller
             'totalBiaya', 'labaOperasi', 'netNonOp', 'labaBersih',
             'tahun', 'bulanDari', 'bulanSampai'
         ));
+    }
+
+    public function exportLabaRugiCsv(Request $request)
+    {
+        $idEntitas = app('entitas_aktif');
+        $tahun = (int) $request->query('tahun', date('Y'));
+        $bulanDari = max(1, min(12, (int) $request->query('bulan_dari', 1)));
+        $bulanSampai = max(1, min(12, (int) $request->query('bulan_sampai', date('n'))));
+
+        $rows = DB::table('jurnal_detail as jd')
+            ->join('jurnal_header as jh', 'jh.id_jurnal', '=', 'jd.id_jurnal')
+            ->join('master_coa as c', 'c.kode_anak', '=', 'jd.kode_anak')
+            ->when($idEntitas, fn($q) => $q->where('jh.id_entitas', $idEntitas))
+            ->where('jh.status', 'POSTED')
+            ->where('jh.periode_tahun', $tahun)
+            ->whereBetween('jh.periode_bulan', [$bulanDari, $bulanSampai])
+            ->whereIn('c.kelompok', ['Pendapatan', 'HPP', 'Biaya', 'Non-Operasional'])
+            ->groupBy('jd.kode_anak', 'c.nama_rekening', 'c.kelompok', 'c.posisi_normal', 'c.urutan_laporan')
+            ->selectRaw('
+                jd.kode_anak,
+                c.nama_rekening,
+                c.kelompok,
+                c.posisi_normal,
+                SUM(jd.debet) as sum_debet,
+                SUM(jd.kredit) as sum_kredit
+            ')
+            ->orderBy('c.urutan_laporan')
+            ->orderBy('jd.kode_anak')
+            ->get();
+
+        $rows = $rows->map(function ($row) {
+            $row->nilai = $row->posisi_normal === 'K'
+                ? $row->sum_kredit - $row->sum_debet
+                : $row->sum_debet - $row->sum_kredit;
+            return $row;
+        });
+
+        $pendapatan = $rows->where('kelompok', 'Pendapatan');
+        $hpp = $rows->where('kelompok', 'HPP');
+        $biaya = $rows->where('kelompok', 'Biaya');
+        $nonOperasional = $rows->where('kelompok', 'Non-Operasional');
+
+        $totalPendapatan = $pendapatan->sum('nilai');
+        $totalHPP = $hpp->sum('nilai');
+        $labaKotor = $totalPendapatan - $totalHPP;
+        $totalBiaya = $biaya->sum('nilai');
+        $labaOperasi = $labaKotor - $totalBiaya;
+        $netNonOp = $nonOperasional->sum('nilai');
+        $labaBersih = $labaOperasi + $netNonOp;
+
+        $filename = "Laba_Rugi_{$tahun}_bln_{$bulanDari}-{$bulanSampai}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        return response()->stream(function () use ($pendapatan, $hpp, $biaya, $nonOperasional, $totalPendapatan, $totalHPP, $labaKotor, $totalBiaya, $labaOperasi, $netNonOp, $labaBersih, $tahun, $bulanDari, $bulanSampai) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['LAPORAN LABA / RUGI']);
+            fputcsv($handle, ["Periode: Tahun {$tahun} (Bulan {$bulanDari} s.d. {$bulanSampai})"]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['Uraian Akun', 'Kode Akun', 'Nilai (Rp)']);
+
+            fputcsv($handle, ['PENDAPATAN', '', '']);
+            foreach ($pendapatan as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->nilai, 2, '.', '')]);
+            }
+            fputcsv($handle, ['Total Pendapatan', '', number_format((float) $totalPendapatan, 2, '.', '')]);
+            fputcsv($handle, []);
+
+            fputcsv($handle, ['HARGA POKOK PENJUALAN (HPP)', '', '']);
+            foreach ($hpp as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->nilai, 2, '.', '')]);
+            }
+            fputcsv($handle, ['Total HPP', '', number_format((float) $totalHPP, 2, '.', '')]);
+            fputcsv($handle, ['LABA KOTOR', '', number_format((float) $labaKotor, 2, '.', '')]);
+            fputcsv($handle, []);
+
+            fputcsv($handle, ['BIAYA OPERASIONAL', '', '']);
+            foreach ($biaya as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->nilai, 2, '.', '')]);
+            }
+            fputcsv($handle, ['Total Biaya', '', number_format((float) $totalBiaya, 2, '.', '')]);
+            fputcsv($handle, ['LABA OPERASI', '', number_format((float) $labaOperasi, 2, '.', '')]);
+            fputcsv($handle, []);
+
+            fputcsv($handle, ['NON-OPERASIONAL', '', '']);
+            foreach ($nonOperasional as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->nilai, 2, '.', '')]);
+            }
+            fputcsv($handle, ['Total Non-Operasional', '', number_format((float) $netNonOp, 2, '.', '')]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['LABA BERSIH', '', number_format((float) $labaBersih, 2, '.', '')]);
+
+            fclose($handle);
+        }, 200, $headers);
     }
 
     // =========================================================================
@@ -394,8 +575,124 @@ class LaporanController extends Controller
         ));
     }
 
+    public function exportNeracaCsv(Request $request)
+    {
+        $idEntitas = app('entitas_aktif');
+        [$tahun, $bulan] = $this->parsePeriode($request);
+
+        $kelompokNeraca = ['Aktiva', 'Kewajiban', 'Modal'];
+        $kelompokLR = ['Pendapatan', 'HPP', 'Biaya', 'Non-Operasional'];
+        $allGroups = array_merge($kelompokNeraca, $kelompokLR);
+
+        $latestPeriode = DB::table('buku_besar_periode as b2')
+            ->select('b2.kode_anak', DB::raw('MAX(b2.periode_bulan) as max_bulan'))
+            ->when($idEntitas, fn($q) => $q->where('b2.id_entitas', $idEntitas))
+            ->where('b2.periode_tahun', $tahun)
+            ->where('b2.periode_bulan', '<=', $bulan)
+            ->groupBy('b2.kode_anak');
+
+        $rows = DB::table('buku_besar_periode as bbp')
+            ->joinSub($latestPeriode, 'latest', function ($join) {
+                $join->on('bbp.kode_anak', '=', 'latest.kode_anak')
+                     ->on('bbp.periode_bulan', '=', 'latest.max_bulan');
+            })
+            ->join('master_coa as c', 'c.kode_anak', '=', 'bbp.kode_anak')
+            ->when($idEntitas, fn($q) => $q->where('bbp.id_entitas', $idEntitas))
+            ->where('bbp.periode_tahun', $tahun)
+            ->whereIn('c.kelompok', $allGroups)
+            ->select([
+                'bbp.kode_anak',
+                'c.kode_induk',
+                'c.nama_rekening',
+                'c.kelompok',
+                'c.posisi_normal',
+                'c.level',
+                'c.urutan_laporan',
+                'bbp.saldo_akhir_debet',
+                'bbp.saldo_akhir_kredit',
+            ])
+            ->get();
+
+        $bankMap = Coa::bankMapForEntitas($idEntitas);
+        $rows = $rows->map(function ($row) use ($bankMap) {
+            if (isset($bankMap[$row->kode_anak])) {
+                $row->nama_rekening = $bankMap[$row->kode_anak]->nama;
+            }
+            $row->saldo = $row->posisi_normal === 'D'
+                ? $row->saldo_akhir_debet - $row->saldo_akhir_kredit
+                : $row->saldo_akhir_kredit - $row->saldo_akhir_debet;
+            return $row;
+        });
+
+        $aktiva = $rows->where('kelompok', 'Aktiva');
+        $kewajiban = $rows->where('kelompok', 'Kewajiban');
+        $modal = $rows->where('kelompok', 'Modal');
+
+        $pendapatan = $rows->where('kelompok', 'Pendapatan')->sum('saldo');
+        $nonOp = $rows->where('kelompok', 'Non-Operasional')->sum('saldo');
+        $hpp = $rows->where('kelompok', 'HPP')->sum('saldo');
+        $biaya = $rows->where('kelompok', 'Biaya')->sum('saldo');
+        $labaBersih = ($pendapatan + $nonOp) - ($hpp + $biaya);
+
+        $modalTambahan = clone $modal;
+        if (abs($labaBersih) > 0.001) {
+            $modalTambahan->push((object)[
+                'kode_anak' => '341',
+                'nama_rekening' => 'Laba / Rugi Tahun Berjalan',
+                'kelompok' => 'Modal',
+                'saldo' => $labaBersih,
+            ]);
+        }
+
+        $totalAktiva = $aktiva->sum('saldo');
+        $totalKewajiban = $kewajiban->sum('saldo');
+        $totalModal = $modalTambahan->sum('saldo');
+        $totalPassiva = $totalKewajiban + $totalModal;
+
+        $namaBulan = $this->bulanLabel($bulan);
+        $filename = "Neraca_{$namaBulan}_{$tahun}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        return response()->stream(function () use ($aktiva, $kewajiban, $modalTambahan, $totalAktiva, $totalKewajiban, $totalModal, $totalPassiva, $namaBulan, $tahun) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['LAPORAN NERACA (BALANCE SHEET)']);
+            fputcsv($handle, ["Per: Akhir {$namaBulan} {$tahun}"]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['Kelompok / Akun', 'Kode Akun', 'Saldo (Rp)']);
+
+            fputcsv($handle, ['AKTIVA / ASET', '', '']);
+            foreach ($aktiva as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->saldo, 2, '.', '')]);
+            }
+            fputcsv($handle, ['TOTAL AKTIVA', '', number_format((float) $totalAktiva, 2, '.', '')]);
+            fputcsv($handle, []);
+
+            fputcsv($handle, ['KEWAJIBAN / HUTANG', '', '']);
+            foreach ($kewajiban as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->saldo, 2, '.', '')]);
+            }
+            fputcsv($handle, ['TOTAL KEWAJIBAN', '', number_format((float) $totalKewajiban, 2, '.', '')]);
+            fputcsv($handle, []);
+
+            fputcsv($handle, ['MODAL / EKUITAS', '', '']);
+            foreach ($modalTambahan as $r) {
+                fputcsv($handle, [$r->nama_rekening, $r->kode_anak, number_format((float) $r->saldo, 2, '.', '')]);
+            }
+            fputcsv($handle, ['TOTAL MODAL', '', number_format((float) $totalModal, 2, '.', '')]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['TOTAL PASSIVA (KEWAJIBAN + MODAL)', '', number_format((float) $totalPassiva, 2, '.', '')]);
+
+            fclose($handle);
+        }, 200, $headers);
+    }
+
     // =========================================================================
-    // 5. ARUS KAS Ã¢â‚¬â€ Belum Diimplementasi (butuh klasifikasi tambahan di COA)
+    // 5. ARUS KAS â€” Belum Diimplementasi (butuh klasifikasi tambahan di COA)
     // =========================================================================
 
     public function arusKas(Request $request): View

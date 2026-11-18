@@ -59,15 +59,24 @@ class PenjualanService
             throw new RuntimeException('Keranjang penjualan masih kosong.');
         }
 
+        foreach ($items as $item) {
+            if (($item['qty_dasar'] ?? 0) <= 0) {
+                throw new RuntimeException('Jumlah barang harus lebih besar dari nol.');
+            }
+        }
         return DB::transaction(function () use ($idEntitas, $idPihak, $idUnitUsaha, $metodeBayar, $items, $idKasBank, $transferDetails, $tglJatuhTempo, $namaPembeli, $diskon) {
             if ($idPihak === null && filled($namaPembeli)) {
+                $targetNama = trim($namaPembeli);
                 $pembeli = Pihak::query()->firstOrCreate(
                     [
                         'id_entitas' => $idEntitas,
-                        'jenis_pihak' => 'entitas_lain',
-                        'nama' => 'Pembeli Umum',
+                        'nama' => $targetNama,
                     ],
-                    ['is_anggota' => false, 'is_active' => true],
+                    [
+                        'jenis_pihak' => 'entitas_lain',
+                        'is_anggota' => false,
+                        'is_active' => true,
+                    ],
                 );
                 if (! $pembeli->is_active) {
                     $pembeli->update(['is_active' => true]);
@@ -258,7 +267,7 @@ class PenjualanService
                     $jurnal = app(JurnalService::class)->posting(
                         $kodeTransaksi,
                         [
-                            'tanggal_jurnal' => $sale->tanggal_transaksi,
+                            'tanggal_jurnal' => $sale->tanggal_transaksi ? Carbon::parse($sale->tanggal_transaksi)->toDateString() : now()->toDateString(),
                             'nomor_nota' => $sale->kode_penjualan,
                             'total_bayar' => (float) $sale->total_bayar,
                             'total_hpp' => (float) $totalHpp,
@@ -276,9 +285,8 @@ class PenjualanService
                     $statusPosting = $idJurnal ? 'T' : 'F';
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Posting jurnal penjualan {$sale->kode_penjualan} dilewati: " . $e->getMessage());
-                $idJurnal = null;
-                $statusPosting = 'F';
+                \Illuminate\Support\Facades\Log::error("Gagal posting jurnal penjualan {$sale->kode_penjualan}: " . $e->getMessage());
+                throw $e;
             }
 
             $sale->update([
@@ -467,7 +475,7 @@ class PenjualanService
                         $jurnal = app(JurnalService::class)->posting(
                             'RJU',
                             [
-                                'tanggal_jurnal' => $return->tgl_retur,
+                                'tanggal_jurnal' => $return->tgl_retur ? Carbon::parse($return->tgl_retur)->toDateString() : now()->toDateString(),
                                 'nomor_nota' => $return->kode_retur,
                                 'total_nilai' => (float) $return->total_nilai,
                                 'total_hpp' => (float) $return->total_hpp,
@@ -481,8 +489,8 @@ class PenjualanService
                         );
                     }
                 } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning("Posting jurnal retur penjualan {$return->kode_retur} dilewati: " . $e->getMessage());
-                    $jurnal = null;
+                    \Illuminate\Support\Facades\Log::error("Gagal posting jurnal retur penjualan {$return->kode_retur}: " . $e->getMessage());
+                    throw $e;
                 }
             }
 

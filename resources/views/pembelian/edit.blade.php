@@ -62,7 +62,7 @@
                             <span class="text-ink-700 font-medium">Gudang *</span>
                             <select name="id_gudang" required class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                                 <option value="">-- Pilih Gudang --</option>
-                                @foreach (\App\Models\Master\Gudang::all() as $gudang)
+                                @foreach ($gudangs ?? \App\Models\Master\Gudang::where('id_entitas', $item->id_entitas)->get() as $gudang)
                                     <option value="{{ $gudang->id_gudang }}" @selected(old('id_gudang', $item->id_gudang) == $gudang->id_gudang)>
                                         {{ $gudang->nama_gudang }}
                                     </option>

@@ -2,6 +2,7 @@
 
 namespace App\Models\Pembelian;
 
+use App\Models\Akuntansi\JurnalHeader;
 use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Gudang;
 use App\Models\Master\KasBank;
@@ -61,5 +62,10 @@ class Pembelian extends Model
     public function returs()
     {
         return $this->hasMany(ReturPembelian::class, 'id_pembelian', 'id_pembelian');
+    }
+
+    public function jurnal()
+    {
+        return $this->belongsTo(JurnalHeader::class, 'id_jurnal', 'id_jurnal');
     }
 }

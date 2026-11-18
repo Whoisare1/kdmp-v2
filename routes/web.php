@@ -10,7 +10,9 @@ use App\Http\Controllers\Akuntansi\SaldoAwalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoPeranController;
 use App\Http\Controllers\Gudang\GudangDashboardController;
+use App\Http\Controllers\Publik\EtalasePublikController;
 use App\Http\Controllers\Gudang\PencocokanSurplusDefisitController;
 use App\Http\Controllers\Gudang\BatchController;
 use App\Http\Controllers\Gudang\KartuStokController;
@@ -38,6 +40,7 @@ use App\Http\Controllers\Master\EntitasController;
 use App\Http\Controllers\Master\PeriodeController;
 use App\Http\Controllers\Master\PihakController;
 use App\Http\Controllers\Master\SatuanController;
+use App\Http\Controllers\Master\PenggunaKoperasiController;
 use App\Http\Controllers\Pembelian\PembelianController;
 use App\Http\Controllers\Pembelian\ReturPembelianController;
 use App\Http\Controllers\Penjualan\PenjualanController;
@@ -54,6 +57,12 @@ use App\Http\Controllers\Perencanaan\StandarKebutuhanController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', \App\Http\Controllers\LandingController::class)->name('landing');
+
+// ===== Zona Publik Lintas Entitas (Bisa Diakses Tanpa Login maupun Seluruh Entitas) =====
+Route::get('/publik/komoditas', [EtalasePublikController::class, 'komoditas'])->name('publik.komoditas');
+
+// ===== Simulator & Switcher Peran Demo (Login Otomatis & Sinkronisasi Alur) =====
+Route::post('/demo/switch-peran', [DemoPeranController::class, 'switchPeran'])->name('demo.switch-peran');
 
 Route::middleware('auth')->get('/home', function () {
     return redirect()->route('dashboard');
@@ -95,12 +104,13 @@ Route::middleware('auth')->group(function () {
         Route::resource('gudang', MasterGudangController::class);
         Route::resource('periode', PeriodeController::class)->only(['index', 'store', 'edit', 'update']);
         Route::resource('coa', CoaController::class);
+        Route::resource('pengguna', PenggunaKoperasiController::class)->middleware('peran:manajer');
     });
 
 
 
     // ===== M2/M3 â€” Kalkulasi Kebutuhan & Perencanaan =====
-    Route::prefix('perencanaan')->name('perencanaan.')->group(function () {
+    Route::prefix('perencanaan')->name('perencanaan.')->middleware('peran:manajer')->group(function () {
         Route::get('dashboard', [DashboardM2Controller::class, 'index'])->name('dashboard');
         Route::resource('demografi', DemografiController::class);
         Route::resource('potensi-produksi', PotensiProduksiController::class);
@@ -119,11 +129,17 @@ Route::middleware('auth')->group(function () {
         Route::resource('perbandingan-harga', PerbandinganHargaController::class);
         Route::get('permintaan-pengadaan/from-hasil/{hasil}', [PermintaanPengadaanController::class, 'fromHasil'])
             ->name('permintaan-pengadaan.from-hasil');
+        Route::post('permintaan-pengadaan/{id}/setujui', [PermintaanPengadaanController::class, 'setujui'])
+            ->name('permintaan-pengadaan.setujui');
+        Route::post('permintaan-pengadaan/{id}/tolak', [PermintaanPengadaanController::class, 'tolak'])
+            ->name('permintaan-pengadaan.tolak');
+        Route::post('permintaan-pengadaan/{id}/draft', [PermintaanPengadaanController::class, 'kembalikanKeDraft'])
+            ->name('permintaan-pengadaan.draft');
         Route::resource('permintaan-pengadaan', PermintaanPengadaanController::class);
     });
 
     // ===== M4 â€” Gudang =====
-    Route::prefix('gudang')->name('gudang.')->group(function () {
+    Route::prefix('gudang')->name('gudang.')->middleware('peran:admin_gudang')->group(function () {
         Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
         Route::get('pencocokan-surplus-defisit', [PencocokanSurplusDefisitController::class, 'index'])
             ->name('pencocokan-surplus-defisit.index');
@@ -131,12 +147,13 @@ Route::middleware('auth')->group(function () {
         Route::resource('penerimaan', PenerimaanBarangController::class);
         Route::resource('opname', OpnameController::class);
         Route::resource('kerusakan', KerusakanBarangController::class);
+        Route::get('kartu-stok/export-csv', [KartuStokController::class, 'exportCsv'])->name('kartu-stok.export');
         Route::resource('kartu-stok', KartuStokController::class)->only(['index', 'show']);
         Route::resource('stok', StokController::class)->only(['index', 'show']);
     });
 
     // ===== M5 Ã¢â‚¬â€ Pembelian =====
-    Route::prefix('pembelian')->name('pembelian.')->group(function () {
+    Route::prefix('pembelian')->name('pembelian.')->middleware('peran:pembelian,admin_gudang')->group(function () {
     Route::resource('pembelian', PembelianController::class);
     Route::get('pembelian/{pembelian}/invoice', [PembelianController::class, 'invoice'])
         ->name('pembelian.invoice');
@@ -164,7 +181,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ===== M6 â€” Penjualan =====
-    Route::prefix('penjualan')->name('penjualan.')->group(function () {
+    Route::prefix('penjualan')->name('penjualan.')->middleware('peran:kasir')->group(function () {
         Route::resource('penjualan', PenjualanController::class);
         Route::resource('retur', ReturPenjualanController::class);
     });
@@ -183,7 +200,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ===== M8/M9 â€” Keuangan & Akuntansi (fokus pendalaman besok) =====
-    Route::prefix('keuangan')->name('keuangan.')->group(function () {
+    Route::prefix('keuangan')->name('keuangan.')->middleware(['peran:akuntan,kasir', 'idempotent'])->group(function () {
         Route::resource('piutang', PiutangController::class)->only(['index', 'show']);
         Route::resource('hutang', HutangController::class)->only(['index', 'show']);
         // AJAX: ambil piutang/hutang terbuka milik pihak tertentu (harus SEBELUM resource)
@@ -195,7 +212,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('simpanan', SimpananController::class);
     });
 
-    Route::prefix('akuntansi')->name('akuntansi.')->group(function () {
+    Route::prefix('akuntansi')->name('akuntansi.')->middleware(['peran:akuntan', 'idempotent'])->group(function () {
+        Route::post('jurnal/proses-gudang', [JurnalController::class, 'prosesGudang'])->name('jurnal.proses-gudang');
         Route::resource('jurnal', JurnalController::class)->only(['index', 'show']);
         Route::post('jurnal/{id}/balik', [JurnalController::class, 'balik'])->name('jurnal.balik');
         Route::get('saldo-awal', [SaldoAwalController::class, 'index'])->name('saldo-awal.index');
@@ -213,9 +231,12 @@ Route::middleware('auth')->group(function () {
 
         Route::prefix('laporan')->name('laporan.')->group(function () {
             Route::get('neraca-saldo', [LaporanController::class, 'neracaSaldo'])->name('neraca-saldo');
+            Route::get('neraca-saldo/export-csv', [LaporanController::class, 'exportNeracaSaldoCsv'])->name('neraca-saldo.export');
             Route::get('buku-besar', [LaporanController::class, 'bukuBesar'])->name('buku-besar');
             Route::get('neraca', [LaporanController::class, 'neraca'])->name('neraca');
+            Route::get('neraca/export-csv', [LaporanController::class, 'exportNeracaCsv'])->name('neraca.export');
             Route::get('laba-rugi', [LaporanController::class, 'labaRugi'])->name('laba-rugi');
+            Route::get('laba-rugi/export-csv', [LaporanController::class, 'exportLabaRugiCsv'])->name('laba-rugi.export');
             Route::get('arus-kas', [LaporanController::class, 'arusKas'])->name('arus-kas');
         });
     });

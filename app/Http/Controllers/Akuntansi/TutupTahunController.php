@@ -14,11 +14,6 @@ use Illuminate\View\View;
  * Alur pengguna:
  *   1. GET  /akuntansi/tutup-tahun  → lihat status pra-kondisi + preview laba/rugi
  *   2. POST /akuntansi/tutup-tahun  → eksekusi finalisasi (permanen, tidak bisa dibatalkan)
- *
- * Catatan Keamanan:
- *   Sebaiknya tambahkan middleware gate/policy untuk membatasi akses hanya ke
- *   peran "Manajer Pusat" atau "Ketua Finance". Implementasi middleware peran
- *   berada di luar scope Step 9 ini.
  */
 class TutupTahunController extends Controller
 {
@@ -32,7 +27,16 @@ class TutupTahunController extends Controller
         // Default: tahun lalu (yang paling mungkin akan difinalisasi)
         $tahun = (int) $request->query('tahun', now()->subYear()->year);
 
-        $idEntitas = app('entitas_aktif');
+        $idEntitas = app()->bound('entitas_aktif') ? app('entitas_aktif') : null;
+        if ($idEntitas === null) {
+            $idEntitas = session('entitas_aktif_pilihan')
+                ?? \App\Models\Tenant\Entitas::where('status', 'APPROVED')->value('id_entitas')
+                ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+            if ($idEntitas) {
+                app()->bind('entitas_aktif', fn() => $idEntitas);
+            }
+        }
 
         if ($idEntitas === null) {
             return view('akuntansi.tutup-tahun', [
@@ -66,7 +70,17 @@ class TutupTahunController extends Controller
 
         $tahun = (int) $request->input('tahun');
 
-        $idEntitas = app('entitas_aktif');
+        $idEntitas = app()->bound('entitas_aktif') ? app('entitas_aktif') : null;
+        if ($idEntitas === null) {
+            $idEntitas = session('entitas_aktif_pilihan')
+                ?? \App\Models\Tenant\Entitas::where('status', 'APPROVED')->value('id_entitas')
+                ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+            if ($idEntitas) {
+                app()->bind('entitas_aktif', fn() => $idEntitas);
+            }
+        }
+
         if ($idEntitas === null) {
             return back()->with('error', 'Harap pilih Entitas terlebih dahulu untuk melakukan eksekusi Tutup Tahun.');
         }

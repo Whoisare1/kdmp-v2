@@ -127,6 +127,8 @@ class DataAwalSeeder extends Seeder
                 ]
             );
 
+            \App\Http\Controllers\Master\EntitasController::provisionDefaultSatuanDanKomoditas($entitas->id_entitas);
+
             DB::table('gudang')->updateOrInsert(
                 ['id_entitas' => $entitas->id_entitas, 'kode_gudang' => 'UTAMA'],
                 ['nama_gudang' => $desa['kode'] === 'KDMP-A'
@@ -175,23 +177,35 @@ class DataAwalSeeder extends Seeder
                 );
             }
 
-            $emailLogin = 'manajer@'.strtolower(str_replace(' ', '', $desa['kode'])).'.test';
+            $suffixDesa = strtolower(str_replace(' ', '', $desa['kode']));
+            $daftarAkun = [
+                ['kode' => 'manajer', 'nama' => 'Manajer '.$desa['wilayah'], 'email' => 'manajer@'.$suffixDesa.'.test'],
+                ['kode' => 'kasir', 'nama' => 'Kasir '.$desa['wilayah'], 'email' => 'kasir@'.$suffixDesa.'.test'],
+                ['kode' => 'admin_gudang', 'nama' => 'Admin Gudang '.$desa['wilayah'], 'email' => 'gudang@'.$suffixDesa.'.test'],
+                ['kode' => 'surveyor', 'nama' => 'Surveyor '.$desa['wilayah'], 'email' => 'surveyor@'.$suffixDesa.'.test'],
+                ['kode' => 'pembelian', 'nama' => 'Staf Pembelian '.$desa['wilayah'], 'email' => 'pembelian@'.$suffixDesa.'.test'],
+                ['kode' => 'akuntan', 'nama' => 'Akuntan '.$desa['wilayah'], 'email' => 'akuntan@'.$suffixDesa.'.test'],
+            ];
 
-            $pengguna = Pengguna::updateOrCreate(
-                ['email' => $emailLogin],
-                [
-                    'id_entitas' => $entitas->id_entitas,
-                    'nama' => 'Manajer '.$desa['wilayah'],
-                    'password' => Hash::make('password'),
-                    'is_active' => true,
-                ]
-            );
+            foreach ($daftarAkun as $staf) {
+                $pengguna = Pengguna::updateOrCreate(
+                    ['email' => $staf['email']],
+                    [
+                        'id_entitas' => $entitas->id_entitas,
+                        'nama' => $staf['nama'],
+                        'password' => Hash::make('password'),
+                        'is_active' => true,
+                    ]
+                );
 
-            $idPeranManajer = Peran::where('kode', 'manajer')->value('id_peran');
-            DB::table('pengguna_peran')->updateOrInsert([
-                'id_pengguna' => $pengguna->id,
-                'id_peran' => $idPeranManajer,
-            ]);
+                $idPeran = Peran::where('kode', $staf['kode'])->value('id_peran');
+                if ($idPeran) {
+                    DB::table('pengguna_peran')->updateOrInsert([
+                        'id_pengguna' => $pengguna->id,
+                        'id_peran' => $idPeran,
+                    ]);
+                }
+            }
         }
 
         // Setiap desa butuh pihak 'entitas_lain' yang menunjuk ke desa

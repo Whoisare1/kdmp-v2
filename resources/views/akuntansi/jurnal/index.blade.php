@@ -8,7 +8,7 @@
                 Daftar semua jurnal yang telah diposting. Jurnal dibuat otomatis dari transaksi atau manual via Kas Masuk/Keluar.
             </p>
         </div>
-        @if($idEntitas && $totalPosted > 0)
+        @if($totalPosted > 0)
             <div class="shrink-0 rounded border border-paper-200 bg-paper-50 px-4 py-2 text-right">
                 <p class="text-xs text-ink-500">Total Jurnal POSTED</p>
                 <p class="font-mono text-base font-bold text-ink-900">{{ number_format($totalPosted) }} entri</p>
@@ -17,10 +17,12 @@
     </div>
 
     @if(! $idEntitas)
-        <div class="rounded border border-padi-500 bg-padi-100 px-4 py-3 text-sm text-ink-700">
-            ⚠️ Harap pilih <strong>Entitas</strong> terlebih dahulu untuk melihat jurnal.
+        <div class="mb-5 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center justify-between">
+            <div>
+                ℹ️ Menampilkan jurnal <strong>Semua Entitas (Global)</strong>. Gunakan dropdown di bilah atas jika ingin fokus pada entitas tertentu.
+            </div>
         </div>
-    @else
+    @endif
 
     {{-- ===== Filter ===== --}}
     <form method="GET" action="{{ route('akuntansi.jurnal.index') }}"
@@ -83,6 +85,9 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-paper-200 bg-paper-100 text-xs font-medium uppercase tracking-wide text-ink-500">
+                        @if(! $idEntitas)
+                            <th class="px-4 py-2.5 text-left">Entitas</th>
+                        @endif
                         <th class="px-4 py-2.5 text-left">Tanggal</th>
                         <th class="px-4 py-2.5 text-left">No. Jurnal</th>
                         <th class="px-4 py-2.5 text-left">Kode</th>
@@ -96,6 +101,11 @@
                 <tbody class="divide-y divide-paper-100">
                     @foreach($jurnal as $j)
                         <tr class="hover:bg-paper-50 transition {{ $j->status === 'REVERSED' ? 'opacity-50' : '' }}">
+                            @if(! $idEntitas)
+                                <td class="px-4 py-2.5 font-medium text-xs text-ink-800 whitespace-nowrap">
+                                    {{ $j->entitas?->nama_entitas ?? "Entitas #{$j->id_entitas}" }}
+                                </td>
+                            @endif
                             <td class="px-4 py-2.5 font-mono text-xs text-ink-700 whitespace-nowrap">
                                 {{ \Carbon\Carbon::parse($j->tanggal_jurnal)->format('d M Y') }}
                             </td>
@@ -169,7 +179,5 @@
             Menampilkan {{ $jurnal->firstItem() }}–{{ $jurnal->lastItem() }} dari {{ $jurnal->total() }} jurnal
         </p>
     @endif
-
-    @endif {{-- end if idEntitas --}}
 
 </x-layouts.app>

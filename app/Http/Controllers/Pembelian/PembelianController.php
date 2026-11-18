@@ -8,10 +8,13 @@ use App\Models\Pembelian\Pembelian;
 use App\Models\Master\Barang;
 use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
+use App\Rules\TenantOwnershipRule;
 use App\Services\PembelianService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -25,6 +28,12 @@ class PembelianController extends ModuleCrudController
 
     public function index(Request $request): View
     {
+        $idEntitas = auth()->user()->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? session('entitas_aktif_pilihan');
+
+        $hasModalAwal = $idEntitas ? $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas) : true;
+
         $filters = $request->validate([
             'archive' => ['sometimes', 'in:1'],
             'year' => ['nullable', 'integer', 'min:1900', 'max:9999'],
@@ -32,6 +41,9 @@ class PembelianController extends ModuleCrudController
             'day' => ['nullable', 'integer', 'between:1,31'],
         ]);
         $query = Pembelian::with(['pihak', 'unitUsaha', 'gudang', 'kasBank']);
+        if ($idEntitas) {
+            $query->where('id_entitas', $idEntitas);
+        }
 
         if ($search = $request->query('q')) {
             $query->where(function ($builder) use ($search) {
@@ -69,7 +81,81 @@ class PembelianController extends ModuleCrudController
             'archiveActive' => $archiveActive,
             'archiveFilters' => $filters,
             'yearlySummary' => $yearlySummary,
+            'hasModalAwal' => $hasModalAwal,
         ]);
+    }
+
+    /**
+     * Memeriksa apakah koperasi telah mencatat transaksi Setoran Simpanan Pokok
+     * atau Saldo Awal Kas sebelum diizinkan membuat Order Pembelian.
+     */
+    protected function hasSimpananPokokOrSaldoAwal(int $idEntitas): bool
+    {
+        // 1. Cek apakah ada Setoran Simpanan Pokok di simpanan_anggota,
+        //    atau jurnal ber-kode SPK, atau transaksi kas masuk ke akun modal simpanan pokok (311)
+        if (Schema::hasTable('simpanan_anggota')) {
+            $adaSimpanan = DB::table('simpanan_anggota')
+                ->where('id_entitas', $idEntitas)
+                ->where('jenis', 'pokok')
+                ->exists();
+
+            if ($adaSimpanan) {
+                return true;
+            }
+        }
+
+        $adaJurnalSpk = DB::table('jurnal_header')
+            ->where('id_entitas', $idEntitas)
+            ->where('status', 'POSTED')
+            ->where('kode_transaksi', 'SPK')
+            ->exists();
+
+        if ($adaJurnalSpk) {
+            return true;
+        }
+
+        if (Schema::hasTable('kas_transaksi')) {
+            $adaKasSimpanan = DB::table('kas_transaksi')
+                ->where('id_entitas', $idEntitas)
+                ->where('jenis', 'masuk')
+                ->where('kode_akun_lawan', 'like', '311%')
+                ->exists();
+
+            if ($adaKasSimpanan) {
+                return true;
+            }
+        }
+
+        // 2. Cek apakah ada Saldo Awal Kas (Jurnal JOP / jenis SALDO_AWAL dengan debet akun kas 111%)
+        $adaSaldoAwalKas = DB::table('jurnal_header as jh')
+            ->join('jurnal_detail as jd', 'jd.id_jurnal', '=', 'jh.id_jurnal')
+            ->where('jh.id_entitas', $idEntitas)
+            ->where('jh.status', 'POSTED')
+            ->where(function ($q) {
+                $q->where('jh.jenis_jurnal', 'SALDO_AWAL')
+                  ->orWhere('jh.kode_transaksi', 'JOP');
+            })
+            ->where('jd.kode_anak', 'like', '111%')
+            ->where('jd.debet', '>', 0)
+            ->exists();
+
+        if ($adaSaldoAwalKas) {
+            return true;
+        }
+
+        // 3. Cek apakah saldo berjalan kas/bank di v_saldo_berjalan > 0
+        if (Schema::hasTable('v_saldo_berjalan')) {
+            $saldoKas = DB::table('v_saldo_berjalan')
+                ->where('id_entitas', $idEntitas)
+                ->where('kode_anak', 'like', '111%')
+                ->sum('saldo_normal');
+
+            if ($saldoKas > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Tampilkan form pembelian dari desa lain/warga lokal dan stok konsinyasi. */
@@ -77,7 +163,15 @@ class PembelianController extends ModuleCrudController
     {
         $idEntitas = auth()->user()->id_entitas
             ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? session('entitas_aktif_pilihan')
             ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
+        if ($idEntitas && ! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                redirect()->route("{$this->routeBase}.index")
+                    ->with('error', 'Koperasi baru wajib mencatat transaksi Setoran Simpanan Pokok atau Saldo Awal Kas terlebih dahulu sebelum diizinkan membuat Order Pembelian.')
+            );
+        }
 
         $pihaks = Pihak::where('id_entitas', $idEntitas)
             ->where('is_active', true)
@@ -132,6 +226,11 @@ class PembelianController extends ModuleCrudController
                 throw new \RuntimeException('Entitas aktif tidak ditemukan. Masuk menggunakan akun koperasi yang terhubung ke entitas.');
             }
 
+            if (! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
+                return redirect()->route("{$this->routeBase}.index")
+                    ->with('error', 'Koperasi baru wajib mencatat transaksi Setoran Simpanan Pokok atau Saldo Awal Kas terlebih dahulu sebelum diizinkan membuat Order Pembelian.');
+            }
+
             $source = $request->input('source');
             $pihakExistsRule = Rule::exists('master_pihak', 'id_pihak')
                 ->where('id_entitas', $idEntitas)
@@ -141,6 +240,25 @@ class PembelianController extends ModuleCrudController
                     : ['petani', 'warga']);
             if ($source === 'pengambilan_konsinyasi') {
                 $pihakExistsRule->whereNotNull('id_entitas_mitra');
+            }
+
+            if (! $request->filled('id_unit_usaha')) {
+                $firstBarangId = data_get($request->input('items'), '0.id_barang');
+                $unitUsahaId = $firstBarangId
+                    ? Barang::where('id_barang', $firstBarangId)->value('id_unit_usaha')
+                    : \App\Models\Master\UnitUsaha::where('kode_unit_usaha', 'SEMBAKO')->value('id_unit_usaha');
+
+                if (! $unitUsahaId) {
+                    $unitUsahaId = \App\Models\Master\UnitUsaha::value('id_unit_usaha') ?? 1;
+                }
+                $request->merge(['id_unit_usaha' => $unitUsahaId]);
+            }
+
+            if (! $request->filled('id_gudang')) {
+                $gudangId = Gudang::where('id_entitas', $idEntitas)->where('is_active', true)->value('id_gudang');
+                if ($gudangId) {
+                    $request->merge(['id_gudang' => $gudangId]);
+                }
             }
 
             $validated = $request->validate([
@@ -283,10 +401,24 @@ class PembelianController extends ModuleCrudController
                     ->values()
                     ->all();
                 session(['pembelian_dummy_requests_processed' => $processed]);
+
+                if (str_starts_with((string) $permintaanPembelian->id_permintaan_pembelian, 'PR-')) {
+                    $idPr = (int) str_replace('PR-', '', $permintaanPembelian->id_permintaan_pembelian);
+                    \App\Models\Perencanaan\PermintaanPengadaan::where('id_permintaan', $idPr)
+                        ->update(['status' => 'jadi_pembelian']);
+                    $pembelian->update(['id_permintaan' => $idPr]);
+                }
             }
 
-            return redirect()->route("{$this->routeBase}.index")
-                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil ditambahkan.");
+            // Otomatis setujui dan posting ke Jurnal Akuntansi & Kas/Hutang
+            try {
+                $pembelian = PembelianService::approvePembelian($pembelian);
+            } catch (\Throwable $approveEx) {
+                \Illuminate\Support\Facades\Log::warning("Pembelian {$pembelian->kode_pembelian} disimpan sebagai draft: " . $approveEx->getMessage());
+            }
+
+            return redirect()->route("{$this->routeBase}.show", $pembelian)
+                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil dibuat dan otomatis diposting ke Jurnal Akuntansi.");
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -314,39 +446,47 @@ class PembelianController extends ModuleCrudController
         }
 
         $processed = collect(session('pembelian_dummy_requests_processed', []));
-        $templates = [
-            ['id' => "demo-{$idEntitas}-gula", 'code' => 'DEMO-GUDANG-001', 'source' => 'desa_lain', 'quantity' => 10],
-            ['id' => "demo-{$idEntitas}-beras", 'code' => 'DEMO-GUDANG-002', 'source' => 'warga_lokal', 'quantity' => 25],
-        ];
 
-        return collect($templates)
-            ->values()
-            ->map(function (array $template, int $index) use ($barangsKg, $gudangs, $pihaks) {
-                $barang = $barangsKg->get($index % $barangsKg->count());
-                $idSatuanKg = strtoupper($barang->satuanDasar?->kode_satuan ?? '') === 'KG'
-                    ? $barang->id_satuan_dasar
-                    : $barang->konversiSatuan
-                        ->first(fn ($conversion) => strtoupper($conversion->satuan?->kode_satuan ?? '') === 'KG')
-                        ?->id_satuan;
-                $recommendedTypes = $template['source'] === 'desa_lain'
-                    ? ['entitas_lain']
-                    : ['petani', 'warga'];
+        $realItems = collect();
+        if (Schema::hasTable('permintaan_pengadaan')) {
+            $realPrs = \App\Models\Perencanaan\PermintaanPengadaan::with([
+                'detail.barang.satuanDasar',
+                'detail.barang.konversiSatuan.satuan',
+                'gudang',
+            ])
+                ->where('id_entitas', $idEntitas)
+                ->where('status', 'disetujui')
+                ->orderByDesc('id_permintaan')
+                ->get();
 
-                return (object) [
-                    'id_permintaan_pembelian' => $template['id'],
-                    'kode_permintaan' => $template['code'],
-                    'sumber_pembelian' => $template['source'],
-                    'barang' => $barang,
-                    'id_barang' => $barang->id_barang,
-                    'id_satuan' => $idSatuanKg,
-                    'gudang' => $gudangs->first(),
-                    'qty_diminta' => $template['quantity'],
-                    'supplier_recommendations' => $pihaks
-                        ->whereIn('jenis_pihak', $recommendedTypes)
-                        ->take(3)
-                        ->values(),
-                ];
-            })
+            foreach ($realPrs as $pr) {
+                foreach ($pr->detail as $detail) {
+                    $barang = $detail->barang;
+                    if (! $barang) {
+                        continue;
+                    }
+                    $idSatuanKg = strtoupper($barang->satuanDasar?->kode_satuan ?? '') === 'KG'
+                        ? $barang->id_satuan_dasar
+                        : $barang->konversiSatuan
+                            ->first(fn ($conversion) => strtoupper($conversion->satuan?->kode_satuan ?? '') === 'KG')
+                            ?->id_satuan;
+
+                    $realItems->push((object) [
+                        'id_permintaan_pembelian' => "PR-{$pr->id_permintaan}",
+                        'kode_permintaan' => $pr->kode_permintaan,
+                        'sumber_pembelian' => 'warga_lokal',
+                        'barang' => $barang,
+                        'id_barang' => $barang->id_barang,
+                        'id_satuan' => $idSatuanKg ?? $barang->id_satuan_dasar,
+                        'gudang' => $pr->gudang ?? $gudangs->first(),
+                        'qty_diminta' => (float) $detail->jumlah_diminta,
+                        'supplier_recommendations' => $pihaks->take(5)->values(),
+                    ]);
+                }
+            }
+        }
+
+        return $realItems
             ->reject(fn (object $requestItem) => $processed->contains($requestItem->id_permintaan_pembelian))
             ->values();
     }
@@ -459,6 +599,11 @@ class PembelianController extends ModuleCrudController
             $kasBanks = KasBank::where('is_active', true)->orderBy('jenis')->orderBy('nama')->get();
         }
 
+        $gudangs = Gudang::when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))
+            ->where('is_active', true)
+            ->orderBy('nama_gudang')
+            ->get();
+
         return view('pembelian.edit', [
             'title' => "Edit Pembelian {$pembelian->kode_pembelian}",
             'routeBase' => $this->routeBase,
@@ -468,6 +613,7 @@ class PembelianController extends ModuleCrudController
             'barangKgIds' => $barangKgIds,
             'editItems' => $editItems,
             'kasBanks' => $kasBanks,
+            'gudangs' => $gudangs,
         ]);
     }
 

@@ -49,9 +49,26 @@ class Pengguna extends Authenticatable
         return $this->belongsToMany(Peran::class, 'pengguna_peran', 'id_pengguna', 'id_peran');
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->id_entitas === null && ($this->peran->isEmpty() || $this->peran->contains('kode', 'super_admin'));
+    }
+
     public function hasPeran(string $kode): bool
     {
+        if ($this->id_entitas === null && $this->peran->contains('kode', 'super_admin')) {
+            return true;
+        }
+
         return $this->peran->contains('kode', $kode);
     }
-}
 
+    public function hasAnyPeran(array $kodes): bool
+    {
+        if ($this->isSuperAdmin() || $this->hasPeran('manajer')) {
+            return true;
+        }
+
+        return $this->peran->pluck('kode')->intersect($kodes)->isNotEmpty();
+    }
+}

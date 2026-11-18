@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M6 Penjualan">
+<x-layouts.app :title="$title" eyebrow="Penjualan">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>
     @endif
@@ -47,6 +47,10 @@
                 <span class="rounded border border-paper-300 bg-paper-100 px-1.5 py-0.5 font-mono">Esc</span> Reset
             </div>
 
+            <a href="{{ route('keuangan.pelunasan.create', ['jenis' => 'terima_piutang']) }}" class="inline-flex items-center gap-1.5 rounded-sm border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 shadow-2xs transition hover:border-emerald-500 hover:bg-emerald-100 hover:text-emerald-950">
+                <span>💸</span> Terima Bayar Kasbon / Piutang
+            </a>
+
             <a href="{{ route("$routeBase.index") }}" class="inline-flex items-center gap-1.5 rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 shadow-2xs transition hover:border-rose-400 hover:bg-rose-50 hover:text-rose-700">
                 <span>📋</span> Riwayat Transaksi
             </a>
@@ -69,9 +73,11 @@
                         <label class="min-w-0 flex-1 text-sm">
                             <span class="sr-only">Unit usaha</span>
                             <select id="unit-select" name="id_unit_usaha" form="checkout-form" required class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 shadow-2xs focus:border-rose-500 focus:outline-none">
-                                <option value="">Semua Unit Usaha</option>
+                                @if ($units->count() > 1)
+                                    <option value="">Semua Unit Usaha</option>
+                                @endif
                                 @foreach ($units as $unit)
-                                    <option value="{{ $unit->id_unit_usaha }}">{{ $unit->nama_unit_usaha }}</option>
+                                    <option value="{{ $unit->id_unit_usaha }}" @selected($units->count() === 1 || old('id_unit_usaha') == $unit->id_unit_usaha)>{{ $unit->nama_unit_usaha }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -195,8 +201,11 @@
                 {{-- Data Pelanggan & Metode Pembayaran --}}
                 <div class="space-y-3 rounded-sm border border-paper-200 bg-paper-50/60 p-3">
                     <label class="block text-sm">
-                        <span id="customer-label" class="mb-1 block text-xs font-semibold uppercase text-ink-700">Nama Pembeli *</span>
-                        <input type="text" name="nama_pembeli" value="{{ old('nama_pembeli') }}" required maxlength="150" autocomplete="off" placeholder="Ketik nama pembeli" class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 shadow-2xs focus:border-rose-500 focus:outline-none">
+                        <div class="mb-1 flex items-center justify-between">
+                            <span id="customer-label" class="block text-xs font-semibold uppercase text-ink-700">Nama Pembeli *</span>
+                            <button type="button" onclick="document.querySelector('input[name=nama_pembeli]').value = 'Pembeli Umum'; calculateChange();" class="text-[11px] font-semibold text-rose-600 hover:underline">+ Pembeli Umum</button>
+                        </div>
+                        <input type="text" name="nama_pembeli" value="{{ old('nama_pembeli', 'Pembeli Umum') }}" required maxlength="150" autocomplete="off" placeholder="Ketik nama pembeli" class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 shadow-2xs focus:border-rose-500 focus:outline-none">
                     </label>
 
                     <div>
@@ -668,10 +677,13 @@
                     transferDetailsSection.classList.remove('hidden');
                     creditDetailsSection.classList.add('hidden');
                     creditDueDate.required = false;
+                    creditDueDate.disabled = true;
                     customerLabel.textContent = 'Nama Pembeli *';
                     transferDestination.required = true;
-                    transferInputs.forEach((input) => { input.required = true; });
+                    transferDestination.disabled = false;
+                    transferInputs.forEach((input) => { input.required = true; input.disabled = false; });
                     transferConfirmation.required = true;
+                    transferConfirmation.disabled = false;
                     hiddenNominalInput.value = currentTotal;
                     const transferReady = transferDestination.value
                         && [...transferInputs].every((input) => input.value.trim() !== '')
@@ -685,10 +697,13 @@
                     cashCalcSection.style.display = 'none';
                     transferDetailsSection.classList.add('hidden');
                     transferDestination.required = false;
-                    transferInputs.forEach((input) => { input.required = false; });
+                    transferDestination.disabled = true;
+                    transferInputs.forEach((input) => { input.required = false; input.disabled = true; });
                     transferConfirmation.required = false;
+                    transferConfirmation.disabled = true;
                     creditDetailsSection.classList.remove('hidden');
                     creditDueDate.required = true;
+                    creditDueDate.disabled = false;
                     customerLabel.textContent = 'Nama Pembeli / Debitur *';
                     hiddenNominalInput.value = '0';
                     checkoutButton.disabled = cart.size === 0 || !unitSelect.value || !customerInput.value.trim() || !creditDueDate.value;
@@ -700,9 +715,12 @@
                 transferDetailsSection.classList.add('hidden');
                 creditDetailsSection.classList.add('hidden');
                 creditDueDate.required = false;
+                creditDueDate.disabled = true;
                 transferDestination.required = false;
-                transferInputs.forEach((input) => { input.required = false; });
+                transferDestination.disabled = true;
+                transferInputs.forEach((input) => { input.required = false; input.disabled = true; });
                 transferConfirmation.required = false;
+                transferConfirmation.disabled = true;
                 customerLabel.textContent = 'Nama Pembeli *';
                 currentCash = parseCleanNumber(cashInput.value);
                 hiddenNominalInput.value = currentCash;

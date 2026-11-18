@@ -10,9 +10,44 @@
             @csrf
 
             <!-- Header Section -->
+            @php
+                $selectedPembelian = old('id_pembelian', request('id_pembelian'));
+                $selectedSumber = old('sumber_penerimaan', $selectedPembelian ? 'pembelian' : 'non_pembelian');
+            @endphp
             <div>
                 <h3 class="mb-3 text-sm font-semibold text-ink-700">Informasi Penerimaan</h3>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-700">Sumber Penerimaan</label>
+                        <select id="sumberPenerimaanSelect" name="sumber_penerimaan" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
+                            <option value="pembelian" {{ $selectedSumber === 'pembelian' ? 'selected' : '' }}>
+                                Dari Pembelian (PO Disetujui - Tautkan Jurnal Pembelian)
+                            </option>
+                            <option value="saldo_awal" {{ $selectedSumber === 'saldo_awal' ? 'selected' : '' }}>
+                                Stok Awal / Migrasi (Tautkan Jurnal Saldo Awal JOP)
+                            </option>
+                            <option value="non_pembelian" {{ $selectedSumber === 'non_pembelian' ? 'selected' : '' }}>
+                                Non-Pembelian (Hibah / Terima Lainnya - Buat Jurnal PNB)
+                            </option>
+                        </select>
+                        <p id="sumberInfoText" class="mt-1 text-xs text-ink-500"></p>
+                    </div>
+
+                    <div id="pembelianWrapper" {{ $selectedSumber === 'pembelian' ? '' : 'hidden' }}>
+                        <label class="mb-1 block text-sm font-medium text-ink-700">Referensi Pembelian (PO Disetujui)</label>
+                        <select id="idPembelianSelect" name="id_pembelian" class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
+                            <option value="">Pilih pembelian yang sudah disetujui</option>
+                            @foreach ($pembelianData as $pb)
+                                <option value="{{ $pb['id'] }}" {{ (string) $selectedPembelian === (string) $pb['id'] ? 'selected' : '' }}>
+                                    {{ $pb['kode'] }} - {{ $pb['pihakNama'] }} ({{ $pb['tanggal'] }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($pembelianData->isEmpty())
+                            <p class="mt-1 text-xs text-ink-500">Belum ada PO berstatus disetujui yang menunggu diterima gudang.</p>
+                        @endif
+                    </div>
+
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-700">Kode Penerimaan</label>
                         <input type="text" name="kode_penerimaan" value="{{ old('kode_penerimaan', 'PNR-' . now()->format('ymdHis')) }}" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
@@ -101,6 +136,7 @@
     <script>
         const barangData = {{ Illuminate\Support\Js::from($barangData) }};
         const satuanData = {{ Illuminate\Support\Js::from($satuanData) }};
+        const pembelianData = {{ Illuminate\Support\Js::from($pembelianData) }};
         const oldItems = {{ Illuminate\Support\Js::from(old('items', [])) }};
         const batchTrackingAvailable = {{ Illuminate\Support\Js::from($batchTrackingAvailable) }};
         let rowCount = 0;
@@ -578,7 +614,65 @@
             document.getElementById('totalNilaiBruto').textContent = formatRupiah(totalBruto);
         }
 
+        const sumberPenerimaanSelect = document.getElementById('sumberPenerimaanSelect');
+        const pembelianWrapper = document.getElementById('pembelianWrapper');
+        const idPembelianSelect = document.getElementById('idPembelianSelect');
+        const sumberInfoText = document.getElementById('sumberInfoText');
+        const gudangSelectEl = document.querySelector('select[name="id_gudang"]');
+        const pihakSelectEl = document.querySelector('select[name="id_pihak"]');
+
+        const keteranganSumber = {
+            pembelian: 'Stok fisik bertambah & menautkan jurnal Pembelian yang sudah disetujui (tidak membuat jurnal ganda).',
+            saldo_awal: 'Stok fisik bertambah & menautkan Jurnal Saldo Awal (JOP) di Akuntansi (tidak membuat jurnal ganda).',
+            non_pembelian: 'Stok fisik bertambah & menjadwalkan jurnal Penerimaan Non-Pembelian (PNB: Dr Persediaan / Cr 711).',
+        };
+
+        function perbaruiModeSumber() {
+            const mode = sumberPenerimaanSelect.value;
+            const isPembelian = mode === 'pembelian';
+            pembelianWrapper.hidden = !isPembelian;
+            idPembelianSelect.required = isPembelian;
+            if (!isPembelian) {
+                idPembelianSelect.value = '';
+            }
+            sumberInfoText.textContent = keteranganSumber[mode] ?? '';
+        }
+
+        function terapkanPembelian(idPembelian) {
+            const pb = pembelianData.find(entry => String(entry.id) === String(idPembelian));
+            if (!pb) return;
+
+            if (pb.idGudang && gudangSelectEl) {
+                gudangSelectEl.value = String(pb.idGudang);
+            }
+            if (pb.idPihak && pihakSelectEl) {
+                pihakSelectEl.value = String(pb.idPihak);
+            }
+
+            const itemRowsEl = document.getElementById('itemRows');
+            itemRowsEl.replaceChildren();
+            rowCount = 0;
+
+            if (Array.isArray(pb.items) && pb.items.length) {
+                pb.items.forEach(pbItem => buatBaris(pbItem));
+            } else {
+                buatBaris();
+            }
+            hitungTotal();
+        }
+
+        sumberPenerimaanSelect.addEventListener('change', perbaruiModeSumber);
+        idPembelianSelect.addEventListener('change', () => terapkanPembelian(idPembelianSelect.value));
+
         document.getElementById('tambahBarang').addEventListener('click', () => buatBaris());
-        (Array.isArray(oldItems) && oldItems.length ? oldItems : [{}]).forEach(item => buatBaris(item));
+        perbaruiModeSumber();
+
+        if (Array.isArray(oldItems) && oldItems.length) {
+            oldItems.forEach(item => buatBaris(item));
+        } else if (sumberPenerimaanSelect.value === 'pembelian' && idPembelianSelect.value) {
+            terapkanPembelian(idPembelianSelect.value);
+        } else {
+            buatBaris();
+        }
     </script>
 </x-layouts.app>

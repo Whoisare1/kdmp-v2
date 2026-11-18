@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Gudang;
 
 use App\Http\Controllers\Concerns\ModuleCrudController;
+use App\Models\Gudang\AntreanJurnalGudang;
 use App\Models\Gudang\OpnameDetail;
 use App\Models\Gudang\OpnameHeader;
 use App\Models\Master\Barang;
@@ -89,6 +90,7 @@ class OpnameController extends ModuleCrudController
 
             $stokService = app(StokService::class);
             $stokBatchService = app(StokBatchService::class);
+            $antreanGroup = [];
 
             foreach ($data['items'] as $item) {
                 $barangId = (int) $item['id_barang'];
@@ -121,6 +123,56 @@ class OpnameController extends ModuleCrudController
                     qtyFisik: $qtyFisik,
                     idKartu: $hasilOpname['id_kartu'],
                 );
+
+                // Kelompokkan untuk antrean jurnal jika ada selisih
+                $selisihNum = (float) $hasilOpname['selisih'];
+                if (abs($selisihNum) > 0.00001) {
+                    $barang = Barang::query()->find($barangId);
+                    $unitId = $barang?->id_unit_usaha;
+                    if ($unitId) {
+                        $jenis = $selisihNum < 0 ? 'OPNAME_KURANG' : 'OPNAME_LEBIH';
+                        $key = "{$unitId}_{$jenis}";
+                        if (! isset($antreanGroup[$key])) {
+                            $antreanGroup[$key] = [
+                                'unit_id' => $unitId,
+                                'jenis' => $jenis,
+                                'nilai' => 0.0,
+                                'items' => [],
+                            ];
+                        }
+                        $nilaiAbs = abs((float) $hasilOpname['nilai_selisih']);
+                        $antreanGroup[$key]['nilai'] += $nilaiAbs;
+                        $antreanGroup[$key]['items'][] = [
+                            'id_barang' => $barangId,
+                            'qty' => abs($selisihNum),
+                            'hpp_satuan' => (float) $hasilOpname['hpp_rata2'],
+                            'nilai' => $nilaiAbs,
+                            'id_kartu' => $hasilOpname['id_kartu'],
+                        ];
+                    }
+                }
+            }
+
+            // Insert baris antrean per unit & jenis (kurang / lebih)
+            foreach ($antreanGroup as $g) {
+                if ($g['nilai'] > 0) {
+                    AntreanJurnalGudang::create([
+                        'id_entitas' => (int) ($header->id_entitas ?? app('entitas_aktif')),
+                        'jenis_transaksi' => $g['jenis'],
+                        'ref_tipe' => 'OPNAME',
+                        'ref_id' => (int) $header->id_opname,
+                        'no_dokumen' => $header->kode_opname,
+                        'id_unit_usaha' => $g['unit_id'],
+                        'tanggal' => $data['tanggal'],
+                        'nilai' => $g['nilai'],
+                        'payload' => [
+                            'id_gudang' => (int) $data['id_gudang'],
+                            'items' => $g['items'],
+                        ],
+                        'status' => 'MENUNGGU',
+                        'created_by' => auth()->id(),
+                    ]);
+                }
             }
 
             return redirect()->route('gudang.opname.index')->with('success', 'Data opname berhasil disimpan.');
