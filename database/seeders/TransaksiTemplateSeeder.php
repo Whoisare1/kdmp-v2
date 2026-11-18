@@ -68,6 +68,7 @@ class TransaksiTemplateSeeder extends Seeder
             ['KRG',  'Kerugian Persediaan',             'gudang'],
             ['OPK',  'Opname - Selisih Kurang',         'gudang'],
             ['OPL',  'Opname - Selisih Lebih',          'gudang'],
+            ['PNB',  'Penerimaan Barang Non-Pembelian', 'gudang'],
             ['PNY',  'Penyusutan Aset Tetap',           'penyesuaian'],
             // --- akuntansi ---
             // JOP tidak punya template baris (baris bebas, bukan otomatis).
@@ -185,6 +186,8 @@ class TransaksiTemplateSeeder extends Seeder
             ['OPK', 2, null,  'PERSEDIAAN_UNIT', 'K', 'nilai_selisih'],
             ['OPL', 1, null,  'PERSEDIAAN_UNIT', 'D', 'nilai_selisih'],
             ['OPL', 2, '712', null,              'K', 'nilai_selisih'],
+            ['PNB', 1, null,  'PERSEDIAAN_UNIT', 'D', 'nilai_penerimaan'],
+            ['PNB', 2, '711', null,              'K', 'nilai_penerimaan'],
         ];
 
         foreach ($detail as $d) {

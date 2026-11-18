@@ -34,15 +34,44 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 sm:gap-4">
                     @auth
-                        @if(auth()->user()->id_entitas === null)
-                            <form action="{{ route('admin.set_entitas') }}" method="POST" class="hidden md:flex items-center gap-2 mr-2">
+                        @php
+                            $navUser = auth()->user();
+                            $navKatalogPeran = \App\Services\DemoPeranService::katalogPeran();
+                            $navPeranAktif = \App\Services\DemoPeranService::kodePeranAktif($navUser);
+                            $navEntitasId = $navUser->id_entitas ?? session('entitas_aktif_pilihan');
+                        @endphp
+
+                        {{-- Quick Switcher Peran Demo (Login Otomatis & Sinkronisasi Sidebar) --}}
+                        <form action="{{ route('demo.switch-peran') }}" method="POST" class="hidden lg:flex items-center gap-1.5 bg-paper-50 border border-paper-200 rounded-lg px-2.5 py-1 shadow-sm">
+                            @csrf
+                            <input type="hidden" name="mode" value="login">
+                            @if($navEntitasId)
+                                <input type="hidden" name="id_entitas" value="{{ $navEntitasId }}">
+                            @endif
+                            <span class="text-[10px] font-mono uppercase tracking-wider text-paper-500">Demo Peran:</span>
+                            <select
+                                name="peran"
+                                onchange="this.form.submit()"
+                                class="text-xs font-semibold text-ink-900 bg-transparent border-0 py-0.5 pl-1 pr-6 focus:ring-0 cursor-pointer"
+                                title="Pindah peran demo sekaligus login otomatis"
+                            >
+                                @foreach($navKatalogPeran as $kode => $info)
+                                    <option value="{{ $kode }}" @selected($navPeranAktif === $kode)>
+                                        {{ $info['ikon'] }} {{ $info['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </form>
+
+                        @if($navUser->id_entitas === null)
+                            <form action="{{ route('admin.set_entitas') }}" method="POST" class="hidden md:flex items-center gap-2">
                                 @csrf
-                                <select name="id_entitas" onchange="this.form.submit()" class="text-xs border-paper-300 rounded-lg py-1.5 pl-3 pr-8 focus:ring-padi-500 focus:border-padi-500 shadow-sm">
-                                    <option value="">Semua Entitas (Global)</option>
+                                <select name="id_entitas" onchange="this.form.submit()" class="text-xs border-paper-300 bg-white text-ink-950 font-medium rounded-lg py-1.5 pl-3 pr-8 focus:ring-padi-500 focus:border-padi-500 shadow-sm" style="color: #0f172a !important; background-color: #ffffff !important;">
+                                    <option value="" style="color: #0f172a !important; background-color: #ffffff !important;">Semua Entitas (Global)</option>
                                     @foreach(\App\Models\Tenant\Entitas::where('status', 'APPROVED')->get() as $ent)
-                                        <option value="{{ $ent->id_entitas }}" {{ session('entitas_aktif_pilihan') == $ent->id_entitas ? 'selected' : '' }}>
+                                        <option value="{{ $ent->id_entitas }}" {{ session('entitas_aktif_pilihan') == $ent->id_entitas ? 'selected' : '' }} style="color: #0f172a !important; background-color: #ffffff !important;">
                                             {{ $ent->nama_entitas }}
                                         </option>
                                     @endforeach
@@ -50,12 +79,12 @@
                             </form>
                         @endif
                         <div class="text-right leading-tight hidden sm:block">
-                            <p class="text-sm font-semibold text-ink-900">{{ auth()->user()->nama }}</p>
+                            <p class="text-sm font-semibold text-ink-900">{{ $navUser->nama }}</p>
                             <p class="text-[11px] text-paper-500 uppercase font-medium mt-0.5">
-                                @if(auth()->user()->id_entitas === null)
+                                @if($navUser->id_entitas === null)
                                     Super Admin {{ session('entitas_aktif_pilihan') ? '(Mode Entitas)' : '(Global)' }}
                                 @else
-                                    {{ auth()->user()->entitas?->nama_entitas }}
+                                    {{ $navUser->entitas?->nama_entitas }}
                                 @endif
                             </p>
                         </div>
@@ -65,6 +94,10 @@
                                 Keluar
                             </button>
                         </form>
+                    @else
+                        <a href="{{ route('login') }}" class="rounded-lg bg-padi-500 hover:bg-padi-600 px-3.5 py-1.5 text-xs font-semibold text-ink-950 transition-colors shadow-sm">
+                            Masuk Sistem Desa
+                        </a>
                     @endauth
                 </div>
             </header>
@@ -87,6 +120,11 @@
                             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                         </svg>
                         <span>{{ session('warning') }}</span>
+                    </div>
+                @endif
+                @if (session('success'))
+                    <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+                        {{ session('success') }}
                     </div>
                 @endif
                 @if (session('error'))

@@ -90,7 +90,34 @@
                             <td class="px-4 py-3">{{ $item->gudang?->nama_gudang ?? '—' }}<span class="block text-xs text-ink-600/60">{{ $item->unitUsaha?->nama_unit_usaha ?? '—' }}</span></td>
                             <td class="px-4 py-3">Rp {{ number_format((float) $item->total_nilai, 2, ',', '.') }}</td>
                             <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs {{ $item->status_badge_class }}">{{ $item->status_label }}</span></td>
-                            <td class="px-4 py-3 text-right"><a href="{{ route('perencanaan.permintaan-pengadaan.show', $item->id_permintaan) }}" class="text-xs font-medium text-ink-700 hover:text-merah-600">Lihat detail</a></td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ route('perencanaan.permintaan-pengadaan.show', $item->id_permintaan) }}" class="rounded-xs border border-paper-300 px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-merah-400 hover:text-merah-600 transition">
+                                        Lihat detail
+                                    </a>
+                                    @if (in_array($item->status, ['draft', 'diajukan']))
+                                        <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.setujui', $item->id_permintaan) }}" class="inline">
+                                            @csrf
+                                            <button type="submit" class="rounded-xs bg-sawah-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-sawah-700 shadow-sm transition" title="Setujui PR ini">
+                                                ✓ Setujui
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.tolak', $item->id_permintaan) }}" onsubmit="return confirm('Apakah Anda yakin ingin menolak PR {{ $item->kode_permintaan }}?');" class="inline">
+                                            @csrf
+                                            <button type="submit" class="rounded-xs border border-merah-300 bg-white px-2 py-1 text-xs font-medium text-merah-700 hover:bg-merah-50 shadow-sm transition" title="Tolak PR ini">
+                                                ✕ Tolak
+                                            </button>
+                                        </form>
+                                    @elseif ($item->status === 'ditolak')
+                                        <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.draft', $item->id_permintaan) }}" class="inline">
+                                            @csrf
+                                            <button type="submit" class="rounded-xs border border-paper-300 bg-white px-2 py-1 text-xs font-medium text-ink-700 hover:bg-paper-100 shadow-sm transition" title="Kembalikan ke status draft">
+                                                ↺ Draft
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-ink-600/60">Belum ada perencanaan pengadaan.</td></tr>

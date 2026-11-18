@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M6 Penjualan">
+<x-layouts.app :title="$title" eyebrow="Penjualan">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ session('success') }}</div>
     @endif
@@ -121,7 +121,12 @@
                             <td class="whitespace-nowrap px-4 py-3">{{ $item->metode_bayar === 'kredit' ? ($item->tgl_jatuh_tempo?->format('d M Y') ?? '—') : '—' }}</td>
                             <td class="whitespace-nowrap px-4 py-3 text-right font-medium">Rp {{ number_format((float) $item->total_bayar, 2, ',', '.') }}</td>
                             <td class="px-4 py-3">
-                                <span class="inline-flex rounded-sm px-2 py-1 text-xs font-medium {{ $item->metode_bayar === 'kredit' ? 'bg-amber-50 text-amber-800' : ($item->status === 'selesai' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800') }}">{{ $item->metode_bayar === 'kredit' ? 'Piutang' : ucfirst(str_replace('_', ' ', $item->status)) }}</span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="inline-flex rounded-sm px-2 py-0.5 text-xs font-medium {{ $item->metode_bayar === 'kredit' ? 'bg-amber-50 text-amber-800' : ($item->status === 'selesai' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800') }}">{{ $item->metode_bayar === 'kredit' ? 'Piutang' : ucfirst(str_replace('_', ' ', $item->status)) }}</span>
+                                    @if ($item->id_jurnal)
+                                        <a href="{{ route('akuntansi.jurnal.show', $item->id_jurnal) }}" class="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 hover:bg-emerald-200" title="Buka Jurnal Akuntansi">✓ Jurnal</a>
+                                    @endif
+                                </div>
                             </td>
                             <td class="px-4 py-3 text-right"><a href="{{ route("$routeBase.show", $item) }}" class="font-semibold text-rose-700 hover:text-rose-900">Detail</a></td>
                         </tr>

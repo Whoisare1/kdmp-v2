@@ -135,7 +135,9 @@ class TutupBulanService
     private function prosesPenyusutanAsetTetap(int $idEntitas, int $tahun, int $bulan): void
     {
         $asetList = \App\Models\Master\AsetTetap::where('id_entitas', $idEntitas)
-            ->where('status', 'AKTIF')
+            ->whereIn('status', ['aktif', 'AKTIF'])
+            ->where('umur_bulan', '>', 0)
+            ->where('kategori', '!=', 'tanah')
             ->whereRaw('(nilai_perolehan - akum_penyusutan) > nilai_residu')
             ->get();
 
@@ -147,6 +149,34 @@ class TutupBulanService
         $totalPenyusutan = 0;
 
         foreach ($asetList as $aset) {
+            if (strtolower((string) $aset->kategori) === 'tanah' || (int) $aset->umur_bulan <= 0) {
+                continue;
+            }
+
+            if (! $aset->kode_akun_akum || ! $aset->kode_akun_biaya) {
+                continue;
+            }
+
+            if ($aset->tgl_perolehan && \Carbon\Carbon::parse($aset->tgl_perolehan)->gt($tanggalAkhirBulan)) {
+                continue;
+            }
+
+            $sourceType = sprintf('ASET_TETAP_%04d_%02d', $tahun, $bulan);
+
+            // Hindari duplikasi jurnal penyusutan untuk aset dan periode yang sama
+            $sudahSusut = DB::table('jurnal_header')
+                ->where('id_entitas', $idEntitas)
+                ->where('periode_tahun', $tahun)
+                ->where('periode_bulan', $bulan)
+                ->where('kode_transaksi', 'PNY')
+                ->where('source_id', $aset->id_aset)
+                ->whereIn('source_type', [$sourceType, 'ASET_TETAP'])
+                ->where('status', 'POSTED')
+                ->exists();
+            if ($sudahSusut) {
+                continue;
+            }
+
             $nilaiSisa = $aset->nilai_perolehan - $aset->akum_penyusutan;
             if ($nilaiSisa <= $aset->nilai_residu) {
                 continue;
@@ -166,8 +196,10 @@ class TutupBulanService
 
             $header = [
                 'tanggal_jurnal' => $tanggalAkhirBulan,
-                'kode_transaksi' => 'DEP', // Kode untuk depresiasi
+                'kode_transaksi' => 'PNY',
                 'jenis_jurnal'   => 'PENYESUAIAN',
+                'source_type'    => $sourceType,
+                'source_id'      => $aset->id_aset,
                 'keterangan'     => "Penyusutan Aset Tetap: {$aset->nama_aset} Periode {$bulan}-{$tahun}",
             ];
 
@@ -190,6 +222,9 @@ class TutupBulanService
 
             // Update nilai akumulasi penyusutan di master aset
             $aset->akum_penyusutan += $bebanPenyusutanBulanIni;
+            if (($aset->nilai_perolehan - $aset->akum_penyusutan) <= $aset->nilai_residu) {
+                $aset->status = 'habis_susut';
+            }
             $aset->save();
 
             $totalPenyusutan++;

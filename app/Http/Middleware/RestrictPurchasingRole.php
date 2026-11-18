@@ -35,11 +35,17 @@ class RestrictPurchasingRole
             'register',
             'register.store',
             'landing',
+            'demo.*',
+            'publik.*',
         )) {
             return $next($request);
         }
 
         if ($request->routeIs('dashboard')) {
+            if ($request->session()->has('demo_peran_aktif') || $request->has('peran')) {
+                return $next($request);
+            }
+
             return redirect()->route($this->homeRoute($isPurchasingUser, $isSalesUser));
         }
 

@@ -39,4 +39,10 @@ class KerusakanBarang extends Model
     {
         return $this->belongsTo(StokBatch::class, 'id_batch', 'id_batch');
     }
+
+    public function antreanJurnal()
+    {
+        return $this->hasMany(AntreanJurnalGudang::class, 'ref_id', 'id_kerusakan')
+            ->where('ref_tipe', 'KERUSAKAN');
+    }
 }

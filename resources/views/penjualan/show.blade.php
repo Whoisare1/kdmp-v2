@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M6 Penjualan">
+<x-layouts.app :title="$title" eyebrow="Penjualan">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>
     @endif
@@ -10,6 +10,11 @@
         <div>
             <div class="flex items-center gap-2">
                 <span class="rounded px-2 py-0.5 text-xs font-bold uppercase {{ $item->metode_bayar === 'kredit' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">{{ $item->metode_bayar === 'kredit' ? 'Piutang' : 'Selesai' }}</span>
+                @if ($item->id_jurnal)
+                    <a href="{{ route('akuntansi.jurnal.show', $item->id_jurnal) }}" class="rounded-sm bg-sawah-100 border border-sawah-300 px-2.5 py-0.5 text-xs font-semibold text-sawah-800 hover:bg-sawah-200">
+                        ✓ Jurnal: Terposting
+                    </a>
+                @endif
                 <p class="text-xs text-ink-600">Transaksi Penjualan Kasir</p>
             </div>
             <h1 class="mt-1 text-2xl font-bold text-ink-900">{{ $item->kode_penjualan }}</h1>
@@ -151,6 +156,14 @@
                         </tbody>
                         <tfoot class="border-t border-paper-300 bg-paper-100 font-bold">
                             <tr>
+                                <th colspan="4" class="px-4 py-2 text-right">Subtotal</th>
+                                <th class="px-4 py-2 text-right font-mono">Rp {{ number_format((float) $item->total_bruto, 0, ',', '.') }}</th>
+                            </tr>
+                            <tr>
+                                <th colspan="4" class="px-4 py-2 text-right">Diskon</th>
+                                <th class="px-4 py-2 text-right font-mono">Rp {{ number_format((float) $item->diskon, 0, ',', '.') }}</th>
+                            </tr>
+                            <tr>
                                 <th colspan="4" class="px-4 py-3 text-right">Total Tagihan</th>
                                 <th class="px-4 py-3 text-right font-mono text-base text-rose-700">Rp {{ number_format((float) $item->total_bayar, 0, ',', '.') }}</th>
                             </tr>
@@ -264,6 +277,14 @@
 
                 {{-- Ringkasan Pembayaran & Kembalian --}}
                 <div class="space-y-1 text-[11px]">
+                    <div class="flex justify-between">
+                        <span>SUBTOTAL :</span>
+                        <span>Rp {{ number_format((float) $item->total_bruto, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>DISKON :</span>
+                        <span>Rp {{ number_format((float) $item->diskon, 0, ',', '.') }}</span>
+                    </div>
                     <div class="flex justify-between font-bold text-xs">
                         <span>TOTAL TAGIHAN :</span>
                         <span>Rp {{ number_format((float) $item->total_bayar, 0, ',', '.') }}</span>

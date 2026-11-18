@@ -10,7 +10,9 @@ use App\Http\Controllers\Akuntansi\SaldoAwalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoPeranController;
 use App\Http\Controllers\Gudang\GudangDashboardController;
+use App\Http\Controllers\Publik\EtalasePublikController;
 use App\Http\Controllers\Gudang\PencocokanSurplusDefisitController;
 use App\Http\Controllers\Gudang\BatchController;
 use App\Http\Controllers\Gudang\KartuStokController;
@@ -55,6 +57,12 @@ use App\Http\Controllers\Perencanaan\StandarKebutuhanController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', \App\Http\Controllers\LandingController::class)->name('landing');
+
+// ===== Zona Publik Lintas Entitas (Bisa Diakses Tanpa Login maupun Seluruh Entitas) =====
+Route::get('/publik/komoditas', [EtalasePublikController::class, 'komoditas'])->name('publik.komoditas');
+
+// ===== Simulator & Switcher Peran Demo (Login Otomatis & Sinkronisasi Alur) =====
+Route::post('/demo/switch-peran', [DemoPeranController::class, 'switchPeran'])->name('demo.switch-peran');
 
 Route::middleware('auth')->get('/home', function () {
     return redirect()->route('dashboard');
@@ -121,6 +129,12 @@ Route::middleware('auth')->group(function () {
         Route::resource('perbandingan-harga', PerbandinganHargaController::class);
         Route::get('permintaan-pengadaan/from-hasil/{hasil}', [PermintaanPengadaanController::class, 'fromHasil'])
             ->name('permintaan-pengadaan.from-hasil');
+        Route::post('permintaan-pengadaan/{id}/setujui', [PermintaanPengadaanController::class, 'setujui'])
+            ->name('permintaan-pengadaan.setujui');
+        Route::post('permintaan-pengadaan/{id}/tolak', [PermintaanPengadaanController::class, 'tolak'])
+            ->name('permintaan-pengadaan.tolak');
+        Route::post('permintaan-pengadaan/{id}/draft', [PermintaanPengadaanController::class, 'kembalikanKeDraft'])
+            ->name('permintaan-pengadaan.draft');
         Route::resource('permintaan-pengadaan', PermintaanPengadaanController::class);
     });
 
@@ -133,6 +147,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('penerimaan', PenerimaanBarangController::class);
         Route::resource('opname', OpnameController::class);
         Route::resource('kerusakan', KerusakanBarangController::class);
+        Route::get('kartu-stok/export-csv', [KartuStokController::class, 'exportCsv'])->name('kartu-stok.export');
         Route::resource('kartu-stok', KartuStokController::class)->only(['index', 'show']);
         Route::resource('stok', StokController::class)->only(['index', 'show']);
     });
@@ -198,6 +213,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('akuntansi')->name('akuntansi.')->middleware(['peran:akuntan', 'idempotent'])->group(function () {
+        Route::post('jurnal/proses-gudang', [JurnalController::class, 'prosesGudang'])->name('jurnal.proses-gudang');
         Route::resource('jurnal', JurnalController::class)->only(['index', 'show']);
         Route::post('jurnal/{id}/balik', [JurnalController::class, 'balik'])->name('jurnal.balik');
         Route::get('saldo-awal', [SaldoAwalController::class, 'index'])->name('saldo-awal.index');
@@ -215,9 +231,12 @@ Route::middleware('auth')->group(function () {
 
         Route::prefix('laporan')->name('laporan.')->group(function () {
             Route::get('neraca-saldo', [LaporanController::class, 'neracaSaldo'])->name('neraca-saldo');
+            Route::get('neraca-saldo/export-csv', [LaporanController::class, 'exportNeracaSaldoCsv'])->name('neraca-saldo.export');
             Route::get('buku-besar', [LaporanController::class, 'bukuBesar'])->name('buku-besar');
             Route::get('neraca', [LaporanController::class, 'neraca'])->name('neraca');
+            Route::get('neraca/export-csv', [LaporanController::class, 'exportNeracaCsv'])->name('neraca.export');
             Route::get('laba-rugi', [LaporanController::class, 'labaRugi'])->name('laba-rugi');
+            Route::get('laba-rugi/export-csv', [LaporanController::class, 'exportLabaRugiCsv'])->name('laba-rugi.export');
             Route::get('arus-kas', [LaporanController::class, 'arusKas'])->name('arus-kas');
         });
     });

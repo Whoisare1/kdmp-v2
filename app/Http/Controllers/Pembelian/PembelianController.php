@@ -8,6 +8,7 @@ use App\Models\Pembelian\Pembelian;
 use App\Models\Master\Barang;
 use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
+use App\Rules\TenantOwnershipRule;
 use App\Services\PembelianService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -241,6 +242,25 @@ class PembelianController extends ModuleCrudController
                 $pihakExistsRule->whereNotNull('id_entitas_mitra');
             }
 
+            if (! $request->filled('id_unit_usaha')) {
+                $firstBarangId = data_get($request->input('items'), '0.id_barang');
+                $unitUsahaId = $firstBarangId
+                    ? Barang::where('id_barang', $firstBarangId)->value('id_unit_usaha')
+                    : \App\Models\Master\UnitUsaha::where('kode_unit_usaha', 'SEMBAKO')->value('id_unit_usaha');
+
+                if (! $unitUsahaId) {
+                    $unitUsahaId = \App\Models\Master\UnitUsaha::value('id_unit_usaha') ?? 1;
+                }
+                $request->merge(['id_unit_usaha' => $unitUsahaId]);
+            }
+
+            if (! $request->filled('id_gudang')) {
+                $gudangId = Gudang::where('id_entitas', $idEntitas)->where('is_active', true)->value('id_gudang');
+                if ($gudangId) {
+                    $request->merge(['id_gudang' => $gudangId]);
+                }
+            }
+
             $validated = $request->validate([
                 'source' => 'required|in:desa_lain,warga_lokal,pengambilan_konsinyasi',
                 'id_permintaan_pembelian' => [
@@ -276,6 +296,7 @@ class PembelianController extends ModuleCrudController
                     'after_or_equal:today',
                     Rule::requiredIf($request->input('jenis_pembayaran') === 'kredit'),
                 ],
+                'diskon' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
                 'id_unit_usaha' => ['required', 'exists:master_unit_usaha,id_unit_usaha'],
                 'id_gudang' => [
                     'required',
@@ -370,6 +391,7 @@ class PembelianController extends ModuleCrudController
                 $validated['tgl_jatuh_tempo'] ?? null,
                 $idKasBank ? (int) $idKasBank : null,
                 $validated['source'],
+                (float) ($validated['diskon'] ?? 0),
             );
 
             if ($permintaanPembelian) {
@@ -379,10 +401,24 @@ class PembelianController extends ModuleCrudController
                     ->values()
                     ->all();
                 session(['pembelian_dummy_requests_processed' => $processed]);
+
+                if (str_starts_with((string) $permintaanPembelian->id_permintaan_pembelian, 'PR-')) {
+                    $idPr = (int) str_replace('PR-', '', $permintaanPembelian->id_permintaan_pembelian);
+                    \App\Models\Perencanaan\PermintaanPengadaan::where('id_permintaan', $idPr)
+                        ->update(['status' => 'jadi_pembelian']);
+                    $pembelian->update(['id_permintaan' => $idPr]);
+                }
             }
 
-            return redirect()->route("{$this->routeBase}.index")
-                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil ditambahkan.");
+            // Otomatis setujui dan posting ke Jurnal Akuntansi & Kas/Hutang
+            try {
+                $pembelian = PembelianService::approvePembelian($pembelian);
+            } catch (\Throwable $approveEx) {
+                \Illuminate\Support\Facades\Log::warning("Pembelian {$pembelian->kode_pembelian} disimpan sebagai draft: " . $approveEx->getMessage());
+            }
+
+            return redirect()->route("{$this->routeBase}.show", $pembelian)
+                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil dibuat dan otomatis diposting ke Jurnal Akuntansi.");
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -410,39 +446,47 @@ class PembelianController extends ModuleCrudController
         }
 
         $processed = collect(session('pembelian_dummy_requests_processed', []));
-        $templates = [
-            ['id' => "demo-{$idEntitas}-gula", 'code' => 'DEMO-GUDANG-001', 'source' => 'desa_lain', 'quantity' => 10],
-            ['id' => "demo-{$idEntitas}-beras", 'code' => 'DEMO-GUDANG-002', 'source' => 'warga_lokal', 'quantity' => 25],
-        ];
 
-        return collect($templates)
-            ->values()
-            ->map(function (array $template, int $index) use ($barangsKg, $gudangs, $pihaks) {
-                $barang = $barangsKg->get($index % $barangsKg->count());
-                $idSatuanKg = strtoupper($barang->satuanDasar?->kode_satuan ?? '') === 'KG'
-                    ? $barang->id_satuan_dasar
-                    : $barang->konversiSatuan
-                        ->first(fn ($conversion) => strtoupper($conversion->satuan?->kode_satuan ?? '') === 'KG')
-                        ?->id_satuan;
-                $recommendedTypes = $template['source'] === 'desa_lain'
-                    ? ['entitas_lain']
-                    : ['petani', 'warga'];
+        $realItems = collect();
+        if (Schema::hasTable('permintaan_pengadaan')) {
+            $realPrs = \App\Models\Perencanaan\PermintaanPengadaan::with([
+                'detail.barang.satuanDasar',
+                'detail.barang.konversiSatuan.satuan',
+                'gudang',
+            ])
+                ->where('id_entitas', $idEntitas)
+                ->where('status', 'disetujui')
+                ->orderByDesc('id_permintaan')
+                ->get();
 
-                return (object) [
-                    'id_permintaan_pembelian' => $template['id'],
-                    'kode_permintaan' => $template['code'],
-                    'sumber_pembelian' => $template['source'],
-                    'barang' => $barang,
-                    'id_barang' => $barang->id_barang,
-                    'id_satuan' => $idSatuanKg,
-                    'gudang' => $gudangs->first(),
-                    'qty_diminta' => $template['quantity'],
-                    'supplier_recommendations' => $pihaks
-                        ->whereIn('jenis_pihak', $recommendedTypes)
-                        ->take(3)
-                        ->values(),
-                ];
-            })
+            foreach ($realPrs as $pr) {
+                foreach ($pr->detail as $detail) {
+                    $barang = $detail->barang;
+                    if (! $barang) {
+                        continue;
+                    }
+                    $idSatuanKg = strtoupper($barang->satuanDasar?->kode_satuan ?? '') === 'KG'
+                        ? $barang->id_satuan_dasar
+                        : $barang->konversiSatuan
+                            ->first(fn ($conversion) => strtoupper($conversion->satuan?->kode_satuan ?? '') === 'KG')
+                            ?->id_satuan;
+
+                    $realItems->push((object) [
+                        'id_permintaan_pembelian' => "PR-{$pr->id_permintaan}",
+                        'kode_permintaan' => $pr->kode_permintaan,
+                        'sumber_pembelian' => 'warga_lokal',
+                        'barang' => $barang,
+                        'id_barang' => $barang->id_barang,
+                        'id_satuan' => $idSatuanKg ?? $barang->id_satuan_dasar,
+                        'gudang' => $pr->gudang ?? $gudangs->first(),
+                        'qty_diminta' => (float) $detail->jumlah_diminta,
+                        'supplier_recommendations' => $pihaks->take(5)->values(),
+                    ]);
+                }
+            }
+        }
+
+        return $realItems
             ->reject(fn (object $requestItem) => $processed->contains($requestItem->id_permintaan_pembelian))
             ->values();
     }
@@ -555,6 +599,11 @@ class PembelianController extends ModuleCrudController
             $kasBanks = KasBank::where('is_active', true)->orderBy('jenis')->orderBy('nama')->get();
         }
 
+        $gudangs = Gudang::when($idEntitas, fn ($q) => $q->where('id_entitas', $idEntitas))
+            ->where('is_active', true)
+            ->orderBy('nama_gudang')
+            ->get();
+
         return view('pembelian.edit', [
             'title' => "Edit Pembelian {$pembelian->kode_pembelian}",
             'routeBase' => $this->routeBase,
@@ -564,6 +613,7 @@ class PembelianController extends ModuleCrudController
             'barangKgIds' => $barangKgIds,
             'editItems' => $editItems,
             'kasBanks' => $kasBanks,
+            'gudangs' => $gudangs,
         ]);
     }
 
@@ -614,6 +664,7 @@ class PembelianController extends ModuleCrudController
                 'after_or_equal:today',
                 Rule::requiredIf($request->input('jenis_pembayaran') === 'kredit'),
             ],
+            'diskon' => ['nullable', 'numeric', 'decimal:0,2', 'min:0'],
             'id_unit_usaha' => 'nullable|exists:master_unit_usaha,id_unit_usaha',
             'id_gudang' => ['nullable', 'integer', new TenantOwnershipRule('gudang', 'id_gudang')],
             'items' => 'required|array|min:1',

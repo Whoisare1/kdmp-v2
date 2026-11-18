@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M5 Pembelian">
+<x-layouts.app :title="$title" eyebrow="Pembelian">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">{{ session('success') }}</div>
     @endif
@@ -132,7 +132,14 @@
                                 @endif
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-right">Rp {{ number_format($item->total_pembelian, 2, ',', '.') }}</td>
-                            <td class="px-4 py-3 capitalize">{{ $item->status }}</td>
+                            <td class="px-4 py-3 capitalize">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="inline-flex rounded-sm px-2 py-0.5 text-xs font-medium {{ $item->status === 'disetujui' || $item->status === 'selesai' ? 'bg-emerald-50 text-emerald-800' : 'bg-paper-200 text-ink-700' }}">{{ ucfirst($item->status) }}</span>
+                                    @if ($item->id_jurnal)
+                                        <a href="{{ route('akuntansi.jurnal.show', $item->id_jurnal) }}" class="rounded bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 hover:bg-emerald-200" title="Buka Jurnal Akuntansi">✓ Jurnal</a>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="whitespace-nowrap px-4 py-3 text-right"><a href="{{ route("$routeBase.show", $item) }}" class="font-medium text-emerald-700 hover:text-emerald-800">Lihat</a></td>
                         </tr>
                     @empty

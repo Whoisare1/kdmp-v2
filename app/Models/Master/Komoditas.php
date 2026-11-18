@@ -29,10 +29,15 @@ class Komoditas extends Model
         return static::$hasEntitasCol;
     }
 
-    public function scopeForEntitas(Builder $query, ?int $idEntitas): Builder
+    public function scopeForEntitas(Builder $query, ?int $idEntitas = null): Builder
     {
-        if ($idEntitas !== null && static::hasEntitasColumn()) {
-            $query->where($this->getTable() . '.id_entitas', $idEntitas);
+        if (static::hasEntitasColumn()) {
+            $query->where(function (Builder $q) use ($idEntitas) {
+                $q->whereNull($this->getTable() . '.id_entitas');
+                if ($idEntitas !== null) {
+                    $q->orWhere($this->getTable() . '.id_entitas', $idEntitas);
+                }
+            });
         }
 
         return $query;

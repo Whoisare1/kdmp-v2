@@ -2,6 +2,21 @@
 
     <div class="mx-auto max-w-4xl">
 
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold text-ink-900">Catat Pelunasan</h1>
+                <p class="text-sm text-ink-600">Penerimaan pembayaran piutang dari pembeli/anggota atau pembayaran hutang ke supplier.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('penjualan.pos') }}" class="rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 shadow-2xs hover:bg-paper-100">
+                    &larr; Kembali ke Kasir (POS)
+                </a>
+                <a href="{{ route('keuangan.pelunasan.index') }}" class="rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 shadow-2xs hover:bg-paper-100">
+                    Riwayat Pelunasan
+                </a>
+            </div>
+        </div>
+
         {{-- Error global --}}
         @if (session('error'))
             <div class="mb-5 rounded-sm border border-merah-200 bg-merah-50 p-4 text-sm text-merah-800">
@@ -45,10 +60,10 @@
                             class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none @error('jenis') border-merah-400 @enderror"
                         >
                             <option value="">— Pilih jenis —</option>
-                            <option value="terima_piutang" @selected(old('jenis') === 'terima_piutang')>
+                            <option value="terima_piutang" @selected(old('jenis', request('jenis')) === 'terima_piutang')>
                                 Terima Pelunasan Piutang (dari Anggota/Pembeli)
                             </option>
-                            <option value="bayar_hutang" @selected(old('jenis') === 'bayar_hutang')>
+                            <option value="bayar_hutang" @selected(old('jenis', request('jenis')) === 'bayar_hutang')>
                                 Bayar Hutang ke Supplier
                             </option>
                         </select>

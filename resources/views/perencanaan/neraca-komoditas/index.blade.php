@@ -13,15 +13,6 @@
         </div>
     @endif
 
-    @if (session('error'))
-        <div class="mb-5 flex items-center justify-between rounded-sm border border-merah-400 bg-merah-50 px-4 py-3 text-sm text-merah-700">
-            <div class="flex items-center gap-2">
-                <span class="font-bold text-merah-600">⚠ Peringatan:</span>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
-
     @php
         $namaBulanList = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',

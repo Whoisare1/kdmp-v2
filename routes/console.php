@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Bersihkan token idempotency setiap hari (token berusia > 72 jam)
 Schedule::command('idempotency:prune --hours=72')->daily();
+
+// Proses antrean jurnal transaksi gudang secara berkala
+Schedule::command('jurnal:proses-gudang')->everyMinute();

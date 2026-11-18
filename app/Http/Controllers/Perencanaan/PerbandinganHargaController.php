@@ -44,7 +44,7 @@ class PerbandinganHargaController extends ModuleCrudController
 
         return view('perencanaan.perbandingan-harga.index', [
             'title' => $this->title,
-            'komoditas' => Komoditas::query()->orderBy('nama')->get(),
+            'komoditas' => Komoditas::query()->where('is_active', true)->orderBy('nama')->get(),
             'selected' => $selected,
             'tahun' => $tahun,
             'periode' => $periode,

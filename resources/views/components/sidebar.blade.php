@@ -21,7 +21,8 @@
                 ['label' => 'Kelola Staf', 'route' => 'master.pengguna.index', 'match' => 'master.pengguna.*', 'roles' => ['manajer']],
                 ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
                 ['label' => 'Satuan Ukur', 'route' => 'master.satuan.index', 'match' => 'master.satuan.*'],
-                ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
+                ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.index,master.barang.create,master.barang.edit,master.barang.show'],
+                ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*', 'roles' => ['manajer', 'admin_gudang']],
                 ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
                 ['label' => 'Gudang', 'route' => 'master.gudang.index', 'match' => 'master.gudang.*'],
                 ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
@@ -67,6 +68,7 @@
                 ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
                 ['label' => 'Pencocokan Surplus-Defisit', 'route' => 'gudang.pencocokan-surplus-defisit.index', 'match' => 'gudang.pencocokan-surplus-defisit.*'],
                 ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
+                ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*'],
                 ['label' => 'Penerimaan', 'route' => 'gudang.penerimaan.index', 'match' => 'gudang.penerimaan.*'],
                 ['label' => 'Batch & Kedaluwarsa', 'route' => 'gudang.batch.index', 'match' => 'gudang.batch.*'],
                 ['label' => 'Kerusakan', 'route' => 'gudang.kerusakan.index', 'match' => 'gudang.kerusakan.*'],
@@ -149,73 +151,145 @@
     </a>
 
     {{-- Navigation --}}
-    <nav class="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
+    <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-4 py-5 custom-scrollbar">
+        @php
+            $user = auth()->user();
+            $isSuperAdmin = $user && $user->isSuperAdmin();
+            $isManajer = $user && $user->hasPeran('manajer');
+            $katalogPeranSidebar = \App\Services\DemoPeranService::katalogPeran();
+            $kodePeranAktifSidebar = \App\Services\DemoPeranService::kodePeranAktif($user);
+            $infoPeranSidebar = $katalogPeranSidebar[$kodePeranAktifSidebar] ?? null;
+            $grupFokusPeran = $infoPeranSidebar['grup_sidebar'] ?? [];
+        @endphp
 
-        @if(auth()->check() && auth()->user()->id_entitas === null && !$isModuleLimitedUser)
-            <div class="mb-6">
-                <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
-                    Super Admin
-                </p>
+        {{-- Navigasi Utama & Zona Publik --}}
+        <div class="mb-5 space-y-1">
+            <p class="px-2 pb-1.5 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                Navigasi Dasbor
+            </p>
+            @auth
                 <a
-                    href="{{ route('admin.dashboard') }}"
-                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors
-                    {{ request()->routeIs('admin.*') ? 'bg-padi-500/10 text-padi-400' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    href="{{ route('dashboard') }}"
+                    class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors
+                    {{ request()->routeIs('dashboard') && (!request('tab') || request('tab') === 'alur') ? 'bg-padi-500/15 text-padi-300 border border-padi-500/30' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    @if(request()->routeIs('dashboard') && (!request('tab') || request('tab') === 'alur')) data-sidebar-active="true" @endif
                 >
-                    <span class="text-padi-500">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                    <span class="flex items-center gap-2.5">
+                        <span>🎯</span>
+                        <span>Dasbor Alur &amp; Demo</span>
                     </span>
-                    <span class="font-medium">Persetujuan Entitas</span>
                 </a>
-            </div>
-        @endif
+                <a
+                    href="{{ route('dashboard', ['tab' => 'katalog']) }}"
+                    class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors
+                    {{ request()->routeIs('dashboard') && request('tab') === 'katalog' ? 'bg-padi-500/15 text-padi-300 border border-padi-500/30' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    @if(request()->routeIs('dashboard') && request('tab') === 'katalog') data-sidebar-active="true" @endif
+                >
+                    <span class="flex items-center gap-2.5">
+                        <span>🌾</span>
+                        <span>Katalog Komoditas Desa</span>
+                    </span>
+                </a>
+                <a
+                    href="{{ route('dashboard', ['tab' => 'neraca']) }}"
+                    class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors
+                    {{ request()->routeIs('dashboard') && request('tab') === 'neraca' ? 'bg-padi-500/15 text-padi-300 border border-padi-500/30' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                    @if(request()->routeIs('dashboard') && request('tab') === 'neraca') data-sidebar-active="true" @endif
+                >
+                    <span class="flex items-center gap-2.5">
+                        <span>⚖️</span>
+                        <span>Ketahanan Pangan Antar-Desa</span>
+                    </span>
+                </a>
+            @endauth
+        </div>
 
-        <p class="px-2 pb-3 font-mono text-[10px] uppercase tracking-widest text-paper-400">
-            Modul Sistem
-        </p>
+        @auth
+            {{-- Indikator Peran Aktif yang Tersinkronisasi --}}
+            @if($infoPeranSidebar)
+                <div class="mb-5 rounded-xl bg-ink-900 border border-ink-800 p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="font-mono text-[9px] uppercase tracking-wider text-padi-400">Peran Aktif</span>
+                        <span class="font-mono text-[9px] text-paper-400">Alur #{{ $infoPeranSidebar['urutan'] }}</span>
+                    </div>
+                    <p class="text-xs font-semibold text-white mt-1 flex items-center gap-1.5">
+                        <span>{{ $infoPeranSidebar['ikon'] }}</span>
+                        <span>{{ $infoPeranSidebar['nama'] }}</span>
+                    </p>
+                    <p class="text-[10px] text-paper-400 mt-0.5 leading-snug">
+                        {{ $infoPeranSidebar['tahap'] }}
+                    </p>
+                </div>
+            @endif
 
-        <ul class="space-y-2">
+            @if($user->id_entitas === null && !$isModuleLimitedUser)
+                <div class="mb-5">
+                    <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                        Super Admin
+                    </p>
+                    <a
+                        href="{{ route('admin.dashboard') }}"
+                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors
+                        {{ request()->routeIs('admin.*') ? 'bg-padi-500/10 text-padi-400' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
+                        @if(request()->routeIs('admin.*')) data-sidebar-active="true" @endif
+                    >
+                        <span class="text-padi-500">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        </span>
+                        <span class="font-medium">Persetujuan Entitas</span>
+                    </a>
+                </div>
+            @endif
+
+            <p class="px-2 pb-2 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+                Modul Internal Entitas
+            </p>
+
             @php
-                $user = auth()->user();
-                $isSuperAdmin = $user && $user->isSuperAdmin();
-                $isManajer = $user && $user->hasPeran('manajer');
+                $anyGroupActive = collect($sidebarGroups)->contains(function ($g) {
+                    return collect(explode(',', $g['match']))->contains(fn ($p) => request()->routeIs($p));
+                });
             @endphp
 
-            @foreach ($sidebarGroups as $group)
-                @if ($isModuleLimitedUser && $group['title'] !== 'Pembelian & Penjualan')
-                    @continue
-                @endif
-                @php
-                    // Filter grup berdasarkan peran pengguna
-                    if (!$isSuperAdmin && !$isManajer && !empty($group['roles'])) {
-                        if (!$user || !$user->hasAnyPeran($group['roles'])) {
-                            continue;
+            <ul class="space-y-2">
+                @foreach ($sidebarGroups as $group)
+                    @if ($isModuleLimitedUser && $group['title'] !== 'Pembelian & Penjualan')
+                        @continue
+                    @endif
+                    @php
+                        // Filter grup berdasarkan peran pengguna
+                        if (!$isSuperAdmin && !$isManajer && !empty($group['roles'])) {
+                            if (!$user || !$user->hasAnyPeran($group['roles'])) {
+                                continue;
+                            }
                         }
-                    }
 
-                    $isGroupActive = collect(explode(',', $group['match']))->contains(fn ($p) => request()->routeIs($p));
-                @endphp
-                
-                <li x-data="{ expanded: {{ $isGroupActive ? 'true' : 'false' }} }">
-                    {{-- Accordion Header --}}
-                    <button 
-                        @click="expanded = !expanded" 
-                        class="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-padi-500/50
-                        {{ $isGroupActive ? 'bg-ink-800 text-white shadow-sm' : 'text-paper-300 hover:bg-ink-800 hover:text-white' }}"
-                    >
-                        <div class="flex items-center gap-3">
-                            <span class="{{ $isGroupActive ? 'text-padi-400' : 'text-paper-500 group-hover:text-paper-300' }}">
-                                {!! $group['icon'] !!}
-                            </span>
-                            <span class="font-medium">{{ $isModuleLimitedUser ? $restrictedGroupTitle : $group['title'] }}</span>
-                        </div>
-                        <svg 
-                            class="w-4 h-4 text-paper-500 transition-transform duration-200" 
-                            :class="expanded ? 'rotate-180' : ''"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        $isGroupActive = collect(explode(',', $group['match']))->contains(fn ($p) => request()->routeIs($p));
+                        $isRoleFocusGroup = ! $isSuperAdmin && in_array($group['title'], $grupFokusPeran, true);
+                        $shouldExpand = $isGroupActive || (! $anyGroupActive && $isRoleFocusGroup);
+                    @endphp
+                    
+                    <li x-data="{ expanded: {{ $shouldExpand ? 'true' : 'false' }} }">
+                        {{-- Accordion Header --}}
+                        <button 
+                            @click="expanded = !expanded" 
+                            class="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-padi-500/50
+                            {{ $isGroupActive ? 'bg-ink-800 text-white shadow-sm' : ($isRoleFocusGroup ? 'bg-ink-900/90 text-paper-100 border border-ink-800' : 'text-paper-300 hover:bg-ink-800 hover:text-white') }}"
                         >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="{{ ($isGroupActive || $isRoleFocusGroup) ? 'text-padi-400' : 'text-paper-500 group-hover:text-paper-300' }}">
+                                    {!! $group['icon'] !!}
+                                </span>
+                                <span class="font-medium truncate">{{ $isModuleLimitedUser ? $restrictedGroupTitle : $group['title'] }}</span>
+                            </div>
+                            <svg 
+                                class="w-4 h-4 text-paper-500 transition-transform duration-200 shrink-0" 
+                                :class="expanded ? 'rotate-180' : ''"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
 
                     {{-- Accordion Body --}}
                     <div 
@@ -247,7 +321,7 @@
                                         <div x-data="{ expanded: {{ ($isChildActive || $isItemActive) ? 'true' : 'false' }} }">
                                             <div class="flex items-center rounded-lg text-xs transition-colors
                                                 {{ ($isChildActive || $isItemActive) ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
-                                                <a href="{{ route($item['route']) }}" class="min-w-0 flex-1 px-3 py-2">
+                                                <a href="{{ route($item['route']) }}" class="min-w-0 flex-1 px-3 py-2" @if($isItemActive) data-sidebar-active="true" @endif>
                                                     {{ $item['label'] }}
                                                 </a>
                                                 <button type="button" @click="expanded = !expanded" class="px-3 py-2 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $item['label'] }}">
@@ -263,14 +337,16 @@
                                                         @php
                                                             $childHasChildren = ! empty($child['children']);
                                                             $isSubChildActive = collect(explode(',', $child['match']))->contains(fn ($p) => request()->routeIs($p))
-                                                                || ($childHasChildren && collect($child['children'])->contains(fn ($grandchild) => collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p))));
+                                                                || ($childHasChildren && collect($child['children'])->contains(function ($grandchild) {
+                                                                    return collect(explode(',', $grandchild['match']))->contains(fn ($p) => request()->routeIs($p));
+                                                                }));
                                                         @endphp
                                                         <li>
                                                             @if ($childHasChildren)
                                                                 <div x-data="{ expanded: {{ $isSubChildActive ? 'true' : 'false' }} }">
                                                                     <div class="flex items-center rounded-lg text-xs transition-colors
                                                                         {{ $isSubChildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}">
-                                                                        <a href="{{ route($child['route']) }}" class="min-w-0 flex-1 px-3 py-2">
+                                                                        <a href="{{ route($child['route']) }}" class="min-w-0 flex-1 px-3 py-2" @if($isSubChildActive) data-sidebar-active="true" @endif>
                                                                             {{ $child['label'] }}
                                                                         </a>
                                                                         <button type="button" @click="expanded = !expanded" class="px-3 py-2 text-paper-500 hover:text-white" aria-label="Buka submenu {{ $child['label'] }}">
@@ -290,6 +366,7 @@
                                                                                         href="{{ route($grandchild['route']) }}"
                                                                                         class="block rounded-lg px-3 py-2 text-xs transition-colors
                                                                                         {{ $isGrandchildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                                                                        @if($isGrandchildActive) data-sidebar-active="true" @endif
                                                                                     >
                                                                                         {{ $grandchild['label'] }}
                                                                                     </a>
@@ -303,6 +380,7 @@
                                                                     href="{{ route($child['route']) }}"
                                                                     class="block rounded-lg px-3 py-2 text-xs transition-colors
                                                                     {{ $isSubChildActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                                                    @if($isSubChildActive) data-sidebar-active="true" @endif
                                                                 >
                                                                     {{ $child['label'] }}
                                                                 </a>
@@ -317,8 +395,9 @@
                                             href="{{ route($item['route']) }}" 
                                             class="block rounded-lg px-3 py-2 text-xs transition-colors
                                             {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
+                                            @if($isItemActive) data-sidebar-active="true" @endif
                                         >
-                                            {{ $item['label'] }}
+                                            {{ ($item['route'] === 'master.pengguna.index' && $isSuperAdmin) ? 'Manajemen Pengguna' : $item['label'] }}
                                         </a>
                                     @endif
                                 </li>
@@ -328,6 +407,7 @@
                 </li>
             @endforeach
         </ul>
+        @endauth
     </nav>
 
     {{-- Footer Info --}}
@@ -352,4 +432,59 @@
             </div>
         </div>
     </div>
+
+    {{-- Sidebar Scroll Position & Active Focus Script --}}
+    <script>
+        (function() {
+            const nav = document.getElementById('sidebar-nav');
+            if (!nav) return;
+
+            function restoreSidebarScroll() {
+                const activeItems = nav.querySelectorAll('[data-sidebar-active="true"]');
+                const activeItem = activeItems.length > 0 ? activeItems[activeItems.length - 1] : null;
+                const savedPos = sessionStorage.getItem('sidebar_scroll_pos');
+
+                if (savedPos !== null) {
+                    nav.scrollTop = parseInt(savedPos, 10);
+                }
+
+                if (activeItem) {
+                    const navRect = nav.getBoundingClientRect();
+                    const itemRect = activeItem.getBoundingClientRect();
+                    
+                    // Jika elemen aktif berada di luar batas pandang nav scroll (terlalu atas / terlalu bawah)
+                    if (itemRect.top < navRect.top + 20 || itemRect.bottom > navRect.bottom - 20) {
+                        activeItem.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+                        sessionStorage.setItem('sidebar_scroll_pos', nav.scrollTop);
+                    }
+                }
+            }
+
+            // Restore saat DOM siap dan setelah transisi render Alpine selesai
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(restoreSidebarScroll, 60);
+                });
+            } else {
+                setTimeout(restoreSidebarScroll, 60);
+            }
+
+            // Simpan scroll position saat user klik link apapun di dalam sidebar
+            nav.addEventListener('click', function(e) {
+                const link = e.target.closest('a');
+                if (link) {
+                    sessionStorage.setItem('sidebar_scroll_pos', nav.scrollTop);
+                }
+            });
+
+            // Debounced scroll listener untuk menyimpan posisi scroll sidebar saat digeser
+            let scrollTimer;
+            nav.addEventListener('scroll', function() {
+                clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(function() {
+                    sessionStorage.setItem('sidebar_scroll_pos', nav.scrollTop);
+                }, 100);
+            }, { passive: true });
+        })();
+    </script>
 </aside>

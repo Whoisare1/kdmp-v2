@@ -8,6 +8,15 @@ use Tests\TestCase;
 
 class PembelianWajibModalAwalTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (Entitas::where('kode_entitas', 'KDMP-A')->doesntExist()) {
+            $this->seed();
+        }
+    }
+
     public function test_koperasi_tanpa_modal_awal_ditolak_membuat_order_pembelian(): void
     {
         // 1. Login sebagai manajer KDMP-B (yang belum memiliki simpanan pokok / saldo awal kas)

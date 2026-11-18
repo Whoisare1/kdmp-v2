@@ -127,6 +127,8 @@ class DataAwalSeeder extends Seeder
                 ]
             );
 
+            \App\Http\Controllers\Master\EntitasController::provisionDefaultSatuanDanKomoditas($entitas->id_entitas);
+
             DB::table('gudang')->updateOrInsert(
                 ['id_entitas' => $entitas->id_entitas, 'kode_gudang' => 'UTAMA'],
                 ['nama_gudang' => $desa['kode'] === 'KDMP-A'
@@ -181,6 +183,8 @@ class DataAwalSeeder extends Seeder
                 ['kode' => 'kasir', 'nama' => 'Kasir '.$desa['wilayah'], 'email' => 'kasir@'.$suffixDesa.'.test'],
                 ['kode' => 'admin_gudang', 'nama' => 'Admin Gudang '.$desa['wilayah'], 'email' => 'gudang@'.$suffixDesa.'.test'],
                 ['kode' => 'surveyor', 'nama' => 'Surveyor '.$desa['wilayah'], 'email' => 'surveyor@'.$suffixDesa.'.test'],
+                ['kode' => 'pembelian', 'nama' => 'Staf Pembelian '.$desa['wilayah'], 'email' => 'pembelian@'.$suffixDesa.'.test'],
+                ['kode' => 'akuntan', 'nama' => 'Akuntan '.$desa['wilayah'], 'email' => 'akuntan@'.$suffixDesa.'.test'],
             ];
 
             foreach ($daftarAkun as $staf) {

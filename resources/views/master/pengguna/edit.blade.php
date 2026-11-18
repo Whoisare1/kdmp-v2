@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data">
+<x-layouts.app :title="$title" eyebrow="Master Data">
     <div class="max-w-2xl mx-auto">
         <div class="mb-5 flex items-center justify-between">
             <div>
@@ -25,8 +25,22 @@
             @csrf
             @method('PUT')
 
+            @if($isSuperAdmin)
+                <div>
+                    <label class="block text-xs font-semibold text-ink-800 mb-1.5">Entitas / Koperasi Desa <span class="text-rose-500">*</span></label>
+                    <select name="id_entitas" required
+                            class="w-full rounded-lg border border-paper-300 bg-white px-3.5 py-2.5 text-xs text-ink-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none">
+                        @foreach($entitasList as $ent)
+                            <option value="{{ $ent->id_entitas }}" @selected((int)old('id_entitas', $user->id_entitas) === (int)$ent->id_entitas)>
+                                {{ $ent->nama_entitas }} ({{ $ent->kode_entitas }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
             <div>
-                <label class="block text-xs font-semibold text-ink-800 mb-1.5">Nama Lengkap Staf <span class="text-rose-500">*</span></label>
+                <label class="block text-xs font-semibold text-ink-800 mb-1.5">Nama Lengkap Pengguna / Staf <span class="text-rose-500">*</span></label>
                 <input type="text" name="nama" value="{{ old('nama', $user->nama) }}" required
                        class="w-full rounded-lg border border-paper-300 px-3.5 py-2.5 text-xs text-ink-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none">
             </div>

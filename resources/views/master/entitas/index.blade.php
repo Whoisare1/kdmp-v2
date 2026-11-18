@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data (Super Admin)">
+<x-layouts.app :title="$title" eyebrow="Master Data (Super Admin)">
     <div x-data="{
         showDeleteModal: false,
         deleteNama: '',
@@ -49,6 +49,7 @@
                         <th class="px-4 py-3 font-medium">Kode &amp; Nama Entitas</th>
                         <th class="px-4 py-3 font-medium">Jenis</th>
                         <th class="px-4 py-3 font-medium">Wilayah Desa</th>
+                        <th class="px-4 py-3 font-medium">Administrator &amp; Akun</th>
                         <th class="px-4 py-3 text-center font-medium">Tahun Buku</th>
                         <th class="px-4 py-3 text-center font-medium">Status</th>
                         <th class="px-4 py-3 text-right font-medium">Aksi</th>
@@ -56,6 +57,9 @@
                 </thead>
                 <tbody class="divide-y divide-paper-200">
                     @forelse ($items as $item)
+                        @php
+                            $manajerUser = $item->pengguna?->first(fn($u) => $u->peran->contains('kode', 'manajer')) ?? $item->pengguna?->first();
+                        @endphp
                         <tr class="hover:bg-paper-100/70">
                             <td class="px-4 py-3">
                                 <div class="font-medium text-ink-900">{{ $item->nama_entitas }}</div>
@@ -65,6 +69,20 @@
                                 {{ $item->jenis_entitas ?? 'koperasi' }}
                             </td>
                             <td class="px-4 py-3 text-ink-800">{{ $item->wilayah?->nama ?? '—' }}</td>
+                            <td class="px-4 py-3 text-xs">
+                                @if($manajerUser)
+                                    <div class="font-medium text-ink-900">{{ $manajerUser->nama }}</div>
+                                    <div class="font-mono text-[11px] text-ink-500">{{ $manajerUser->email }}</div>
+                                    <span class="inline-block mt-0.5 rounded bg-paper-200 px-1.5 py-0.2 text-[10px] text-ink-700">
+                                        {{ $item->pengguna_count }} Akun Terdaftar
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                                        ⚠️ Belum ada akun
+                                    </span>
+                                    <a href="{{ route('master.entitas.edit', $item->id_entitas) }}" class="block mt-0.5 text-[11px] text-merah-600 hover:underline">+ Buat Akun</a>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-center font-mono text-ink-800">{{ $item->tahun_buku_awal }}</td>
                             <td class="px-4 py-3 text-center">
                                 <span class="rounded-full px-2.5 py-0.5 font-mono text-xs {{ $item->status === 'APPROVED' && $item->is_active ? 'bg-sawah-100 text-sawah-700' : ($item->status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-merah-100 text-merah-700') }}">
@@ -83,7 +101,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-10 text-center text-sm text-ink-600/60">
+                            <td colspan="7" class="px-4 py-10 text-center text-sm text-ink-600/60">
                                 Belum ada data Entitas.
                             </td>
                         </tr>

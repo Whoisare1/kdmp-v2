@@ -60,4 +60,23 @@ class PembelianServiceConsignmentTest extends TestCase
             'pengambilan_konsinyasi',
         );
     }
+
+    public function test_quick_purchase_rejects_discount_greater_than_item_subtotal(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Diskon pembelian tidak boleh melebihi total harga barang.');
+
+        PembelianService::createQuickPurchase(
+            1,
+            1,
+            1,
+            1,
+            [['id_barang' => 1, 'id_satuan' => 1, 'qty_dasar' => 1, 'harga_satuan' => 100]],
+            'tunai',
+            null,
+            null,
+            'warga_lokal',
+            101,
+        );
+    }
 }

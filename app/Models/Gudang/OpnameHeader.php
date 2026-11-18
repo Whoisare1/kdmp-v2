@@ -32,4 +32,10 @@ class OpnameHeader extends Model
     {
         return $this->hasMany(OpnameDetail::class, 'id_opname', 'id_opname');
     }
+
+    public function antreanJurnal()
+    {
+        return $this->hasMany(AntreanJurnalGudang::class, 'ref_id', 'id_opname')
+            ->where('ref_tipe', 'OPNAME');
+    }
 }

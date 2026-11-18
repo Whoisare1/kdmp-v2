@@ -169,12 +169,11 @@ class AlurFlowStudiKasusLengkapTest extends TestCase
         $this->assertArrayHasKey('11121', $bankMap);
         $this->assertEquals('Bank BRI Unit Sukatani', $bankMap['11121']->nama);
 
-        // Tambah Satuan & Komoditas Lokal
-        $satuanKg = Satuan::create([
-            'kode_satuan' => 'KG',
-            'id_entitas' => $idEntitas,
-            'is_active' => true,
-        ]);
+        // Satuan KG otomatis tersedia via provisionDefaultMasterData; tambah Komoditas Lokal
+        $satuanKg = Satuan::firstOrCreate(
+            ['kode_satuan' => 'KG', 'id_entitas' => $idEntitas],
+            ['is_active' => true]
+        );
         $komoditasBeras = Komoditas::create([
             'nama' => 'Beras Raja Lele',
             'kategori' => 'pangan_pokok',

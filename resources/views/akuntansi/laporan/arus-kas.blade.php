@@ -30,6 +30,10 @@
             <button type="submit" class="rounded bg-paper-200 px-4 py-1.5 text-sm font-medium text-ink-700 hover:bg-paper-300 transition">
                 Tampilkan
             </button>
+            <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 rounded border border-paper-400 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 shadow-sm hover:border-merah-500 hover:text-merah-600 print:hidden">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Cetak / Simpan PDF
+            </button>
         </form>
     </div>
 

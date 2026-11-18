@@ -184,21 +184,41 @@ class NeracaKomoditasController extends ModuleCrudController
             ->where('status_surplus_defisit', 'surplus')
             ->with('komoditas')
             ->firstOrFail();
+
         $user = auth()->user();
+        $entitasId = $user?->id_entitas
+            ?? session('entitas_aktif_pilihan')
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
 
         $barang = Barang::query()
             ->where('id_komoditas', $hasil->id_komoditas)
             ->where('is_active', true)
-            ->first();
+            ->where(function ($q) use ($entitasId) {
+                if ($entitasId) {
+                    $q->where('id_entitas', $entitasId);
+                }
+            })
+            ->first()
+            ?? Barang::query()
+                ->where('id_komoditas', $hasil->id_komoditas)
+                ->where('is_active', true)
+                ->first();
+
         if (! $barang) {
             return back()->with('error', 'Komoditas surplus belum memiliki master barang aktif untuk diajukan ke gudang.');
         }
 
         $gudang = Gudang::query()
-            ->where('id_entitas', $user->id_entitas)
+            ->where(function ($q) use ($entitasId) {
+                if ($entitasId) {
+                    $q->where('id_entitas', $entitasId);
+                }
+            })
             ->where('is_active', true)
             ->orderBy('nama_gudang')
             ->first();
+
         if (! $gudang) {
             return back()->with('error', 'Belum ada gudang aktif untuk entitas ini.');
         }
@@ -208,14 +228,15 @@ class NeracaKomoditasController extends ModuleCrudController
             ->where('permintaan_pengadaan_detail.id_hasil', $hasil->id_hasil)
             ->whereNotIn('permintaan_pengadaan.status', ['dibatalkan', 'ditolak'])
             ->exists();
+
         if ($sudahDiajukan) {
             return back()->with('error', 'Surplus komoditas ini sudah memiliki pengajuan ke gudang yang masih aktif.');
         }
 
-        DB::transaction(function () use ($hasil, $barang, $gudang, $user): void {
+        DB::transaction(function () use ($hasil, $barang, $gudang, $entitasId): void {
             $pengajuan = PermintaanPengadaan::create([
-                'id_entitas' => $user->id_entitas,
-                'kode_permintaan' => PermintaanPengadaan::generateKode((int) $user->id_entitas),
+                'id_entitas' => $entitasId,
+                'kode_permintaan' => PermintaanPengadaan::generateKode((int) $entitasId),
                 'tgl_pengajuan' => now()->toDateString(),
                 'id_unit_usaha' => $barang->id_unit_usaha,
                 'id_gudang' => $gudang->id_gudang,

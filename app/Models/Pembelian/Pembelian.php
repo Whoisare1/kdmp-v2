@@ -2,6 +2,7 @@
 
 namespace App\Models\Pembelian;
 
+use App\Models\Akuntansi\JurnalHeader;
 use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Gudang;
 use App\Models\Master\KasBank;
@@ -19,7 +20,7 @@ class Pembelian extends Model
     protected $fillable = [
         'id_entitas', 'kode_pembelian', 'id_permintaan', 'sumber_pembelian', 'id_pihak', 'id_unit_usaha',
         'id_gudang', 'tanggal_transaksi', 'jenis_pembayaran', 'id_kas_bank',
-        'tgl_jatuh_tempo', 'total_pembelian', 'status', 'status_posting',
+        'tgl_jatuh_tempo', 'total_pembelian', 'diskon', 'status', 'status_posting',
         'id_jurnal', 'created_by',
     ];
 
@@ -29,6 +30,7 @@ class Pembelian extends Model
             'tanggal_transaksi' => 'date',
             'tgl_jatuh_tempo' => 'date',
             'total_pembelian' => 'decimal:2',
+            'diskon' => 'decimal:2',
         ];
     }
 
@@ -60,5 +62,10 @@ class Pembelian extends Model
     public function returs()
     {
         return $this->hasMany(ReturPembelian::class, 'id_pembelian', 'id_pembelian');
+    }
+
+    public function jurnal()
+    {
+        return $this->belongsTo(JurnalHeader::class, 'id_jurnal', 'id_jurnal');
     }
 }
