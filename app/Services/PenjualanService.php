@@ -64,7 +64,6 @@ class PenjualanService
                 throw new RuntimeException('Jumlah barang harus lebih besar dari nol.');
             }
         }
-
         return DB::transaction(function () use ($idEntitas, $idPihak, $idUnitUsaha, $metodeBayar, $items, $idKasBank, $transferDetails, $tglJatuhTempo, $namaPembeli, $diskon) {
             if ($idPihak === null && filled($namaPembeli)) {
                 $targetNama = trim($namaPembeli);
