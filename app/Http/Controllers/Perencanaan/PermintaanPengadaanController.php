@@ -105,6 +105,72 @@ class PermintaanPengadaanController extends ModuleCrudController
         ]);
     }
 
+    /**
+     * Setujui draft Permintaan Pengadaan (PR).
+     */
+    public function setujui(int|string $id): RedirectResponse
+    {
+        $user = auth()->user();
+        $item = PermintaanPengadaan::findOrFail($id);
+
+        if ($user && $user->id_entitas !== null && (int) $item->id_entitas !== (int) $user->id_entitas) {
+            abort(403, 'Akses ditolak: Permintaan pengadaan milik koperasi lain.');
+        }
+
+        $item->update([
+            'status' => 'disetujui',
+            'approved_by' => $user?->id,
+            'approved_at' => now(),
+        ]);
+
+        return back()->with('status', "Permintaan Pengadaan {$item->kode_permintaan} berhasil disetujui.");
+    }
+
+    /**
+     * Tolak Permintaan Pengadaan.
+     */
+    public function tolak(Request $request, int|string $id): RedirectResponse
+    {
+        $user = auth()->user();
+        $item = PermintaanPengadaan::findOrFail($id);
+
+        if ($user && $user->id_entitas !== null && (int) $item->id_entitas !== (int) $user->id_entitas) {
+            abort(403, 'Akses ditolak: Permintaan pengadaan milik koperasi lain.');
+        }
+
+        $alasan = $request->input('catatan') ?? $request->input('alasan');
+
+        $item->update([
+            'status' => 'ditolak',
+            'catatan' => $alasan ? ($item->catatan ? $item->catatan . ' | Ditolak: ' . $alasan : 'Ditolak: ' . $alasan) : ($item->catatan ?: 'Ditolak oleh pengelola.'),
+            'approved_by' => $user?->id,
+            'approved_at' => now(),
+        ]);
+
+        return back()->with('status', "Permintaan Pengadaan {$item->kode_permintaan} berhasil ditolak.");
+    }
+
+    /**
+     * Kembalikan status Permintaan Pengadaan ke draft.
+     */
+    public function kembalikanKeDraft(int|string $id): RedirectResponse
+    {
+        $user = auth()->user();
+        $item = PermintaanPengadaan::findOrFail($id);
+
+        if ($user && $user->id_entitas !== null && (int) $item->id_entitas !== (int) $user->id_entitas) {
+            abort(403, 'Akses ditolak: Permintaan pengadaan milik koperasi lain.');
+        }
+
+        $item->update([
+            'status' => 'draft',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        return back()->with('status', "Status Permintaan Pengadaan {$item->kode_permintaan} dikembalikan ke Draft.");
+    }
+
     public function create(): View
     {
         $hargaService = app(PerbandinganHargaService::class);
@@ -119,21 +185,34 @@ class PermintaanPengadaanController extends ModuleCrudController
             $this->assertHasilBisaDiproses($hasil);
         }
 
+        $user = auth()->user();
+        $entitasId = $user?->id_entitas 
+            ?? session('entitas_aktif_pilihan') 
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
         $barang = $hasil
             ? Barang::query()
                 ->with('satuanDasar')
                 ->where('id_komoditas', $hasil->id_komoditas)
                 ->where('is_active', true)
+                ->where(function ($q) use ($entitasId) {
+                    if ($entitasId) {
+                        $q->where('id_entitas', $entitasId)->orWhereNull('id_entitas');
+                    }
+                })
+                ->orderByRaw("CASE WHEN id_entitas = ? THEN 0 ELSE 1 END", [$entitasId ?? 0])
+                ->orderByDesc('id_barang')
                 ->first()
             : null;
-        $user = auth()->user();
-        $gudangs = $user
-            ? Gudang::query()->where('id_entitas', $user->id_entitas)->where('is_active', true)->orderBy('nama_gudang')->get()
-            : collect();
+
+        $gudangs = $entitasId
+            ? Gudang::query()->where('id_entitas', $entitasId)->where('is_active', true)->orderBy('nama_gudang')->get()
+            : Gudang::query()->where('is_active', true)->orderBy('nama_gudang')->get();
         $satuanBarang = $barang?->satuanDasar?->kode_satuan;
         $hargaComparison = $hasil
             ? $hargaService->bandingkan(
-                (int) $user->id_entitas,
+                (int) $entitasId,
                 (int) $hasil->id_komoditas,
                 (int) $hasil->tahun,
                 PeriodeKalkulasi::fromMonth((int) $hasil->bulan),
@@ -174,18 +253,35 @@ class PermintaanPengadaanController extends ModuleCrudController
         $hasil = HasilKalkulasi::with('komoditas')->findOrFail((int) $validated['id_hasil']);
         $this->assertHasilBisaDiproses($hasil);
         $user = auth()->user();
+        $entitasId = $user?->id_entitas 
+            ?? session('entitas_aktif_pilihan') 
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
 
         $barang = Barang::query()->whereKey($validated['id_barang'])
             ->with('satuanDasar')
             ->where('id_komoditas', $hasil->id_komoditas)->where('is_active', true)->firstOrFail();
         $gudang = Gudang::query()->whereKey($validated['id_gudang'])
-            ->where('id_entitas', $user->id_entitas)->where('is_active', true)->firstOrFail();
+            ->where(function ($q) use ($entitasId) {
+                if ($entitasId) {
+                    $q->where('id_entitas', $entitasId);
+                }
+            })->where('is_active', true)->firstOrFail();
+
+        $unitUsahaId = $hasil->id_unit_usaha_rekomendasi
+            ?? $barang->id_unit_usaha
+            ?? UnitUsaha::where('kode_unit_usaha', 'SEMBAKO')->value('id_unit_usaha')
+            ?? UnitUsaha::value('id_unit_usaha');
+
+        if (! $unitUsahaId || ! UnitUsaha::query()->whereKey($unitUsahaId)->exists()) {
+            return back()->withInput()->withErrors(['id_hasil' => 'Unit usaha rekomendasi tidak ditemukan.']);
+        }
 
         if (! $hasil->id_unit_usaha_rekomendasi) {
-            return back()->withInput()->withErrors(['id_hasil' => 'Hasil kalkulasi belum memiliki unit usaha rekomendasi yang valid.']);
-        }
-        if (! UnitUsaha::query()->whereKey($hasil->id_unit_usaha_rekomendasi)->exists()) {
-            return back()->withInput()->withErrors(['id_hasil' => 'Unit usaha rekomendasi tidak ditemukan.']);
+            $hasil->update([
+                'id_unit_usaha_rekomendasi' => $unitUsahaId,
+                'alasan_rekomendasi' => 'Rekomendasi pengadaan untuk pemenuhan defisit komoditas.',
+            ]);
         }
 
         $jumlah = abs((float) $hasil->selisih);
@@ -193,7 +289,7 @@ class PermintaanPengadaanController extends ModuleCrudController
             return back()->withInput()->withErrors(['id_hasil' => 'Jumlah kebutuhan defisit tidak valid.']);
         }
         $comparison = $hargaService->bandingkan(
-            (int) $user->id_entitas,
+            (int) $entitasId,
             (int) $hasil->id_komoditas,
             (int) $hasil->tahun,
             PeriodeKalkulasi::fromMonth((int) $hasil->bulan),
@@ -202,17 +298,21 @@ class PermintaanPengadaanController extends ModuleCrudController
         $harga = $comparison['lowest'] ?? 0;
         $total = $jumlah * $harga;
 
-        DB::transaction(function () use ($validated, $user, $hasil, $barang, $gudang, $jumlah, $harga, $total): void {
+        $isSetujui = $request->input('aksi') === 'setujui';
+
+        DB::transaction(function () use ($validated, $entitasId, $hasil, $barang, $gudang, $jumlah, $harga, $total, $unitUsahaId, $isSetujui): void {
             $pr = PermintaanPengadaan::create([
-                'id_entitas' => $user->id_entitas,
-                'kode_permintaan' => PermintaanPengadaan::generateKode((int) $user->id_entitas),
+                'id_entitas' => $entitasId,
+                'kode_permintaan' => PermintaanPengadaan::generateKode((int) $entitasId),
                 'tgl_pengajuan' => $validated['tgl_pengajuan'],
-                'id_unit_usaha' => $hasil->id_unit_usaha_rekomendasi,
+                'id_unit_usaha' => $unitUsahaId,
                 'id_gudang' => $gudang->id_gudang,
                 'total_nilai' => $total,
-                'status' => 'draft',
+                'status' => $isSetujui ? 'disetujui' : 'draft',
                 'catatan' => $validated['catatan'] ?? null,
                 'created_by' => auth()->id(),
+                'approved_by' => $isSetujui ? auth()->id() : null,
+                'approved_at' => $isSetujui ? now() : null,
             ]);
             $pr->detail()->create([
                 'id_barang' => $barang->id_barang,
@@ -223,21 +323,28 @@ class PermintaanPengadaanController extends ModuleCrudController
             ]);
         });
 
-        return redirect()->route($this->routeBase . '.index')->with('status', 'Draft PR berhasil disimpan.');
+        $statusMsg = $isSetujui
+            ? 'Permintaan Pengadaan berhasil dibuat dan langsung disetujui.'
+            : 'Draft PR berhasil disimpan.';
+
+        return redirect()->route($this->routeBase . '.index')->with('status', $statusMsg);
     }
 
     private function assertHasilBisaDiproses(HasilKalkulasi $hasil): void
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->id_entitas) {
-            abort(403, 'Hanya pengguna desa yang dapat membuat PR.');
+        if (! $user) {
+            abort(403, 'Silakan login terlebih dahulu.');
         }
 
-        $idWilayahUser = $user->entitas?->id_wilayah;
+        // Jika bukan Super Admin, validasi apakah hasil kalkulasi milik wilayahnya
+        if ($user->id_entitas !== null) {
+            $idWilayahUser = $user->entitas?->id_wilayah;
 
-        if ((int) $hasil->id_wilayah !== (int) $idWilayahUser) {
-            abort(403, 'Hasil kalkulasi tidak milik koperasi aktif Anda.');
+            if ((int) $hasil->id_wilayah !== (int) $idWilayahUser) {
+                abort(403, 'Hasil kalkulasi tidak milik koperasi aktif Anda.');
+            }
         }
 
         if ($hasil->status_surplus_defisit !== 'defisit') {

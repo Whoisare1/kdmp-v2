@@ -48,7 +48,7 @@
         </div>
         <div class="border-l-4 border-rose-600 bg-rose-50 px-4 py-3">
             <p class="text-xs font-medium uppercase text-rose-800">Total Nilai Retur</p>
-            <p class="mt-1 font-semibold text-rose-950">Rp {{ number_format((float) $item->total_nilai, 0, ',', '.') }}</p>
+            <p class="mt-1 font-semibold text-rose-950">Rp {{ number_format((float) $item->total_nilai, 2, ',', '.') }}</p>
         </div>
     </div>
 
@@ -64,33 +64,41 @@
             <h2 class="font-semibold text-ink-900">Rincian Barang yang Dikembalikan</h2>
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-[650px] w-full text-sm">
+            <table class="min-w-[800px] w-full text-sm">
                 <thead class="bg-rose-50 text-left text-rose-950">
                     <tr>
                         <th class="px-4 py-3">Barang</th>
                         <th class="px-4 py-3 text-right">Qty Diretur</th>
                         <th class="px-4 py-3">Satuan</th>
                         <th class="px-4 py-3 text-right">Harga Satuan</th>
-                        <th class="px-4 py-3 text-right">Subtotal Nilai</th>
+                        <th class="px-4 py-3 text-right">Nilai Sebelum Diskon</th>
+                        <th class="px-4 py-3 text-right">Diskon Dialokasikan</th>
+                        <th class="px-4 py-3 text-right">Nilai Bersih Retur</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($item->detail as $line)
+                        @php
+                            $nilaiSebelumDiskon = round((float) $line->qty_dasar * (float) $line->harga_satuan, 2);
+                            $diskonDialokasikan = max(0, $nilaiSebelumDiskon - (float) $line->nilai);
+                        @endphp
                         <tr class="border-t border-paper-200">
                             <td class="px-4 py-3 font-medium text-ink-900">{{ $line->barang?->nama_barang ?? '-' }}</td>
                             <td class="px-4 py-3 text-right font-semibold text-rose-700">{{ number_format((float) $line->qty_dasar, 2, ',', '.') }}</td>
                             <td class="px-4 py-3">{{ $line->barang?->satuanDasar?->kode_satuan ?? 'unit' }}</td>
                             <td class="px-4 py-3 text-right">Rp {{ number_format((float) $line->harga_satuan, 0, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-right font-medium">Rp {{ number_format((float) $line->nilai, 0, ',', '.') }}</td>
+                            <td class="px-4 py-3 text-right">Rp {{ number_format($nilaiSebelumDiskon, 2, ',', '.') }}</td>
+                            <td class="px-4 py-3 text-right">Rp {{ number_format($diskonDialokasikan, 2, ',', '.') }}</td>
+                            <td class="px-4 py-3 text-right font-medium">Rp {{ number_format((float) $line->nilai, 2, ',', '.') }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-8 text-center text-ink-600">Tidak ada detail barang retur.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-ink-600">Tidak ada detail barang retur.</td></tr>
                     @endforelse
                 </tbody>
                 <tfoot class="border-t border-paper-300 bg-paper-100">
                     <tr>
-                        <th colspan="4" class="px-4 py-3 text-right">Total Nilai Retur</th>
-                        <th class="px-4 py-3 text-right text-rose-700">Rp {{ number_format((float) $item->total_nilai, 0, ',', '.') }}</th>
+                        <th colspan="6" class="px-4 py-3 text-right">Total Nilai Bersih Retur</th>
+                        <th class="px-4 py-3 text-right text-rose-700">Rp {{ number_format((float) $item->total_nilai, 2, ',', '.') }}</th>
                     </tr>
                 </tfoot>
             </table>

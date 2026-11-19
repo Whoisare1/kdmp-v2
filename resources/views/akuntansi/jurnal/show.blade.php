@@ -31,6 +31,7 @@
                     @if($jurnal->status === 'POSTED')
                         <form action="{{ route('akuntansi.jurnal.balik', $jurnal->id_jurnal) }}" method="POST" onsubmit="return confirm('Yakin ingin membalik (reverse) jurnal ini? Proses ini akan membuat jurnal baru dengan arah kebalikan.');">
                             @csrf
+                            @idempotency
                             <input type="hidden" name="alasan" value="Koreksi Otomatis dari Detail Jurnal">
                             <button type="submit" class="rounded bg-merah-500 px-3 py-1 text-sm font-medium text-white hover:bg-merah-600 transition">
                                 Balik Jurnal

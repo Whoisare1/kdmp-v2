@@ -62,7 +62,7 @@
                             <span class="text-ink-700 font-medium">Gudang *</span>
                             <select name="id_gudang" required class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                                 <option value="">-- Pilih Gudang --</option>
-                                @foreach (\App\Models\Master\Gudang::all() as $gudang)
+                                @foreach ($gudangs ?? \App\Models\Master\Gudang::where('id_entitas', $item->id_entitas)->get() as $gudang)
                                     <option value="{{ $gudang->id_gudang }}" @selected(old('id_gudang', $item->id_gudang) == $gudang->id_gudang)>
                                         {{ $gudang->nama_gudang }}
                                     </option>
@@ -117,6 +117,14 @@
                         </table>
                     </div>
                     <p class="mt-2 text-xs text-ink-600">Jumlah dan harga wajib menggunakan KG dan harga per KG. Baris lama yang barangnya tidak memiliki konversi KG harus dihapus atau diganti.</p>
+                </div>
+
+                <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
+                    <label class="block max-w-sm text-sm">
+                        <span class="font-medium text-ink-700">Diskon (Rp)</span>
+                        <input type="number" name="diskon" min="0" step="0.01" value="{{ old('diskon', $item->diskon ?? 0) }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-white px-3 py-2">
+                        <span class="mt-1 block text-xs text-ink-500">Masukkan nominal potongan dari supplier. Isi 0 jika tidak ada diskon.</span>
+                    </label>
                 </div>
 
                 <!-- Supplier dan Pembayaran -->

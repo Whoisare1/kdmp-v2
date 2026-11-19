@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M6 Penjualan">
+<x-layouts.app :title="$title" eyebrow="Penjualan">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>
     @endif
@@ -10,32 +10,6 @@
             <ul class="list-inside list-disc space-y-1">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
     @endif
-
-    <section class="mb-5 rounded-sm border border-sky-300 bg-sky-50 p-4">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h2 class="font-semibold text-sky-950">Rekomendasi Penjualan dari Gudang (Data Contoh)</h2>
-                <p class="mt-1 text-sm text-sky-900">
-                    Rekomendasi simulasi berdasarkan contoh surplus dan kebutuhan komoditas. Ini hanya saran—kasir bebas menentukan barang dan pembeli, dan rekomendasi tidak mengubah keranjang maupun transaksi.
-                </p>
-            </div>
-        </div>
-
-        @if ($warehouseRecommendations->isEmpty())
-            <p class="mt-3 text-sm text-sky-900">Belum ada rekomendasi barang tersedia dari gudang.</p>
-        @else
-            <ul class="mt-3 grid gap-3 md:grid-cols-2">
-                @foreach ($warehouseRecommendations as $recommendation)
-                    <li class="rounded-sm border border-sky-200 bg-white p-3 text-sm text-sky-950">
-                        <p class="font-semibold">{{ $recommendation->barang->nama_barang }}</p>
-                        <p class="mt-1"><strong>Jumlah saran:</strong> {{ number_format((float) $recommendation->qty_rekomendasi, 2, ',', '.') }} {{ $recommendation->barang->satuanDasar?->kode_satuan ?? 'unit' }}</p>
-                        <p class="mt-1"><strong>Pasar yang disarankan:</strong> {{ $recommendation->tujuan_label }}</p>
-                        <p class="mt-1">{{ $recommendation->alasan }}</p>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
-    </section>
 
     {{-- POS Modern Header Bar --}}
     <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-sm">
@@ -52,6 +26,9 @@
                 </div>
                 <p class="text-xs text-ink-600">
                     {{ $entitas?->nama_entitas ?? 'Koperasi Desa Merah Putih' }} &bull; Operator: <span class="font-medium text-ink-800">{{ auth()->user()->name ?? 'Petugas Kasir' }}</span>
+                    @if (isset($gudang))
+                        &bull; Sumber Stok: <span class="inline-flex items-center gap-1 font-semibold text-emerald-700"><span class="size-1.5 rounded-full bg-emerald-500"></span>{{ $gudang->nama_gudang }}</span>
+                    @endif
                 </p>
             </div>
         </div>
@@ -69,6 +46,10 @@
                 <span class="rounded border border-paper-300 bg-paper-100 px-1.5 py-0.5 font-mono">F4</span> Uang Pas
                 <span class="rounded border border-paper-300 bg-paper-100 px-1.5 py-0.5 font-mono">Esc</span> Reset
             </div>
+
+            <a href="{{ route('keuangan.pelunasan.create', ['jenis' => 'terima_piutang']) }}" class="inline-flex items-center gap-1.5 rounded-sm border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 shadow-2xs transition hover:border-emerald-500 hover:bg-emerald-100 hover:text-emerald-950">
+                <span>💸</span> Terima Bayar Kasbon / Piutang
+            </a>
 
             <a href="{{ route("$routeBase.index") }}" class="inline-flex items-center gap-1.5 rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 shadow-2xs transition hover:border-rose-400 hover:bg-rose-50 hover:text-rose-700">
                 <span>📋</span> Riwayat Transaksi
@@ -92,9 +73,11 @@
                         <label class="min-w-0 flex-1 text-sm">
                             <span class="sr-only">Unit usaha</span>
                             <select id="unit-select" name="id_unit_usaha" form="checkout-form" required class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-800 shadow-2xs focus:border-rose-500 focus:outline-none">
-                                <option value="">Semua Unit Usaha</option>
+                                @if ($units->count() > 1)
+                                    <option value="">Semua Unit Usaha</option>
+                                @endif
                                 @foreach ($units as $unit)
-                                    <option value="{{ $unit->id_unit_usaha }}">{{ $unit->nama_unit_usaha }}</option>
+                                    <option value="{{ $unit->id_unit_usaha }}" @selected($units->count() === 1 || old('id_unit_usaha') == $unit->id_unit_usaha)>{{ $unit->nama_unit_usaha }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -119,8 +102,8 @@
                         data-price="{{ (float) $product->harga_jual_standar }}"
                         data-unit="{{ $product->satuanDasar?->kode_satuan ?? 'unit' }}"
                         data-unit-id="{{ $product->id_unit_usaha }}"
-                        data-stock="{{ number_format((float) $product->stok_demo, 4, '.', '') }}"
-                        @disabled($product->stok_demo <= 0)
+                        data-stock="{{ number_format((float) $product->stok_tersedia, 4, '.', '') }}"
+                        @disabled($product->stok_tersedia <= 0)
                         class="group relative flex min-h-40 flex-col justify-between rounded-sm border border-paper-300 bg-white p-3.5 text-left shadow-2xs transition-all duration-150 hover:-translate-y-0.5 hover:border-rose-500 hover:shadow-md focus:border-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500/30 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         {{-- Badge kuantitas di keranjang --}}
@@ -152,8 +135,14 @@
                             </div>
 
                             <div class="mt-1 flex items-center justify-between text-xs">
-                                <span data-stock-label class="font-medium {{ $product->stok_demo <= 5 ? 'text-amber-700' : 'text-emerald-700' }}">
-                                    Stok: {{ number_format((float) $product->stok_demo, 0, ',', '.') }} {{ $product->satuanDasar?->kode_satuan }}
+                                <span data-stock-label class="font-medium {{ $product->stok_tersedia <= 0 ? 'text-merah-600 font-bold' : ($product->stok_tersedia <= 5 ? 'text-amber-700' : 'text-emerald-700') }}">
+                                    @if ($product->stok_tersedia <= 0)
+                                        Stok Habis (0 {{ $product->satuanDasar?->kode_satuan }})
+                                    @elseif ($product->stok_tersedia <= 5)
+                                        Sisa: {{ number_format((float) $product->stok_tersedia, 0, ',', '.') }} {{ $product->satuanDasar?->kode_satuan }}
+                                    @else
+                                        Stok: {{ number_format((float) $product->stok_tersedia, 0, ',', '.') }} {{ $product->satuanDasar?->kode_satuan }}
+                                    @endif
                                 </span>
                                 <span class="text-[11px] font-semibold text-rose-600 opacity-0 transition group-hover:opacity-100">
                                     + Tambah
@@ -203,11 +192,20 @@
                 <div id="cart-items" class="max-h-64 space-y-2 overflow-y-auto pr-1"></div>
                 <div id="cart-inputs"></div>
 
+                <label class="block rounded-sm border border-amber-200 bg-amber-50/70 p-3 text-sm">
+                    <span class="mb-1 block text-xs font-semibold uppercase text-amber-950">Diskon Transaksi (Rp)</span>
+                    <input id="discount-input" type="number" name="diskon" min="0" step="0.01" value="{{ old('diskon', '0') }}" class="w-full rounded-sm border border-amber-300 bg-white px-3 py-2 text-right font-mono text-lg font-bold text-ink-900">
+                    <span class="mt-1 block text-xs text-amber-900">Isi nominal diskon yang diberikan; masukkan 0 jika tidak ada diskon.</span>
+                </label>
+
                 {{-- Data Pelanggan & Metode Pembayaran --}}
                 <div class="space-y-3 rounded-sm border border-paper-200 bg-paper-50/60 p-3">
                     <label class="block text-sm">
-                        <span id="customer-label" class="mb-1 block text-xs font-semibold uppercase text-ink-700">Nama Pembeli *</span>
-                        <input type="text" name="nama_pembeli" value="{{ old('nama_pembeli') }}" required maxlength="150" autocomplete="off" placeholder="Ketik nama pembeli" class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 shadow-2xs focus:border-rose-500 focus:outline-none">
+                        <div class="mb-1 flex items-center justify-between">
+                            <span id="customer-label" class="block text-xs font-semibold uppercase text-ink-700">Nama Pembeli *</span>
+                            <button type="button" onclick="document.querySelector('input[name=nama_pembeli]').value = 'Pembeli Umum'; calculateChange();" class="text-[11px] font-semibold text-rose-600 hover:underline">+ Pembeli Umum</button>
+                        </div>
+                        <input type="text" name="nama_pembeli" value="{{ old('nama_pembeli', 'Pembeli Umum') }}" required maxlength="150" autocomplete="off" placeholder="Ketik nama pembeli" class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 shadow-2xs focus:border-rose-500 focus:outline-none">
                     </label>
 
                     <div>
@@ -288,6 +286,14 @@
                     <div class="flex items-center justify-between text-xs font-medium tracking-wider text-rose-200">
                         <span>TOTAL TAGIHAN</span>
                         <span id="pos-item-summary">0 Item</span>
+                    </div>
+                    <div class="mt-2 flex justify-between text-xs text-rose-100">
+                        <span>Subtotal</span>
+                        <span id="cart-subtotal-display">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-rose-100">
+                        <span>Diskon</span>
+                        <span id="cart-discount-display">Rp 0</span>
                     </div>
                     <div id="cart-total-display" class="mt-1 text-right font-mono text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
                         Rp 0
@@ -477,7 +483,15 @@
                 {{-- Perhitungan Pembayaran --}}
                 <div class="space-y-1 text-[11px]">
                     <div class="flex justify-between font-bold text-xs">
-                        <span>TOTAL :</span>
+                        <span>SUBTOTAL :</span>
+                        <span id="preview-subtotal">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>DISKON :</span>
+                        <span id="preview-discount">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-xs">
+                        <span>TOTAL TAGIHAN :</span>
                         <span id="preview-total">Rp 0</span>
                     </div>
                     <div class="flex justify-between text-gray-600">
@@ -567,6 +581,7 @@
             const transferInputs = document.querySelectorAll('.transfer-input');
             const transferConfirmation = document.getElementById('transfer-confirmed');
             const cashInput = document.getElementById('cash-input');
+            const discountInput = document.getElementById('discount-input');
             const hiddenNominalInput = document.getElementById('input_nominal_bayar');
             const autoPrintCheckbox = document.getElementById('check-auto-print');
             const hiddenAutoPrint = document.getElementById('input_auto_print');
@@ -585,6 +600,8 @@
 
             const formatter = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 
+            let currentSubtotal = 0;
+            let currentDiscount = 0;
             let currentTotal = 0;
             let currentCash = 0;
 
@@ -623,7 +640,19 @@
                     
                     const stockLabel = card.querySelector('[data-stock-label]');
                     if (stockLabel) {
-                        stockLabel.textContent = `Stok: ${formatNumber(remaining)} ${card.dataset.unit}`;
+                        if (stock <= 0) {
+                            stockLabel.textContent = `Stok Habis (0 ${card.dataset.unit})`;
+                            stockLabel.className = 'font-bold text-merah-600';
+                        } else if (remaining <= 0) {
+                            stockLabel.textContent = `Maks di Keranjang (${formatNumber(stock)} ${card.dataset.unit})`;
+                            stockLabel.className = 'font-bold text-amber-600';
+                        } else if (remaining <= 5) {
+                            stockLabel.textContent = `Sisa: ${formatNumber(remaining)} ${card.dataset.unit}`;
+                            stockLabel.className = 'font-medium text-amber-700';
+                        } else {
+                            stockLabel.textContent = `Stok: ${formatNumber(remaining)} ${card.dataset.unit}`;
+                            stockLabel.className = 'font-medium text-emerald-700';
+                        }
                     }
 
                     // Badge di pojok kartu
@@ -648,10 +677,13 @@
                     transferDetailsSection.classList.remove('hidden');
                     creditDetailsSection.classList.add('hidden');
                     creditDueDate.required = false;
+                    creditDueDate.disabled = true;
                     customerLabel.textContent = 'Nama Pembeli *';
                     transferDestination.required = true;
-                    transferInputs.forEach((input) => { input.required = true; });
+                    transferDestination.disabled = false;
+                    transferInputs.forEach((input) => { input.required = true; input.disabled = false; });
                     transferConfirmation.required = true;
+                    transferConfirmation.disabled = false;
                     hiddenNominalInput.value = currentTotal;
                     const transferReady = transferDestination.value
                         && [...transferInputs].every((input) => input.value.trim() !== '')
@@ -665,10 +697,13 @@
                     cashCalcSection.style.display = 'none';
                     transferDetailsSection.classList.add('hidden');
                     transferDestination.required = false;
-                    transferInputs.forEach((input) => { input.required = false; });
+                    transferDestination.disabled = true;
+                    transferInputs.forEach((input) => { input.required = false; input.disabled = true; });
                     transferConfirmation.required = false;
+                    transferConfirmation.disabled = true;
                     creditDetailsSection.classList.remove('hidden');
                     creditDueDate.required = true;
+                    creditDueDate.disabled = false;
                     customerLabel.textContent = 'Nama Pembeli / Debitur *';
                     hiddenNominalInput.value = '0';
                     checkoutButton.disabled = cart.size === 0 || !unitSelect.value || !customerInput.value.trim() || !creditDueDate.value;
@@ -680,9 +715,12 @@
                 transferDetailsSection.classList.add('hidden');
                 creditDetailsSection.classList.add('hidden');
                 creditDueDate.required = false;
+                creditDueDate.disabled = true;
                 transferDestination.required = false;
-                transferInputs.forEach((input) => { input.required = false; });
+                transferDestination.disabled = true;
+                transferInputs.forEach((input) => { input.required = false; input.disabled = true; });
                 transferConfirmation.required = false;
+                transferConfirmation.disabled = true;
                 customerLabel.textContent = 'Nama Pembeli *';
                 currentCash = parseCleanNumber(cashInput.value);
                 hiddenNominalInput.value = currentCash;
@@ -698,7 +736,7 @@
 
                 const diff = currentCash - currentTotal;
 
-                if (currentTotal === 0) {
+                if (cart.size === 0) {
                     changeDisplayBox.className = 'rounded-sm border border-paper-300 bg-paper-100 p-3 transition-colors';
                     changeStatusLabel.textContent = 'UANG KEMBALI';
                     changeStatusLabel.className = 'text-ink-700';
@@ -743,13 +781,14 @@
             function renderCart() {
                 cartItems.replaceChildren();
                 cartInputs.replaceChildren();
+                currentSubtotal = 0;
                 currentTotal = 0;
                 let count = 0;
                 let index = 0;
 
                 cart.forEach((item, id) => {
                     const itemSubtotal = item.price * item.quantity;
-                    currentTotal += itemSubtotal;
+                    currentSubtotal += itemSubtotal;
                     count += item.quantity;
 
                     const row = document.createElement('div');
@@ -842,7 +881,16 @@
                     index += 1;
                 });
 
+                const requestedDiscount = Number.parseFloat(discountInput.value) || 0;
+                currentDiscount = Math.min(Math.max(0, requestedDiscount), currentSubtotal);
+                if (requestedDiscount > currentSubtotal) {
+                    discountInput.value = currentSubtotal.toFixed(2);
+                }
+                discountInput.max = currentSubtotal.toFixed(2);
+                currentTotal = Math.max(0, Math.round((currentSubtotal - currentDiscount) * 100) / 100);
                 emptyState.classList.toggle('hidden', cart.size > 0);
+                document.getElementById('cart-subtotal-display').textContent = `Rp ${formatNumber(currentSubtotal)}`;
+                document.getElementById('cart-discount-display').textContent = `Rp ${formatNumber(currentDiscount)}`;
                 totalDisplay.textContent = `Rp ${formatNumber(currentTotal)}`;
                 itemSummaryDisplay.textContent = `${count} Total Item`;
                 cartCountBadge.textContent = count;
@@ -880,8 +928,10 @@
             document.getElementById('clear-cart').addEventListener('click', () => {
                 cart.clear();
                 cashInput.value = '0';
+                discountInput.value = '0';
                 renderCart();
             });
+            discountInput.addEventListener('input', renderCart);
 
             // Ganti Unit Usaha
             unitSelect.addEventListener('change', () => {
@@ -1031,6 +1081,8 @@
                 
                 document.getElementById('preview-customer').textContent = customerName;
                 document.getElementById('preview-method').textContent = method.toUpperCase();
+                document.getElementById('preview-subtotal').textContent = `Rp ${formatNumber(currentSubtotal)}`;
+                document.getElementById('preview-discount').textContent = `Rp ${formatNumber(currentDiscount)}`;
                 document.getElementById('preview-total').textContent = `Rp ${formatNumber(currentTotal)}`;
                 
                 const paidVal = method === 'transfer' ? currentTotal : (method === 'kredit' ? 0 : currentCash);

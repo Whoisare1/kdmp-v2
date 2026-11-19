@@ -19,6 +19,24 @@ class Entitas extends Model
         return ['tgl_berdiri' => 'date', 'is_active' => 'boolean'];
     }
 
+    public function setJenisEntitasAttribute($value): void
+    {
+        $map = [
+            'koperasi' => 'Koperasi Desa',
+            'koperasi desa' => 'Koperasi Desa',
+            'bumdes' => 'BUMDes',
+            'poktan' => 'Kelompok Tani',
+            'kelompok tani' => 'Kelompok Tani',
+            'gapoktan' => 'Gapoktan',
+            'perorangan' => 'Perorangan',
+            'umkm' => 'Lainnya',
+            'lainnya' => 'Lainnya',
+        ];
+
+        $normalized = strtolower(trim((string) $value));
+        $this->attributes['jenis_entitas'] = $map[$normalized] ?? $value;
+    }
+
     public function wilayah()
     {
         return $this->belongsTo(Wilayah::class, 'id_wilayah');

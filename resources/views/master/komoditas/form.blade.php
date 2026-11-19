@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data">
+<x-layouts.app :title="$title" eyebrow="Master Data">
     <div class="mb-5">
         <a href="{{ route('master.komoditas.index') }}" class="inline-flex items-center gap-1 text-sm text-ink-600 hover:text-ink-900">
             &larr; Kembali ke Daftar Komoditas
@@ -57,7 +57,7 @@
                        placeholder="Contoh: cabe merah, lombok merah, cabai keriting"
                        class="w-full rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-merah-400 focus:outline-none">
                 <p class="mt-1 text-[11px] text-ink-500">
-                    Membantu jembatan sinkronisasi M1 &rarr; M2 mengenali variasi penulisan nama komoditas saat survei lapangan.
+                    Membantu jembatan sinkronisasi Survei &rarr; Perencanaan mengenali variasi penulisan nama komoditas saat survei lapangan.
                 </p>
             </div>
 
@@ -67,7 +67,7 @@
                     <input type="checkbox" name="is_active" value="1"
                            @checked(old('is_active', $item->is_active ?? true))
                            class="rounded border-paper-300 text-merah-600 focus:ring-merah-500">
-                    <span>Komoditas Aktif (Dihitung dalam Kalkulasi Neraca Komoditas M2)</span>
+                    <span>Komoditas Aktif (Dihitung dalam Kalkulasi Neraca Komoditas)</span>
                 </label>
             </div>
         </div>

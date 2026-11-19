@@ -15,16 +15,40 @@
             <p class="mt-1 text-sm text-ink-600">{{ $item->tanggal_terima?->format('d M Y') }}</p>
         </div>
 
+        @php
+            $antrean = $item->relationLoaded('antreanJurnal') ? $item->antreanJurnal->first() : null;
+            $sumberLabel = $item->pembelian
+                ? 'Pembelian (' . $item->pembelian->kode_pembelian . ')'
+                : match ($antrean?->payload['sumber_penerimaan'] ?? null) {
+                    'saldo_awal' => 'Stok Awal / Saldo Awal (JOP)',
+                    default => 'Non-Pembelian',
+                };
+        @endphp
         <div class="rounded-sm border border-paper-300 bg-paper-50 p-5">
             <dl class="grid grid-cols-2 gap-3 text-sm">
                 <dt class="text-ink-600">Gudang</dt>
                 <dd class="text-right font-medium text-ink-800">{{ $item->gudang->nama_gudang ?? '-' }}</dd>
                 <dt class="text-ink-600">Pihak</dt>
                 <dd class="text-right font-medium text-ink-800">{{ $item->pihak->nama ?? '-' }}</dd>
-                <dt class="text-ink-600">Referensi pembelian</dt>
-                <dd class="text-right font-medium text-ink-800">{{ $item->pembelian?->kode_pembelian ?? 'Tanpa PO' }}</dd>
+                <dt class="text-ink-600">Sumber Penerimaan</dt>
+                <dd class="text-right font-medium text-ink-800">{{ $sumberLabel }}</dd>
                 <dt class="text-ink-600">Status</dt>
                 <dd class="text-right font-medium text-sawah-600">{{ $item->status }}</dd>
+                <dt class="text-ink-600">Status Jurnal Akuntansi</dt>
+                <dd class="text-right font-medium text-ink-800">
+                    @if ($antrean)
+                        <span class="{{ $antrean->status === 'DIPOSTING' ? 'text-sawah-600' : ($antrean->status === 'GAGAL' ? 'text-merah-600' : 'text-ink-700') }}">
+                            {{ $antrean->status }}
+                        </span>
+                        @if ($antrean->no_jurnal)
+                            <span class="font-mono text-xs text-ink-600">({{ $antrean->no_jurnal }})</span>
+                        @elseif ($antrean->pesan_error)
+                            <span class="block text-xs font-normal text-merah-600">{{ $antrean->pesan_error }}</span>
+                        @endif
+                    @else
+                        <span class="text-ink-500">-</span>
+                    @endif
+                </dd>
             </dl>
         </div>
     </div>

@@ -21,7 +21,12 @@ trait ResolvesEntitasAktif
 
         $pilihan = request()->session()->get('entitas_aktif_pilihan');
 
-        return $pilihan !== null && $pilihan !== '' ? (int) $pilihan : null;
+        if ($pilihan !== null && $pilihan !== '') {
+            return (int) $pilihan;
+        }
+
+        return (int) (Entitas::where('status', 'APPROVED')->value('id_entitas')
+            ?? Entitas::value('id_entitas'));
     }
 
     protected function requireEntitasAktifId(): int
@@ -42,4 +47,3 @@ trait ResolvesEntitasAktif
         return $id ? Entitas::find($id) : null;
     }
 }
-

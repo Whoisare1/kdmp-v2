@@ -127,13 +127,15 @@ class StokMinimumBarangController extends Controller
         $pengguna = auth()->user();
 
         abort_unless(
-            $pengguna && ($pengguna->hasPeran('admin_gudang') || $pengguna->hasPeran('manajer')),
+            $pengguna && ($pengguna->isSuperAdmin() || $pengguna->hasPeran('admin_gudang') || $pengguna->hasPeran('manajer')),
             403,
             'Hanya Admin Gudang atau Manajer yang dapat mengatur stok minimum.',
         );
 
         $entitasId = $pengguna->id_entitas
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+            ?? session('entitas_aktif_pilihan')
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
 
         abort_unless($entitasId, 403, 'Entitas aktif tidak ditemukan.');
 

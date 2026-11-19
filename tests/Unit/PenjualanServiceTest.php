@@ -40,4 +40,33 @@ class PenjualanServiceTest extends TestCase
 
         PenjualanService::createSale(1, 1, 1, 'kredit', [], null, [], today()->addDay()->toDateString());
     }
+
+    public function test_sale_rejects_a_negative_discount(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Diskon penjualan tidak boleh bernilai negatif.');
+
+        PenjualanService::createSale(
+            1,
+            1,
+            1,
+            'tunai',
+            [['id_barang' => 1, 'qty_dasar' => 1]],
+            diskon: -1,
+        );
+    }
+
+    public function test_sale_rejects_zero_quantity(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Jumlah barang harus lebih besar dari nol.');
+
+        PenjualanService::createSale(
+            1,
+            1,
+            1,
+            'tunai',
+            [['id_barang' => 1, 'qty_dasar' => 0]],
+        );
+    }
 }

@@ -100,7 +100,7 @@ Route::post('/survei/isi/{token}/sesi4/selesaikan', [$cSurvei . 'PublicSesi4Cont
 // 2. RUTE ADMIN MANAJEMEN SURVEI (Membutuhkan Login / Auth)
 // =========================================================================
 
-Route::middleware('auth')->group(function () use ($cSurvei) {
+Route::middleware(['auth', 'peran:surveyor'])->group(function () use ($cSurvei) {
     Route::prefix('survei')->name('survei.')->group(function () use ($cSurvei) {
         
         // ─── Dashboard Survei (Induk Menu: http://127.0.0.1:8000/survei/dashboard) ───

@@ -36,14 +36,22 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        $isPurchasingUser = $user->hasPeran('pembelian');
-        $isSalesUser = $user->hasPeran('kasir') || $user->hasPeran('penjualan');
-        if ($isPurchasingUser || $isSalesUser) {
-            $route = $isPurchasingUser
-                ? 'pembelian.pembelian.index'
-                : 'penjualan.penjualan.index';
+        $isSuperAdmin = $user->id_entitas === null && $user->peran->contains('kode', 'super_admin');
+        if ($isSuperAdmin) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
 
-            return redirect()->route($route);
+        $isManajer = $user->hasPeran('manajer');
+        if (! $isManajer) {
+            $isPurchasingUser = $user->hasPeran('pembelian');
+            $isSalesUser = $user->hasPeran('kasir') || $user->hasPeran('penjualan');
+            if ($isPurchasingUser || $isSalesUser) {
+                $route = $isPurchasingUser
+                    ? 'pembelian.pembelian.index'
+                    : 'penjualan.penjualan.index';
+
+                return redirect()->route($route);
+            }
         }
 
         if ($user->id_entitas === null) {

@@ -62,7 +62,7 @@
                                     <div class="font-medium text-ink-900">{{ $a->nama_aset }}</div>
                                     <div class="font-mono text-xs text-ink-500">{{ $a->kode_aset }}</div>
                                 </td>
-                                <td class="px-4 py-2.5 text-ink-700">{{ $a->kategori }}</td>
+                                <td class="px-4 py-2.5 text-ink-700 capitalize">{{ $a->kategori }}</td>
                                 <td class="px-4 py-2.5 text-ink-700">{{ $a->tgl_perolehan->format('d M Y') }}</td>
                                 <td class="px-4 py-2.5 text-right font-mono text-ink-900">
                                     {{ number_format($a->nilai_perolehan, 0, ',', '.') }}
@@ -75,15 +75,22 @@
                                 </td>
                                 <td class="px-4 py-2.5 text-center">
                                     @php
-                                        $statusColor = match($a->status) {
-                                            'AKTIF' => 'bg-sawah-100 text-sawah-700',
-                                            'DIJUAL' => 'bg-blue-100 text-blue-700',
-                                            'RUSAK' => 'bg-merah-100 text-merah-700',
+                                        $statusKey = strtolower((string) $a->status);
+                                        $statusColor = match($statusKey) {
+                                            'aktif' => 'bg-sawah-100 text-sawah-700',
+                                            'habis_susut' => 'bg-blue-100 text-blue-700',
+                                            'dilepas', 'dijual', 'rusak' => 'bg-merah-100 text-merah-700',
                                             default => 'bg-paper-100 text-ink-500',
+                                        };
+                                        $statusLabel = match($statusKey) {
+                                            'aktif' => 'Aktif',
+                                            'habis_susut' => 'Habis Susut',
+                                            'dilepas' => 'Dilepas',
+                                            default => strtoupper($statusKey),
                                         };
                                     @endphp
                                     <span class="rounded px-2 py-0.5 text-xs font-medium {{ $statusColor }}">
-                                        {{ $a->status }}
+                                        {{ $statusLabel }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-2.5 text-right">

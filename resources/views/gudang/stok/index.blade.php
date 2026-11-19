@@ -22,6 +22,10 @@
                 Terapkan
             </button>
         </form>
+
+        <a href="{{ route('master.barang.stok-minimum.index') }}" class="inline-flex items-center justify-center rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-paper-100 shadow-sm transition">
+            ⚙️ Atur Stok Minimum & Batch
+        </a>
     </div>
 
     <div class="overflow-x-auto rounded-sm border border-paper-300 bg-paper-50">

@@ -23,6 +23,7 @@
 
     <form method="POST" action="{{ route('akuntansi.aset-tetap.store') }}" class="rounded border border-paper-200 bg-white p-6 shadow-sm">
         @csrf
+        @idempotency
 
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
             
@@ -44,9 +45,13 @@
 
                 <div>
                     <label class="block text-xs font-medium text-ink-700 mb-1">Kategori / Kelompok</label>
-                    <input type="text" name="kategori" value="{{ old('kategori', 'Peralatan') }}" required
-                           class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400"
-                           placeholder="Misal: Kendaraan, Bangunan, Peralatan Kantor">
+                    @php $katVal = strtolower((string) old('kategori', 'peralatan')); @endphp
+                    <select name="kategori" id="kategori_aset" required
+                            class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
+                        @foreach($kategoriList as $kode => $label)
+                            <option value="{{ $kode }}" @selected($katVal === $kode)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
@@ -62,8 +67,9 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-ink-700 mb-1">Umur Ekonomis (Bulan)</label>
-                        <input type="number" name="umur_bulan" value="{{ old('umur_bulan', 48) }}" required min="1"
+                        <input type="number" name="umur_bulan" id="umur_bulan" value="{{ old('umur_bulan', 48) }}" min="0"
                                class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
+                        <p id="tanah_hint" class="hidden mt-1 text-[11px] text-ink-500">Tanah tidak disusutkan (umur bulan = 0).</p>
                     </div>
                 </div>
 
@@ -92,10 +98,10 @@
                     </select>
                 </div>
 
-                <div>
+                <div id="wrap_akun_akum">
                     <label class="block text-xs font-medium text-ink-700 mb-1">Akun Akumulasi Penyusutan</label>
-                    <select name="kode_akun_akum" required class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
-                        <option value="">-- Pilih Akun Akumulasi --</option>
+                    <select name="kode_akun_akum" id="kode_akun_akum" class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
+                        <option value="">-- Pilih Akun Akumulasi (Kosongkan untuk Tanah) --</option>
                         @foreach($akunAkum as $akun)
                             <option value="{{ $akun->kode_anak }}" @selected(old('kode_akun_akum') == $akun->kode_anak)>
                                 {{ $akun->kode_anak }} - {{ $akun->nama_rekening }}
@@ -104,10 +110,10 @@
                     </select>
                 </div>
 
-                <div>
+                <div id="wrap_akun_biaya">
                     <label class="block text-xs font-medium text-ink-700 mb-1">Akun Biaya Penyusutan</label>
-                    <select name="kode_akun_biaya" required class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
-                        <option value="">-- Pilih Akun Biaya --</option>
+                    <select name="kode_akun_biaya" id="kode_akun_biaya" class="w-full rounded border border-paper-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-merah-400">
+                        <option value="">-- Pilih Akun Biaya (Kosongkan untuk Tanah) --</option>
                         @foreach($akunBiaya as $akun)
                             <option value="{{ $akun->kode_anak }}" @selected(old('kode_akun_biaya') == $akun->kode_anak)>
                                 {{ $akun->kode_anak }} - {{ $akun->nama_rekening }}
@@ -128,5 +134,7 @@
             </button>
         </div>
     </form>
+
+    @include('akuntansi.aset-tetap._kategori-script')
 
 </x-layouts.app>

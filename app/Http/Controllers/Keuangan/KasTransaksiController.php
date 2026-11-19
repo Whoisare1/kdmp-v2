@@ -53,7 +53,7 @@ class KasTransaksiController extends Controller
         $idEntitas = app('entitas_aktif');
         $kasBanks = KasBank::when($idEntitas, fn($q) => $q->where('id_entitas', $idEntitas))->where('is_active', 1)->get();
         // Ambil akun untuk lawan (selain header dan grup kas)
-        $akunLawan = Coa::where('is_transaction', 1)
+        $akunLawan = Coa::where('is_transaction', 'T')
             ->where('is_active', 1)
             ->orderBy('kode_anak')
             ->get();

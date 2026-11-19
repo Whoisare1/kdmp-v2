@@ -31,6 +31,7 @@
             <a href="#overview" class="text-sm text-paper-300 hover:text-paper-50 transition-colors">Fitur</a>
             <a href="#modul" class="text-sm text-paper-300 hover:text-paper-50 transition-colors">Modul</a>
             <a href="#cara-kerja" class="text-sm text-paper-300 hover:text-paper-50 transition-colors">Cara Kerja</a>
+            <a href="#potensi-desa" class="text-sm text-padi-400 hover:text-padi-300 font-medium transition-colors">Potensi Desa</a>
             <a href="#komoditi" class="text-sm text-paper-300 hover:text-paper-50 transition-colors">Komoditi</a>
             <a href="#tentang" class="text-sm text-paper-300 hover:text-paper-50 transition-colors">Tentang</a>
         </div>
@@ -68,6 +69,9 @@
                 <a href="{{ route("login") }}" class="cta-glow inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-padi-500 text-ink-950 font-semibold text-sm">
                     Mulai Sekarang
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </a>
+                <a href="#potensi-desa" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-padi-500/50 bg-padi-500/15 text-padi-100 hover:bg-padi-500/25 font-medium text-sm transition-all duration-200">
+                    🌾 Peta Potensi Desa
                 </a>
                 <a href="#fitur" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-ink-600 text-paper-200 hover:border-padi-500/50 hover:text-padi-100 font-medium text-sm transition-all duration-200">
                     Lihat Fitur
@@ -146,7 +150,7 @@
         @php
         $modules = [
             [
-                "no" => "M0",
+                "no" => "Tahap 1",
                 "icon" => "🗄️",
                 "color" => "padi",
                 "title" => "Master Data & Konfigurasi",
@@ -155,7 +159,7 @@
                 "badge" => "Fondasi",
             ],
             [
-                "no" => "M1",
+                "no" => "Tahap 2",
                 "icon" => "📋",
                 "color" => "sawah",
                 "title" => "Survei Kebutuhan Warga",
@@ -164,7 +168,7 @@
                 "badge" => "Input Data",
             ],
             [
-                "no" => "M2",
+                "no" => "Tahap 3",
                 "icon" => "📊",
                 "color" => "padi",
                 "title" => "Kalkulasi Kebutuhan",
@@ -173,7 +177,7 @@
                 "badge" => "Analitik",
             ],
             [
-                "no" => "M3",
+                "no" => "Tahap 4",
                 "icon" => "📝",
                 "color" => "sawah",
                 "title" => "Rencana Pengadaan",
@@ -182,7 +186,7 @@
                 "badge" => "Perencanaan",
             ],
             [
-                "no" => "M4",
+                "no" => "Tahap 5",
                 "icon" => "🏭",
                 "color" => "padi",
                 "title" => "Gudang & Manajemen Stok",
@@ -191,7 +195,7 @@
                 "badge" => "Operasional",
             ],
             [
-                "no" => "M5",
+                "no" => "Tahap 6",
                 "icon" => "🛒",
                 "color" => "merah",
                 "title" => "Pembelian (Purchase Order)",
@@ -200,7 +204,7 @@
                 "badge" => "Transaksi",
             ],
             [
-                "no" => "M6",
+                "no" => "Tahap 7",
                 "icon" => "💰",
                 "color" => "sawah",
                 "title" => "Penjualan & Distribusi",
@@ -209,7 +213,7 @@
                 "badge" => "Transaksi",
             ],
             [
-                "no" => "M7",
+                "no" => "Tahap 8",
                 "icon" => "🔄",
                 "color" => "padi",
                 "title" => "Konsinyasi & Barter Antar-Desa",
@@ -218,7 +222,7 @@
                 "badge" => "Unggulan",
             ],
             [
-                "no" => "M8",
+                "no" => "Tahap 9",
                 "icon" => "📒",
                 "color" => "sawah",
                 "title" => "Akuntansi & Laporan Keuangan",
@@ -280,23 +284,23 @@
             <p class="text-center text-xs font-mono text-paper-500 mb-6 uppercase tracking-widest">Alur Antar Modul</p>
             <div class="flex flex-wrap justify-center items-center gap-2 text-xs">
                 @foreach([
-                    ["M0","Master Data","padi"],
+                    ["Tahap 1","Master Data","padi"],
                     ["→","",""],
-                    ["M1","Survei","sawah"],
+                    ["Tahap 2","Survei","sawah"],
                     ["→","",""],
-                    ["M2","Kalkulasi","padi"],
+                    ["Tahap 3","Kalkulasi","padi"],
                     ["→","",""],
-                    ["M3","Rencana","sawah"],
+                    ["Tahap 4","Rencana","sawah"],
                     ["→","",""],
-                    ["M4","Gudang","padi"],
+                    ["Tahap 5","Gudang","padi"],
                     ["→","",""],
-                    ["M5","Pembelian","merah"],
+                    ["Tahap 6","Pembelian","merah"],
                     ["→","",""],
-                    ["M6","Penjualan","sawah"],
+                    ["Tahap 7","Penjualan","sawah"],
                     ["→","",""],
-                    ["M7","Konsinyasi","padi"],
+                    ["Tahap 8","Konsinyasi","padi"],
                     ["→","",""],
-                    ["M8","Akuntansi","sawah"],
+                    ["Tahap 9","Akuntansi","sawah"],
                 ] as [$no,$label,$color])
                     @if($no === "→")
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-ink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
@@ -388,6 +392,96 @@
                     @endforeach
                 </div>
             </div>
+        </div>
+    </div>
+</section>
+
+{{-- PETA POTENSI SURPLUS DEFISIT DESA (PUBLIK & AMAN: HANYA SURPLUS/DEFISIT, TANPA HARGA, TANPA LINK SURVEI) --}}
+<section id="potensi-desa" class="py-24 border-t border-ink-800 map-pattern" style="background-color:rgba(20,23,15,0.7)">
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="text-center mb-14 reveal">
+            <span class="badge bg-padi-500/15 text-padi-100 border border-padi-500/30 mb-3">Transparansi Pangan Desa</span>
+            <h2 class="font-display text-4xl font-semibold text-paper-50 mt-2">Peta Potensi &amp; Ketahanan Pangan Antar-Desa</h2>
+            <p class="text-paper-300/70 mt-3 max-w-2xl mx-auto text-sm leading-relaxed">
+                Sistem secara otomatis mendeteksi komoditas yang <strong>Surplus (Kelebihan Pasokan)</strong> dan <strong>Defisit (Kekurangan Pasokan)</strong> di masing-masing desa untuk memfasilitasi pertukaran dan konsinyasi antar-koperasi.
+            </p>
+            <p class="text-[11px] font-mono text-paper-400 mt-2">
+                🔒 Data rincian harga transaksi dan survei detail dilindungi di dalam portal internal koperasi desa.
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @forelse($daftarEntitas ?? [] as $ent)
+                @php
+                    $surplusItems = ($hasilKalkulasi ?? collect())
+                        ->where('id_wilayah', $ent->id_wilayah)
+                        ->where('status_surplus_defisit', 'surplus');
+                    $defisitItems = ($hasilKalkulasi ?? collect())
+                        ->where('id_wilayah', $ent->id_wilayah)
+                        ->where('status_surplus_defisit', 'defisit');
+                @endphp
+                <div class="rounded-2xl border border-ink-700 bg-ink-900/90 p-6 flex flex-col justify-between gap-5 hover:border-padi-500/40 transition-all">
+                    <div>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="rounded bg-padi-500/15 border border-padi-500/30 px-2.5 py-0.5 font-mono text-xs font-semibold text-padi-200">
+                                {{ $ent->kode_entitas }}
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sawah-500/15 border border-sawah-500/30 px-2.5 py-0.5 text-[11px] text-sawah-100">
+                                ● Terdaftar
+                            </span>
+                        </div>
+
+                        <h3 class="font-display text-lg font-semibold text-paper-50 mt-3">
+                            {{ $ent->nama_entitas }}
+                        </h3>
+                        <p class="text-xs text-paper-400 mt-1">
+                            Wilayah: <strong class="text-paper-200">{{ $ent->wilayah?->nama ?? 'Wilayah Desa' }}</strong>
+                        </p>
+                    </div>
+
+                    <div class="space-y-3 pt-3 border-t border-ink-800 text-xs">
+                        <div>
+                            <span class="text-sawah-100 font-semibold flex items-center gap-1.5">
+                                <span>🌾</span>
+                                <span>Komoditas Surplus (Siap Pasok / Barter):</span>
+                            </span>
+                            <div class="flex flex-wrap gap-1.5 mt-1.5">
+                                @forelse($surplusItems->take(4) as $item)
+                                    <span class="rounded-md bg-sawah-500/15 border border-sawah-500/30 px-2 py-0.5 text-[11px] text-sawah-100 font-medium">
+                                        {{ $item->komoditas?->nama }} (+{{ number_format((float) $item->selisih, 0, ',', '.') }} kg)
+                                    </span>
+                                @empty
+                                    <span class="text-paper-500 italic text-[11px]">Belum ada surplus tercatat</span>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div>
+                            <span class="text-merah-100 font-semibold flex items-center gap-1.5">
+                                <span>⚠️</span>
+                                <span>Komoditas Defisit (Butuh Pasokan Mitra):</span>
+                            </span>
+                            <div class="flex flex-wrap gap-1.5 mt-1.5">
+                                @forelse($defisitItems->take(4) as $item)
+                                    <span class="rounded-md bg-merah-500/15 border border-merah-500/30 px-2 py-0.5 text-[11px] text-merah-100 font-medium">
+                                        {{ $item->komoditas?->nama }} ({{ number_format((float) $item->selisih, 0, ',', '.') }} kg)
+                                    </span>
+                                @empty
+                                    <span class="text-paper-500 italic text-[11px]">Kebutuhan terpenuhi lokal</span>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="{{ route('login') }}" class="w-full text-center rounded-xl border border-ink-700 bg-ink-800 hover:bg-ink-700 hover:text-white px-3 py-2 text-xs font-semibold text-paper-200 transition-colors">
+                        Masuk untuk Mengajukan Barter →
+                    </a>
+                </div>
+            @empty
+                <div class="col-span-full rounded-2xl border border-ink-700 bg-ink-900 p-8 text-center text-sm text-paper-400">
+                    Belum ada data entitas aktif di database.
+                </div>
+            @endforelse
         </div>
     </div>
 </section>

@@ -17,5 +17,10 @@ Thumbs.db
 /storage/framework/views/*
 
 scratch_*.php
+scratch/
 fix_ledger.php
 *.zip
+rekaman_video/
+scripts/
+
+

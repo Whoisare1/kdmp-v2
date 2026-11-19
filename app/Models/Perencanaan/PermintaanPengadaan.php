@@ -65,7 +65,7 @@ class PermintaanPengadaan extends Model
             'diajukan' => 'Menunggu Verifikasi',
             'disetujui' => 'Disetujui',
             'ditolak' => 'Ditolak',
-            'jadi_pembelian' => 'Diproses Pembelian (M5)',
+            'jadi_pembelian' => 'Diproses Pembelian',
             'dibatalkan' => 'Dibatalkan',
             default => ucfirst((string) $this->status),
         };

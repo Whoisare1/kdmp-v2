@@ -27,19 +27,24 @@ class PerbandinganHargaController extends ModuleCrudController
             'bulan' => ['nullable', 'integer', 'min:1', 'max:12'],
         ]);
         $user = auth()->user();
+        $entitasId = $user?->id_entitas 
+            ?? session('entitas_aktif_pilihan') 
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
+            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+
         $service = app(PerbandinganHargaService::class);
         $selected = (int) ($validated['id_komoditas'] ?? 0);
         $tahun = (int) ($validated['tahun'] ?? now()->year);
         $periode = isset($validated['bulan'])
             ? (int) $validated['bulan']
             : ($validated['periode'] ?? PeriodeKalkulasi::fromMonth(now()->month));
-        $comparison = $selected > 0
-            ? $service->bandingkan((int) $user->id_entitas, $selected, $tahun, $periode)
+        $comparison = $selected > 0 && $entitasId
+            ? $service->bandingkan((int) $entitasId, $selected, $tahun, $periode)
             : ['items' => collect(), 'lowest' => null, 'highest' => null, 'difference' => null, 'satuan' => null];
 
         return view('perencanaan.perbandingan-harga.index', [
             'title' => $this->title,
-            'komoditas' => Komoditas::query()->orderBy('nama')->get(),
+            'komoditas' => Komoditas::query()->where('is_active', true)->orderBy('nama')->get(),
             'selected' => $selected,
             'tahun' => $tahun,
             'periode' => $periode,

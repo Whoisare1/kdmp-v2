@@ -231,7 +231,7 @@
                                 @if ($item->status_surplus_defisit === 'defisit')
                                     <span class="text-merah-700 font-medium">Ajukan Permintaan Pengadaan</span>
                                 @elseif ($item->status_surplus_defisit === 'surplus')
-                                    <span class="text-sawah-700">Potensi Konsinyasi Antar Desa (M7)</span>
+                                    <span class="text-sawah-700">Potensi Konsinyasi Antar Desa</span>
                                 @else
                                     <span class="text-ink-600">Kebutuhan Mandiri Tercukupi</span>
                                 @endif
