@@ -14,7 +14,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -93,7 +92,7 @@ class PembelianController extends ModuleCrudController
     {
         // 1. Cek apakah ada Setoran Simpanan Pokok di simpanan_anggota,
         //    atau jurnal ber-kode SPK, atau transaksi kas masuk ke akun modal simpanan pokok (311)
-        if (Schema::hasTable('simpanan_anggota')) {
+        try {
             $adaSimpanan = DB::table('simpanan_anggota')
                 ->where('id_entitas', $idEntitas)
                 ->where('jenis', 'pokok')
@@ -102,6 +101,7 @@ class PembelianController extends ModuleCrudController
             if ($adaSimpanan) {
                 return true;
             }
+        } catch (\Throwable) {
         }
 
         $adaJurnalSpk = DB::table('jurnal_header')
@@ -114,7 +114,7 @@ class PembelianController extends ModuleCrudController
             return true;
         }
 
-        if (Schema::hasTable('kas_transaksi')) {
+        try {
             $adaKasSimpanan = DB::table('kas_transaksi')
                 ->where('id_entitas', $idEntitas)
                 ->where('jenis', 'masuk')
@@ -124,6 +124,7 @@ class PembelianController extends ModuleCrudController
             if ($adaKasSimpanan) {
                 return true;
             }
+        } catch (\Throwable) {
         }
 
         // 2. Cek apakah ada Saldo Awal Kas (Jurnal JOP / jenis SALDO_AWAL dengan debet akun kas 111%)
@@ -144,7 +145,7 @@ class PembelianController extends ModuleCrudController
         }
 
         // 3. Cek apakah saldo berjalan kas/bank di v_saldo_berjalan > 0
-        if (Schema::hasTable('v_saldo_berjalan')) {
+        try {
             $saldoKas = DB::table('v_saldo_berjalan')
                 ->where('id_entitas', $idEntitas)
                 ->where('kode_anak', 'like', '111%')
@@ -153,6 +154,7 @@ class PembelianController extends ModuleCrudController
             if ($saldoKas > 0) {
                 return true;
             }
+        } catch (\Throwable) {
         }
 
         return false;
@@ -448,7 +450,7 @@ class PembelianController extends ModuleCrudController
         $processed = collect(session('pembelian_dummy_requests_processed', []));
 
         $realItems = collect();
-        if (Schema::hasTable('permintaan_pengadaan')) {
+        try {
             $realPrs = \App\Models\Perencanaan\PermintaanPengadaan::with([
                 'detail.barang.satuanDasar',
                 'detail.barang.konversiSatuan.satuan',
@@ -484,6 +486,7 @@ class PembelianController extends ModuleCrudController
                     ]);
                 }
             }
+        } catch (\Throwable) {
         }
 
         return $realItems

@@ -5,15 +5,12 @@ namespace App\Models\Master;
 use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 
 class Satuan extends Model
 {
     protected $table = 'satuan';
 
     protected $fillable = ['id_entitas', 'kode_satuan', 'alias_json', 'is_active'];
-
-    protected static ?bool $hasEntitasCol = null;
 
     protected function casts(): array
     {
@@ -22,11 +19,7 @@ class Satuan extends Model
 
     public static function hasEntitasColumn(): bool
     {
-        if (static::$hasEntitasCol === null) {
-            static::$hasEntitasCol = Schema::hasColumn('satuan', 'id_entitas');
-        }
-
-        return static::$hasEntitasCol;
+        return false;
     }
 
     public function scopeForEntitas(Builder $query, ?int $idEntitas): Builder

@@ -5,7 +5,6 @@ namespace App\Models\Master;
 use App\Models\Tenant\Entitas;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 
 class Barang extends Model
 {
@@ -17,8 +16,6 @@ class Barang extends Model
         'id_satuan_dasar', 'is_active',
     ];
 
-    protected static ?bool $hasEntitasCol = null;
-
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
@@ -26,11 +23,7 @@ class Barang extends Model
 
     public static function hasEntitasColumn(): bool
     {
-        if (static::$hasEntitasCol === null) {
-            static::$hasEntitasCol = Schema::hasColumn('master_barang', 'id_entitas');
-        }
-
-        return static::$hasEntitasCol;
+        return false;
     }
 
     /**
