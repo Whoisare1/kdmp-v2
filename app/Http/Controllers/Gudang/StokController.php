@@ -30,12 +30,22 @@ class StokController extends ModuleCrudController
         $filterStatus = $request->query('status');
 
         if ($filterStatus === 'menipis') {
+            $ringkasanStok = DB::table('stok')
+                ->join('gudang as gudang_ringkasan', 'gudang_ringkasan.id_gudang', '=', 'stok.id_gudang')
+                ->select('gudang_ringkasan.id_entitas', 'stok.id_barang')
+                ->selectRaw('SUM(stok.qty_on_hand) as qty_on_hand')
+                ->selectRaw('SUM(stok.qty_reserved) as qty_reserved')
+                ->selectRaw('SUM(stok.nilai_persediaan) as nilai_persediaan')
+                ->selectRaw('CASE WHEN SUM(stok.qty_on_hand) > 0 THEN SUM(stok.nilai_persediaan) / SUM(stok.qty_on_hand) ELSE 0 END as hpp_rata2')
+                ->groupBy('gudang_ringkasan.id_entitas', 'stok.id_barang');
+
             $query = Stok::query()
                 ->from('barang_per_koperasi as pengaturan')
-                ->join('gudang as gudang_stok', 'gudang_stok.id_entitas', '=', 'pengaturan.id_entitas')
-                ->leftJoin('stok', function ($join) {
-                    $join->on('stok.id_gudang', '=', 'gudang_stok.id_gudang')
-                        ->on('stok.id_barang', '=', 'pengaturan.id_barang');
+                ->join('entitas as entitas_stok', 'entitas_stok.id_entitas', '=', 'pengaturan.id_entitas')
+                ->join('master_barang as barang_minimum', 'barang_minimum.id_barang', '=', 'pengaturan.id_barang')
+                ->leftJoinSub($ringkasanStok, 'ringkasan_stok', function ($join) {
+                    $join->on('ringkasan_stok.id_entitas', '=', 'pengaturan.id_entitas')
+                        ->on('ringkasan_stok.id_barang', '=', 'pengaturan.id_barang');
                 })
                 ->leftJoinSub($saldoPerBarang, 'saldo_per_barang', function ($join) {
                     $join->on('saldo_per_barang.id_entitas', '=', 'pengaturan.id_entitas')
@@ -44,14 +54,15 @@ class StokController extends ModuleCrudController
                 ->where('pengaturan.stok_minimum', '>', 0)
                 ->whereRaw('COALESCE(saldo_per_barang.qty_tersedia, 0) <= pengaturan.stok_minimum')
                 ->selectRaw('
-                    gudang_stok.id_gudang as id_gudang,
+                    NULL as id_gudang,
                     pengaturan.id_barang as id_barang,
-                    COALESCE(stok.qty_on_hand, 0) as qty_on_hand,
-                    COALESCE(stok.qty_reserved, 0) as qty_reserved,
-                    COALESCE(stok.hpp_rata2, 0) as hpp_rata2,
-                    COALESCE(stok.nilai_persediaan, 0) as nilai_persediaan,
+                    COALESCE(ringkasan_stok.qty_on_hand, 0) as qty_on_hand,
+                    COALESCE(ringkasan_stok.qty_reserved, 0) as qty_reserved,
+                    COALESCE(ringkasan_stok.hpp_rata2, 0) as hpp_rata2,
+                    COALESCE(ringkasan_stok.nilai_persediaan, 0) as nilai_persediaan,
                     pengaturan.stok_minimum,
-                    COALESCE(saldo_per_barang.qty_tersedia, 0) as qty_tersedia_koperasi
+                    COALESCE(saldo_per_barang.qty_tersedia, 0) as qty_tersedia_koperasi,
+                    entitas_stok.nama_entitas as nama_entitas
                 ')
                 ->with(['gudang', 'barang.satuanDasar']);
         } else {
@@ -74,18 +85,14 @@ class StokController extends ModuleCrudController
         }
 
         if ($entitasId !== null) {
-            $query->where('gudang_stok.id_entitas', $entitasId);
+            $query->where($filterStatus === 'menipis' ? 'pengaturan.id_entitas' : 'gudang_stok.id_entitas', $entitasId);
         }
 
         if ($search = $request->query('q')) {
             if ($filterStatus === 'menipis') {
                 $query->where(function ($q) use ($search) {
-                    $q->whereIn(
-                        'pengaturan.id_barang',
-                        DB::table('master_barang')
-                            ->select('id_barang')
-                            ->where('nama_barang', 'like', "%{$search}%"),
-                    )->orWhere('gudang_stok.nama_gudang', 'like', "%{$search}%");
+                    $q->where('barang_minimum.nama_barang', 'like', "%{$search}%")
+                        ->orWhere('entitas_stok.nama_entitas', 'like', "%{$search}%");
                 });
             } else {
                 $query->where(function ($q) use ($search) {
@@ -96,7 +103,7 @@ class StokController extends ModuleCrudController
         }
 
         // Stok punya composite primary key, jadi tidak bisa sort by ID standar
-        $items = $query->orderBy('gudang_stok.id_gudang')
+        $items = $query->orderBy($filterStatus === 'menipis' ? 'pengaturan.id_entitas' : 'gudang_stok.id_gudang')
             ->orderBy($filterStatus === 'menipis' ? 'pengaturan.id_barang' : 'stok.id_barang')
             ->paginate(15)
             ->withQueryString();

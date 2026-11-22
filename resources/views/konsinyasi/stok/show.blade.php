@@ -13,6 +13,7 @@
         <div class="flex items-center gap-3">
             @if ($item->status === 'aktif')
                 <a href="{{ route('konsinyasi.retur.create', ['stok' => $item->id_stok_konsinyasi]) }}" class="rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600">Catat Retur</a>
+                <a href="{{ route('konsinyasi.susut.create', ['stok' => $item->id_stok_konsinyasi]) }}" class="rounded-sm border border-merah-300 px-4 py-2 text-sm font-medium text-merah-700 hover:border-merah-500">Catat Susut</a>
             @endif
             <span class="rounded-full px-3 py-1 text-sm font-medium {{ $item->status === 'aktif' ? 'bg-sawah-100 text-sawah-600' : 'bg-paper-200 text-ink-600' }}">
                 {{ ['aktif' => 'Masih ada', 'habis' => 'Habis', 'dikembalikan' => 'Dikembalikan'][$item->status] ?? $item->status }}
@@ -72,6 +73,22 @@
         <div class="border-b border-paper-300 px-4 py-3">
             <h2 class="font-semibold text-ink-900">Riwayat perubahan stok</h2>
         </div>
+        <form method="GET" class="flex flex-wrap items-end gap-3 border-b border-paper-200 p-4">
+            <label class="text-sm">
+                <span class="mb-1 block text-xs font-medium text-ink-700">Bulan</span>
+                <select name="bulan" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
+                    <option value="">Semua bulan</option>
+                    @foreach ([1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'] as $angkaBulan => $namaBulan)
+                        <option value="{{ $angkaBulan }}" @selected((string) ($filters['bulan'] ?? '') === (string) $angkaBulan)>{{ $namaBulan }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="text-sm">
+                <span class="mb-1 block text-xs font-medium text-ink-700">Tahun</span>
+                <input type="number" name="tahun" min="2000" max="2100" value="{{ $filters['tahun'] ?? '' }}" placeholder="Semua tahun" class="w-32 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
+            </label>
+            <button class="rounded-sm border border-paper-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">Tampilkan</button>
+        </form>
         <div class="overflow-x-auto">
             <table class="min-w-[800px] w-full text-left text-sm">
                 <thead class="bg-paper-200/60 text-ink-600">

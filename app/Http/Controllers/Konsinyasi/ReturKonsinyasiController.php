@@ -18,10 +18,14 @@ class ReturKonsinyasiController extends Controller
 {
     use ResolvesEntitasAktif;
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $entitasId = $this->requireEntitasAktifId();
-        $items = ReturKonsinyasi::query()
+        $filters = $request->validate([
+            'bulan' => ['nullable', 'integer', 'between:1,12'],
+            'tahun' => ['nullable', 'integer', 'between:2000,2100'],
+        ]);
+        $query = ReturKonsinyasi::query()
             ->where(function ($query) use ($entitasId): void {
                 $query->where('id_entitas_pemilik', $entitasId)
                     ->orWhere('id_entitas_pencatat', $entitasId);
@@ -32,12 +36,14 @@ class ReturKonsinyasiController extends Controller
                 'stokKonsinyasi.kiriman.pihakPemilik',
                 'stokKonsinyasi.kiriman.koperasiPenerima',
             ])
-            ->latest('id_retur_konsinyasi')
-            ->paginate(15);
+            ->when($filters['bulan'] ?? null, fn ($query, $bulan) => $query->whereMonth('tanggal', $bulan))
+            ->when($filters['tahun'] ?? null, fn ($query, $tahun) => $query->whereYear('tanggal', $tahun));
+        $items = $query->latest('id_retur_konsinyasi')->paginate(15)->withQueryString();
 
         return view('konsinyasi.retur.index', [
             'items' => $items,
             'title' => 'Retur Konsinyasi',
+            'filters' => $filters,
         ]);
     }
 
@@ -65,7 +71,7 @@ class ReturKonsinyasiController extends Controller
     {
         $validated = $request->validate([
             'id_stok_konsinyasi' => ['required', 'integer', 'exists:stok_konsinyasi,id_stok_konsinyasi'],
-            'tanggal' => ['required', 'date'],
+            'tanggal' => ['required', 'date', 'before_or_equal:today'],
             'qty_dikembalikan' => ['required', 'numeric', 'gt:0'],
             'catatan' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -79,6 +85,12 @@ class ReturKonsinyasiController extends Controller
                 ->firstOrFail();
 
             $this->pastikanBerwenangMencatat($stok, $entitasId);
+
+            if ($stok->kiriman?->status_posting !== 'T') {
+                throw ValidationException::withMessages([
+                    'id_stok_konsinyasi' => 'Retur hanya dapat dicatat untuk barang titipan yang sudah diposting.',
+                ]);
+            }
 
             if (bccomp((string) $stok->qty_sisa, (string) $validated['qty_dikembalikan'], 4) < 0) {
                 throw ValidationException::withMessages([
@@ -133,15 +145,16 @@ class ReturKonsinyasiController extends Controller
             ->where('status', 'aktif')
             ->where('qty_sisa', '>', 0)
             ->whereHas('kiriman', function ($query) use ($entitasId): void {
-                $query->where(function ($owner) use ($entitasId): void {
-                    $owner->where(function ($entityOwner) use ($entitasId): void {
-                        $entityOwner->where('jenis_pemilik', 'entitas')
-                            ->where('id_entitas_pemilik', $entitasId);
-                    })->orWhere(function ($personOwner) use ($entitasId): void {
-                        $personOwner->where('jenis_pemilik', 'pihak')
-                            ->where('id_entitas_penerima', $entitasId);
+                $query->where('status_posting', 'T')
+                    ->where(function ($owner) use ($entitasId): void {
+                        $owner->where(function ($entityOwner) use ($entitasId): void {
+                            $entityOwner->where('jenis_pemilik', 'entitas')
+                                ->where('id_entitas_pemilik', $entitasId);
+                        })->orWhere(function ($personOwner) use ($entitasId): void {
+                            $personOwner->where('jenis_pemilik', 'pihak')
+                                ->where('id_entitas_penerima', $entitasId);
+                        });
                     });
-                });
             });
     }
 

@@ -3,22 +3,54 @@
 namespace App\Http\Controllers\Gudang;
 
 use App\Http\Controllers\Controller;
+use App\Services\StokBatchService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
+use RuntimeException;
 
 class BatchController extends Controller
 {
-    public function index(Request $request): View
+    public function klasifikasikanStokAwal(Request $request, int $idBatch, StokBatchService $stokBatch): RedirectResponse
     {
+        $pengguna = $request->user();
         abort_unless(
-            Schema::hasTable('stok_batch')
-                && Schema::hasColumn('barang_per_koperasi', 'lacak_batch'),
-            404,
-            'Pelacakan batch belum tersedia.',
+            $pengguna && ($pengguna->hasPeran('admin_gudang') || $pengguna->hasPeran('manajer')),
+            403,
+            'Hanya Admin Gudang atau Manajer yang dapat melengkapi batch stok awal.',
         );
 
+        $entitasId = $pengguna->id_entitas
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
+        abort_unless($entitasId, 403, 'Entitas aktif tidak ditemukan.');
+
+        $data = $request->validate([
+            'batches' => ['required', 'array', 'min:1'],
+            'batches.*.kode_batch' => ['nullable', 'string', 'max:100'],
+            'batches.*.tanggal_kedaluwarsa' => ['required', 'date'],
+            'batches.*.qty' => ['required', 'numeric', 'regex:/^\\d{1,14}(?:\\.\\d{1,4})?$/', 'gt:0'],
+        ]);
+
+        try {
+            $batchBaru = $stokBatch->klasifikasikanStokAwal(
+                entitasId: (int) $entitasId,
+                barangId: (int) DB::table('stok_batch')->where('id_batch', $idBatch)->value('id_barang'),
+                batchAwalId: $idBatch,
+                allocations: $data['batches'],
+                createdBy: $pengguna->getAuthIdentifier(),
+                ipAddress: $request->ip(),
+            );
+        } catch (RuntimeException $exception) {
+            return back()->withInput()->withErrors(['batch' => $exception->getMessage()]);
+        }
+
+        return redirect()->route('gudang.batch.index')
+            ->with('status', count($batchBaru).' batch stok awal berhasil dicatat tanpa mengubah jumlah stok gudang.');
+    }
+
+    public function index(Request $request): View
+    {
         $entitasId = auth()->user()->id_entitas
             ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
         $status = $request->query('status');

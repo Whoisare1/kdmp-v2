@@ -6,8 +6,35 @@
     </div>
 
     <div class="mx-auto max-w-5xl rounded-sm border border-paper-300 bg-paper-50 p-6">
+        <form method="GET" action="{{ route('gudang.penerimaan.create') }}" class="mb-5 rounded-sm border border-paper-300 bg-paper-100/60 p-4">
+            <label for="id_pembelian_pilihan" class="mb-1 block text-sm font-medium text-ink-700">Referensi Pembelian / PO (opsional)</label>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <select id="id_pembelian_pilihan" name="id_pembelian" class="min-w-0 flex-1 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
+                    <option value="">Penerimaan tanpa PO</option>
+                    @foreach ($pembelianTersedia as $pilihan)
+                        <option value="{{ $pilihan['pembelian']->id_pembelian }}" @selected((string) request('id_pembelian') === (string) $pilihan['pembelian']->id_pembelian)>
+                            {{ $pilihan['pembelian']->kode_pembelian }} · {{ $pilihan['pembelian']->pihak?->nama ?? 'Pemasok' }} · sisa {{ number_format($pilihan['qty_sisa_total'], 4, ',', '.') }} satuan dasar
+                        </option>
+                    @endforeach
+                </select>
+                <button class="rounded-sm border border-paper-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-merah-400">Pilih PO</button>
+            </div>
+            <p class="mt-2 text-xs text-ink-600">Hanya PO berstatus disetujui atau diterima yang masih memiliki kuantitas tersisa yang tersedia.</p>
+        </form>
+
+        @if ($pembelianTerpilih)
+            <div class="mb-5 rounded-sm border border-sawah-500/40 bg-sawah-50 p-4 text-sm text-sawah-800">
+                <p class="font-semibold">PO {{ $pembelianTerpilih->kode_pembelian }}</p>
+                <p class="mt-1">Pemasok: {{ $pembelianTerpilih->pihak?->nama ?? '-' }} · Gudang tujuan: {{ $pembelianTerpilih->gudang?->nama_gudang ?? '-' }}</p>
+                <p class="mt-1 text-xs">Barang pada form dibatasi sesuai PO. Kuantitas yang diisi tidak boleh melebihi sisa pesanan.</p>
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('gudang.penerimaan.store') }}" class="space-y-5" id="formPenerimaan">
             @csrf
+            @if ($pembelianTerpilih)
+                <input type="hidden" name="id_pembelian" value="{{ $pembelianTerpilih->id_pembelian }}">
+            @endif
 
             <!-- Header Section -->
             @php
@@ -58,29 +85,37 @@
                         <input type="date" name="tanggal_terima" value="{{ old('tanggal_terima', now()->format('Y-m-d')) }}" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
                     </div>
 
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-ink-700">Gudang</label>
-                        <select name="id_gudang" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
-                            <option value="">Pilih gudang</option>
-                            @foreach ($gudang as $item)
-                                <option value="{{ $item->id_gudang }}" {{ old('id_gudang') == $item->id_gudang ? 'selected' : '' }}>
-                                    {{ $item->nama_gudang }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-ink-700">Pihak</label>
-                        <select name="id_pihak" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
-                            <option value="">Pilih pihak</option>
-                            @foreach ($pihak as $item)
-                                <option value="{{ $item->id_pihak }}" {{ old('id_pihak') == $item->id_pihak ? 'selected' : '' }}>
-                                    {{ $item->nama }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if ($pembelianTerpilih)
+                        <input type="hidden" name="id_gudang" value="{{ $pembelianTerpilih->id_gudang }}">
+                        <input type="hidden" name="id_pihak" value="{{ $pembelianTerpilih->id_pihak }}">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-700">Gudang</label>
+                            <input type="text" value="{{ $pembelianTerpilih->gudang?->nama_gudang ?? '-' }}" readonly class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-700">Pihak</label>
+                            <input type="text" value="{{ $pembelianTerpilih->pihak?->nama ?? '-' }}" readonly class="w-full rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-sm">
+                        </div>
+                    @else
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-700">Gudang</label>
+                            <select name="id_gudang" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
+                                <option value="">Pilih gudang</option>
+                                @foreach ($gudang as $item)
+                                    <option value="{{ $item->id_gudang }}" {{ old('id_gudang') == $item->id_gudang ? 'selected' : '' }}>{{ $item->nama_gudang }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-700">Pihak</label>
+                            <select name="id_pihak" required class="w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm focus:border-merah-400 focus:outline-none">
+                                <option value="">Pilih pihak</option>
+                                @foreach ($pihak as $item)
+                                    <option value="{{ $item->id_pihak }}" {{ old('id_pihak') == $item->id_pihak ? 'selected' : '' }}>{{ $item->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
 
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-sm font-medium text-ink-700">Catatan</label>
@@ -137,7 +172,7 @@
         const barangData = {{ Illuminate\Support\Js::from($barangData) }};
         const satuanData = {{ Illuminate\Support\Js::from($satuanData) }};
         const pembelianData = {{ Illuminate\Support\Js::from($pembelianData) }};
-        const oldItems = {{ Illuminate\Support\Js::from(old('items', [])) }};
+        const oldItems = {{ Illuminate\Support\Js::from(old('items', $poItems ?? [])) }};
         const batchTrackingAvailable = {{ Illuminate\Support\Js::from($batchTrackingAvailable) }};
         let rowCount = 0;
 

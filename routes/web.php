@@ -18,6 +18,7 @@ use App\Http\Controllers\Gudang\BatchController;
 use App\Http\Controllers\Gudang\KartuStokController;
 use App\Http\Controllers\Gudang\KerusakanBarangController;
 use App\Http\Controllers\Gudang\OpnameController;
+use App\Http\Controllers\Gudang\PermintaanAntarEntitasController;
 use App\Http\Controllers\Gudang\PenerimaanBarangController;
 use App\Http\Controllers\Gudang\StokController;
 use App\Http\Controllers\Keuangan\HutangController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Konsinyasi\RekonsiliasiController;
 use App\Http\Controllers\Konsinyasi\ReturKonsinyasiController;
 use App\Http\Controllers\Konsinyasi\SetoranKonsinyasiController;
 use App\Http\Controllers\Konsinyasi\StokKonsinyasiController;
+use App\Http\Controllers\Konsinyasi\SusutKonsinyasiController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\Master\BarangController;
 use App\Http\Controllers\Master\CoaController;
@@ -143,8 +145,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
         Route::get('pencocokan-surplus-defisit', [PencocokanSurplusDefisitController::class, 'index'])
             ->name('pencocokan-surplus-defisit.index');
+        Route::post('permintaan-antar-entitas', [PermintaanAntarEntitasController::class, 'store'])
+            ->name('permintaan-antar-entitas.store');
+        Route::patch('permintaan-antar-entitas/{id}/status', [PermintaanAntarEntitasController::class, 'respond'])
+            ->whereNumber('id')->name('permintaan-antar-entitas.respond');
         Route::get('batch', [BatchController::class, 'index'])->name('batch.index');
+        Route::patch('batch/{idBatch}/klasifikasikan-stok-awal', [BatchController::class, 'klasifikasikanStokAwal'])
+            ->name('batch.klasifikasikan-stok-awal');
         Route::resource('penerimaan', PenerimaanBarangController::class);
+        Route::patch('opname/{id}/approve', [OpnameController::class, 'approve'])->name('opname.approve');
         Route::resource('opname', OpnameController::class);
         Route::resource('kerusakan', KerusakanBarangController::class);
         Route::get('kartu-stok/export-csv', [KartuStokController::class, 'exportCsv'])->name('kartu-stok.export');
@@ -192,9 +201,12 @@ Route::middleware('auth')->group(function () {
             ->name('pengiriman.posting-page');
         Route::post('pengiriman/{id}/posting', [PengirimanKonsinyasiController::class, 'posting'])
             ->name('pengiriman.posting');
+        Route::patch('pengiriman/{id}/terima', [PengirimanKonsinyasiController::class, 'terima'])
+            ->name('pengiriman.terima');
         Route::resource('pengiriman', PengirimanKonsinyasiController::class);
         Route::resource('stok', StokKonsinyasiController::class)->only(['index', 'show']);
         Route::resource('retur', ReturKonsinyasiController::class)->only(['index', 'create', 'store']);
+        Route::resource('susut', SusutKonsinyasiController::class)->only(['index', 'create', 'store']);
         Route::resource('setoran', SetoranKonsinyasiController::class);
         Route::get('rekonsiliasi', [RekonsiliasiController::class, 'index'])->name('rekonsiliasi.index');
     });

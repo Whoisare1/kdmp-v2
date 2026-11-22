@@ -69,6 +69,11 @@ class PengirimanKonsinyasi extends Model
         return $this->hasMany(PengirimanKonsinyasiDetail::class, 'id_kiriman', 'id_kiriman');
     }
 
+    public function stokKonsinyasi()
+    {
+        return $this->hasMany(StokKonsinyasi::class, 'id_kiriman', 'id_kiriman');
+    }
+
     // =========================================================================
     // LOCAL SCOPES Ã¢â‚¬â€ Dipakai eksplisit di Controller, bukan Global Scope,
     // karena konsinyasi secara desain bersifat lintas entitas.

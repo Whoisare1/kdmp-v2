@@ -3,29 +3,163 @@
 namespace App\Services;
 
 use App\Models\Gudang\KartuStok;
+use App\Models\Tenant\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class StokBatchService
 {
+    /**
+     * Reclassify an unknown opening-stock batch into batches with known expiry dates.
+     * The allocation must equal the current unknown batch balance; regular stock is unchanged.
+     *
+     * @param array<int, array{kode_batch?: string|null, tanggal_kedaluwarsa: string, qty: string}> $allocations
+     * @return array<int, array{id_batch: int, kode_batch: string, tanggal_kedaluwarsa: string, qty_on_hand: string}>
+     */
+    public function klasifikasikanStokAwal(
+        int $entitasId,
+        int $barangId,
+        int $batchAwalId,
+        array $allocations,
+        ?int $createdBy,
+        ?string $ipAddress,
+    ): array {
+        return DB::transaction(function () use (
+            $entitasId,
+            $barangId,
+            $batchAwalId,
+            $allocations,
+            $createdBy,
+            $ipAddress,
+        ): array {
+            $pengaturan = DB::table('barang_per_koperasi')
+                ->where('id_entitas', $entitasId)
+                ->where('id_barang', $barangId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $pengaturan || ! (bool) $pengaturan->lacak_batch) {
+                throw new RuntimeException('Pelacakan batch belum diaktifkan untuk barang ini.');
+            }
+
+            $stok = DB::table('stok')
+                ->join('gudang', 'gudang.id_gudang', '=', 'stok.id_gudang')
+                ->where('gudang.id_entitas', $entitasId)
+                ->where('stok.id_barang', $barangId)
+                ->where('stok.id_gudang', function ($query) use ($batchAwalId) {
+                    $query->select('id_gudang')
+                        ->from('stok_batch')
+                        ->where('id_batch', $batchAwalId);
+                })
+                ->select('stok.id_gudang', 'stok.qty_on_hand')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $stok) {
+                throw new RuntimeException('Stok gudang untuk batch awal ini tidak ditemukan.');
+            }
+
+            $batches = DB::table('stok_batch')
+                ->where('id_gudang', $stok->id_gudang)
+                ->where('id_barang', $barangId)
+                ->orderBy('id_batch')
+                ->lockForUpdate()
+                ->get();
+            $batchAwal = $batches->firstWhere('id_batch', $batchAwalId);
+
+            if (
+                ! $batchAwal
+                || ! (bool) $batchAwal->is_stok_awal
+                || $batchAwal->tanggal_kedaluwarsa !== null
+                || bccomp((string) $batchAwal->qty_on_hand, '0', 4) <= 0
+            ) {
+                throw new RuntimeException('Batch ini bukan batch stok awal yang masih belum diketahui tanggalnya.');
+            }
+
+            $totalBatchGudang = '0';
+            foreach ($batches as $batch) {
+                $totalBatchGudang = bcadd($totalBatchGudang, (string) $batch->qty_on_hand, 4);
+            }
+            if (bccomp($totalBatchGudang, (string) $stok->qty_on_hand, 4) !== 0) {
+                throw new RuntimeException('Saldo batch dan stok gudang tidak cocok. Minta pemeriksaan Admin Gudang sebelum mengubah batch awal.');
+            }
+
+            $totalAlokasi = '0';
+            foreach ($allocations as $allocation) {
+                $totalAlokasi = bcadd($totalAlokasi, (string) $allocation['qty'], 4);
+            }
+            if (bccomp($totalAlokasi, (string) $batchAwal->qty_on_hand, 4) !== 0) {
+                throw new RuntimeException('Total pembagian harus sama persis dengan saldo batch awal yang belum diketahui tanggalnya.');
+            }
+
+            $batchBaru = [];
+            foreach (array_values($allocations) as $index => $allocation) {
+                $kodeInput = trim((string) ($allocation['kode_batch'] ?? ''));
+                $kode = $kodeInput !== ''
+                    ? $kodeInput
+                    : "AWAL-{$batchAwalId}-".($index + 1);
+                $idBatchBaru = DB::table('stok_batch')->insertGetId([
+                    'id_gudang' => $stok->id_gudang,
+                    'id_barang' => $barangId,
+                    'kode_batch' => $kode,
+                    'tanggal_kedaluwarsa' => $allocation['tanggal_kedaluwarsa'],
+                    'qty_on_hand' => (string) $allocation['qty'],
+                    'is_stok_awal' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $batchBaru[] = [
+                    'id_batch' => (int) $idBatchBaru,
+                    'kode_batch' => $kode,
+                    'tanggal_kedaluwarsa' => $allocation['tanggal_kedaluwarsa'],
+                    'qty_on_hand' => (string) $allocation['qty'],
+                ];
+            }
+
+            DB::table('stok_batch')
+                ->where('id_batch', $batchAwalId)
+                ->update(['qty_on_hand' => '0', 'updated_at' => now()]);
+
+            AuditLog::query()->create([
+                'id_entitas' => $entitasId,
+                'id_pengguna' => $createdBy,
+                'tabel' => 'stok_batch',
+                'record_id' => $batchAwalId,
+                'aksi' => 'UPDATE',
+                'data_lama' => [
+                    'id_batch' => $batchAwalId,
+                    'kode_batch' => $batchAwal->kode_batch,
+                    'tanggal_kedaluwarsa' => null,
+                    'qty_on_hand' => (string) $batchAwal->qty_on_hand,
+                ],
+                'data_baru' => [
+                    'saldo_batch_awal' => '0',
+                    'pembagian_batch' => $batchBaru,
+                    'qty_stok_gudang_tetap' => (string) $stok->qty_on_hand,
+                ],
+                'ip_address' => $ipAddress,
+            ]);
+
+            return $batchBaru;
+        });
+    }
+
     public function pelacakanAktif(int $entitasId, int $barangId): bool
     {
-        if (! Schema::hasColumn('barang_per_koperasi', 'lacak_batch')) {
+        try {
+            return (bool) DB::table('barang_per_koperasi')
+                ->where('id_entitas', $entitasId)
+                ->where('id_barang', $barangId)
+                ->value('lacak_batch');
+        } catch (\Throwable) {
             return false;
         }
-
-        return (bool) DB::table('barang_per_koperasi')
-            ->where('id_entitas', $entitasId)
-            ->where('id_barang', $barangId)
-            ->value('lacak_batch');
     }
 
     public function sediakanSaldoAwal(int $entitasId, int $barangId): void
     {
-        if (! Schema::hasTable('stok_batch')) {
-            throw new RuntimeException('Struktur batch belum tersedia. Migration belum dijalankan.');
-        }
 
         $stokBarang = DB::table('stok')
             ->join('gudang', 'gudang.id_gudang', '=', 'stok.id_gudang')
@@ -346,21 +480,44 @@ class StokBatchService
 
     public function jumlahBatchMendekatiKedaluwarsa(?int $entitasId = null): int
     {
-        if (! Schema::hasTable('stok_batch')) {
+        try {
+            return DB::table('stok_batch')
+                ->join('gudang', 'gudang.id_gudang', '=', 'stok_batch.id_gudang')
+                ->where('stok_batch.qty_on_hand', '>', 0)
+                ->whereBetween('stok_batch.tanggal_kedaluwarsa', [
+                    now()->toDateString(),
+                    now()->addDays(30)->toDateString(),
+                ])
+                ->when(
+                    $entitasId !== null,
+                    fn ($query) => $query->where('gudang.id_entitas', $entitasId),
+                )
+                ->count();
+        } catch (\Throwable) {
             return 0;
         }
+    }
 
-        return DB::table('stok_batch')
-            ->join('gudang', 'gudang.id_gudang', '=', 'stok_batch.id_gudang')
-            ->where('stok_batch.qty_on_hand', '>', 0)
-            ->whereBetween('stok_batch.tanggal_kedaluwarsa', [
-                now()->toDateString(),
-                now()->addDays(30)->toDateString(),
-            ])
-            ->when(
-                $entitasId !== null,
-                fn ($query) => $query->where('gudang.id_entitas', $entitasId),
-            )
-            ->count();
+    public function jumlahBatchKedaluwarsa(?int $entitasId = null): int
+    {
+        try {
+            return DB::table('stok_batch')
+                ->join('gudang', 'gudang.id_gudang', '=', 'stok_batch.id_gudang')
+                ->join('barang_per_koperasi as pengaturan', function ($join): void {
+                    $join->on('pengaturan.id_entitas', '=', 'gudang.id_entitas')
+                        ->on('pengaturan.id_barang', '=', 'stok_batch.id_barang')
+                        ->where('pengaturan.lacak_batch', true);
+                })
+                ->where('stok_batch.qty_on_hand', '>', 0)
+                ->whereNotNull('stok_batch.tanggal_kedaluwarsa')
+                ->where('stok_batch.tanggal_kedaluwarsa', '<', now()->toDateString())
+                ->when(
+                    $entitasId !== null,
+                    fn ($query) => $query->where('gudang.id_entitas', $entitasId),
+                )
+                ->count();
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 }

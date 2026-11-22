@@ -38,8 +38,7 @@
             </div>
 
             <p class="mb-3 rounded-sm border border-padi-100 bg-padi-100/50 px-3 py-2 text-xs text-ink-700">
-                Saat disimpan, jumlah stok akan langsung disesuaikan. Jika ada selisih, sistem mencatat mutasi penyesuaian pada kartu stok. Jika tidak ada selisih, hasil hitung tetap tercatat tanpa mutasi nol.
-                Untuk barang dengan pelacakan batch, opname tetap dihitung sederhana berdasarkan total barang. Selisih kurang dialokasikan otomatis dengan FEFO; selisih lebih dicatat sebagai batch baru dengan tanggal kedaluwarsa tidak diketahui.
+                Data opname akan disimpan sebagai <strong>Draft</strong> untuk ditinjau selisihnya terlebih dahulu. Penyesuaian stok fisik dan pencatatan mutasi pada kartu stok baru akan dieksekusi setelah disetujui oleh Manajer.
             </p>
 
             <div class="overflow-x-auto">
@@ -82,7 +81,7 @@
 
         <div class="flex gap-3">
             <button type="submit" class="rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600">
-                Simpan Opname
+                Simpan Draft Opname
             </button>
             <a href="{{ route('gudang.opname.index') }}" class="rounded-sm border border-paper-300 px-4 py-2 text-sm text-ink-700 hover:border-merah-400">
                 Batal

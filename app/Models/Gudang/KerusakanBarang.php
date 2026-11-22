@@ -2,6 +2,7 @@
 
 namespace App\Models\Gudang;
 
+use App\Models\Akuntansi\JurnalHeader;
 use App\Models\Concerns\BelongsToEntitas;
 use App\Models\Master\Barang;
 use App\Models\Master\Gudang as GudangModel;
@@ -38,6 +39,12 @@ class KerusakanBarang extends Model
     public function batch()
     {
         return $this->belongsTo(StokBatch::class, 'id_batch', 'id_batch');
+    }
+
+    public function jurnal()
+    {
+        return $this->hasOne(JurnalHeader::class, 'source_id', 'id_kerusakan')
+            ->where('source_type', 'kerusakan_barang');
     }
 
     public function antreanJurnal()

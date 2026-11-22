@@ -56,4 +56,3 @@ class AntreanJurnalGudang extends Model
         return $this->belongsTo(JurnalHeader::class, 'id_jurnal', 'id_jurnal');
     }
 }
-

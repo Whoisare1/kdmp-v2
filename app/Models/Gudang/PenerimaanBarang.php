@@ -36,14 +36,14 @@ class PenerimaanBarang extends Model
         return $this->belongsTo(Pihak::class, 'id_pihak', 'id_pihak');
     }
 
-    public function detail()
-    {
-        return $this->hasMany(PenerimaanBarangDetail::class, 'id_penerimaan', 'id_penerimaan');
-    }
-
     public function pembelian()
     {
         return $this->belongsTo(Pembelian::class, 'id_pembelian', 'id_pembelian');
+    }
+
+    public function detail()
+    {
+        return $this->hasMany(PenerimaanBarangDetail::class, 'id_penerimaan', 'id_penerimaan');
     }
 
     public function antreanJurnal()
@@ -52,4 +52,3 @@ class PenerimaanBarang extends Model
             ->where('ref_tipe', 'PENERIMAAN');
     }
 }
-

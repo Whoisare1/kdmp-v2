@@ -32,6 +32,10 @@
                 <dd class="text-right font-medium text-ink-800">{{ $item->pihak->nama ?? '-' }}</dd>
                 <dt class="text-ink-600">Sumber Penerimaan</dt>
                 <dd class="text-right font-medium text-ink-800">{{ $sumberLabel }}</dd>
+                @if ($item->pembelian)
+                    <dt class="text-ink-600">Referensi Pembelian</dt>
+                    <dd class="text-right font-medium text-ink-800">{{ $item->pembelian->kode_pembelian }}</dd>
+                @endif
                 <dt class="text-ink-600">Status</dt>
                 <dd class="text-right font-medium text-sawah-600">{{ $item->status }}</dd>
                 <dt class="text-ink-600">Status Jurnal Akuntansi</dt>
@@ -52,6 +56,42 @@
             </dl>
         </div>
     </div>
+
+    @if ($item->antreanJurnal->isNotEmpty())
+        <div class="mb-5 overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
+            <div class="border-b border-paper-300 px-4 py-3">
+                <h2 class="font-display text-base font-semibold text-ink-900">Status Jurnal Keuangan</h2>
+            </div>
+            <div class="divide-y divide-paper-200">
+                @foreach ($item->antreanJurnal as $antrean)
+                    <dl class="grid gap-3 p-4 text-sm md:grid-cols-4">
+                        <div>
+                            <dt class="text-ink-600">Unit usaha</dt>
+                            <dd class="mt-1 font-medium text-ink-900">{{ $antrean->unitUsaha->nama_unit_usaha ?? 'Unit #' . $antrean->id_unit_usaha }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-ink-600">Nilai masuk stok</dt>
+                            <dd class="mt-1 font-medium text-ink-900">Rp {{ number_format((float) $antrean->nilai, 2, ',', '.') }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-ink-600">Status</dt>
+                            <dd class="mt-1 font-medium text-ink-900">{{ $antrean->status }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-ink-600">No. jurnal</dt>
+                            <dd class="mt-1 font-medium text-ink-900">{{ $antrean->no_jurnal ?? 'Belum tersedia' }}</dd>
+                        </div>
+                        @if ($antrean->pesan_error)
+                            <div class="md:col-span-4">
+                                <dt class="text-ink-600">Keterangan dari Keuangan</dt>
+                                <dd class="mt-1 text-merah-600">{{ $antrean->pesan_error }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
         <div class="border-b border-paper-300 px-4 py-3">

@@ -32,7 +32,7 @@
         <table class="w-full min-w-[760px] text-left text-sm">
             <thead>
                 <tr class="border-b border-paper-300 bg-paper-200/60 font-mono text-[11px] uppercase tracking-wide text-ink-600/70">
-                    <th class="px-4 py-3 font-medium">Gudang</th>
+                    <th class="px-4 py-3 font-medium">{{ $filterStatus === 'menipis' ? 'Entitas / cakupan' : 'Gudang' }}</th>
                     <th class="px-4 py-3 font-medium">Barang</th>
                     <th class="px-4 py-3 text-right font-medium">Tersedia</th>
                     <th class="px-4 py-3 text-center font-medium">Status</th>
@@ -51,7 +51,13 @@
                             && bccomp((string) $item->qty_tersedia_koperasi, (string) $stokMinimum, 4) <= 0;
                     @endphp
                     <tr class="border-b border-paper-200 last:border-0 hover:bg-paper-100/70">
-                        <td class="px-4 py-3 text-sm text-ink-800">{{ $item->gudang->nama_gudang ?? '-' }}</td>
+                        <td class="px-4 py-3 text-sm text-ink-800">
+                            @if ($filterStatus === 'menipis')
+                                {{ $item->nama_entitas ?? 'Entitas' }} · Semua gudang
+                            @else
+                                {{ $item->gudang->nama_gudang ?? '-' }}
+                            @endif
+                        </td>
                         <td class="px-4 py-3 font-medium text-ink-800">{{ $item->barang->nama_barang ?? '-' }}</td>
                         <td class="px-4 py-3 text-right">
                             <span class="font-medium text-ink-800">

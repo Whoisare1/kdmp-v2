@@ -1,23 +1,35 @@
 <x-layouts.app :title="$title" eyebrow="Konsinyasi">
     <div class="mb-4 flex items-center justify-between gap-4">
         <a href="{{ route('konsinyasi.pengiriman.index') }}" class="text-sm font-medium text-ink-700 hover:text-merah-600">&larr; Kembali ke Pengiriman</a>
-        @if ($item->status_posting !== 'T')
+        @if ($bolehPosting && $item->status_posting !== 'T')
             <form method="POST" action="{{ route('konsinyasi.pengiriman.posting', $item->id_kiriman) }}">
                 @csrf
                 <button type="submit" class="rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600">Posting Pengiriman</button>
             </form>
         @endif
+        @if ($bolehKonfirmasiTerima)
+            <form method="POST" action="{{ route('konsinyasi.pengiriman.terima', $item->id_kiriman) }}" class="flex items-center gap-2">
+                @csrf
+                @method('PATCH')
+                <input type="text" name="catatan_penerimaan" maxlength="2000" placeholder="Catatan penerimaan (opsional)" class="w-64 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-sm">
+                <button type="submit" class="rounded-sm bg-sawah-600 px-4 py-2 text-sm font-medium text-white hover:bg-sawah-700" onclick="return confirm('Konfirmasi seluruh barang pada pengiriman ini sudah diterima?')">Konfirmasi Barang Diterima</button>
+            </form>
+        @endif
     </div>
+
+    @if (session('success'))
+        <div class="mb-5 rounded-sm border border-sawah-500/40 bg-sawah-50 px-4 py-3 text-sm text-sawah-700">{{ session('success') }}</div>
+    @endif
+    @if (session('warning'))
+        <div class="mb-5 rounded-sm border border-padi-500/40 bg-padi-50 px-4 py-3 text-sm text-padi-700">{{ session('warning') }}</div>
+    @endif
+    @if ($errors->has('penerimaan'))
+        <div class="mb-5 rounded-sm border border-merah-500/40 bg-merah-50 px-4 py-3 text-sm text-merah-700">{{ $errors->first('penerimaan') }}</div>
+    @endif
 
     @if ($errors->has('posting'))
         <div class="mb-5 rounded-sm border border-merah-500/40 bg-merah-50 px-4 py-3 text-sm text-merah-700">
             {{ $errors->first('posting') }}
-        </div>
-    @endif
-
-    @if (session('warning'))
-        <div class="mb-5 rounded-sm border border-padi-500/40 bg-padi-50 px-4 py-3 text-sm text-padi-700">
-            {{ session('warning') }}
         </div>
     @endif
 
@@ -36,4 +48,10 @@
         <div class="mt-4 rounded-sm border border-padi-500/40 bg-padi-50 p-4 text-sm text-padi-700">Barang perorangan sudah tercatat sebagai stok titipan. Penjualan melalui POS dan pembayaran kepada penitip belum terhubung pada alur ini.</div>
     @endif
     @if ($item->catatan_pengiriman)<div class="mt-4 rounded-sm border border-paper-300 bg-paper-50 p-4 text-sm text-ink-700"><span class="font-medium">Catatan:</span> {{ $item->catatan_pengiriman }}</div>@endif
+    @if ($item->tgl_terima || $item->catatan_penerimaan)
+        <div class="mt-4 rounded-sm border border-paper-300 bg-paper-50 p-4 text-sm text-ink-700">
+            <span class="font-medium">Penerimaan:</span> {{ $item->tgl_terima?->format('d M Y') ?? 'Belum dikonfirmasi' }}
+            @if ($item->catatan_penerimaan)<p class="mt-1">{{ $item->catatan_penerimaan }}</p>@endif
+        </div>
+    @endif
 </x-layouts.app>
