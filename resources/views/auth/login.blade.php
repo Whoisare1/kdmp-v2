@@ -83,9 +83,54 @@
 
                 <div class="divider my-5">atau</div>
 
-                <a href="{{ route('register') }}" class="block w-full text-center px-4 py-2.5 rounded-xl border border-ink-600 text-paper-300 hover:border-padi-500/50 hover:text-padi-100 text-sm font-medium transition-all duration-200">
-                    Belum punya akun? <span class="text-padi-400 font-semibold">Daftar Desa</span>
-                </a>
+                {{-- Panel Login Cepat Mode Demo Peran --}}
+                @php
+                    $loginKatalogPeran = \App\Services\DemoPeranService::katalogPeran();
+                    try {
+                        $loginDaftarEntitas = \App\Models\Tenant\Entitas::withoutGlobalScopes()
+                            ->where('is_active', true)
+                            ->orderBy('id_entitas')
+                            ->get();
+                    } catch (\Throwable) {
+                        $loginDaftarEntitas = collect();
+                    }
+                @endphp
+                <form method="POST" action="{{ route('demo.switch-peran') }}" class="mb-4 rounded-xl border border-padi-500/30 bg-padi-500/10 p-3.5 space-y-2.5">
+                    @csrf
+                    <input type="hidden" name="mode" value="login">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-mono uppercase tracking-wider text-padi-300 font-semibold">🎯 Pintasan Demo Sidang</span>
+                        <span class="text-[10px] text-paper-400">1-Klik Login</span>
+                    </div>
+                    @if($loginDaftarEntitas->isNotEmpty())
+                        <div>
+                            <select name="id_entitas" class="input-field !py-1.5 !text-xs">
+                                @foreach($loginDaftarEntitas as $ent)
+                                    <option value="{{ $ent->id_entitas }}">{{ $ent->kode_entitas }} — {{ $ent->nama_entitas }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    <div>
+                        <select name="peran" class="input-field !py-1.5 !text-xs">
+                            @foreach($loginKatalogPeran as $kode => $info)
+                                <option value="{{ $kode }}">{{ $info['ikon'] }} {{ $info['urutan'] }}. {{ $info['nama'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full rounded-lg bg-padi-500/25 hover:bg-padi-500/40 border border-padi-500/40 py-2 text-xs font-semibold text-padi-100 transition-colors cursor-pointer">
+                        Masuk Cepat Sesuai Peran Demo →
+                    </button>
+                </form>
+
+                <div class="space-y-2">
+                    <a href="{{ route('publik.komoditas') }}" class="block w-full text-center px-4 py-2.5 rounded-xl border border-sawah-500/40 bg-sawah-500/10 text-sawah-100 hover:bg-sawah-500/20 text-xs font-medium transition-all duration-200">
+                        🌐 Lihat Etalase Publik Komoditas (Tanpa Login)
+                    </a>
+                    <a href="{{ route('register') }}" class="block w-full text-center px-4 py-2.5 rounded-xl border border-ink-600 text-paper-300 hover:border-padi-500/50 hover:text-padi-100 text-sm font-medium transition-all duration-200">
+                        Belum punya akun? <span class="text-padi-400 font-semibold">Daftar Desa</span>
+                    </a>
+                </div>
             </div>
 
             {{-- Info hint --}}

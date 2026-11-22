@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data">
+<x-layouts.app :title="$title" eyebrow="Master Data">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">
             {{ session('success') }}

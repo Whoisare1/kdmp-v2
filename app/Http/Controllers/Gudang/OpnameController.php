@@ -243,6 +243,8 @@ class OpnameController extends ModuleCrudController
                             'id_gudang' => (int) $header->id_gudang,
                             'items' => $antrean['items'],
                         ],
+                        'status' => 'MENUNGGU',
+                        'created_by' => auth()->id(),
                     ]);
                 }
 

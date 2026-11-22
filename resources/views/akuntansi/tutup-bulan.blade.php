@@ -121,6 +121,7 @@
                 <form method="POST" action="{{ route('akuntansi.tutup-bulan.store') }}"
                       onsubmit="return confirm('Anda yakin ingin menutup periode {{ $namaBulan }}? Tindakan ini tidak bisa dibatalkan.')">
                     @csrf
+                    @idempotency
                     <input type="hidden" name="tahun" value="{{ $tahun }}">
                     <input type="hidden" name="bulan" value="{{ $bulan }}">
                     <button type="submit"

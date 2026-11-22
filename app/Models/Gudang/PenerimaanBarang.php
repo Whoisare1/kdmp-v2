@@ -52,4 +52,3 @@ class PenerimaanBarang extends Model
             ->where('ref_tipe', 'PENERIMAAN');
     }
 }
-

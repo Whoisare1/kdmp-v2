@@ -80,6 +80,7 @@
     {{-- ===== Form Utama ===== --}}
     <form method="POST" action="{{ route('akuntansi.saldo-awal.store') }}" id="form-saldo-awal">
         @csrf
+        @idempotency
         <input type="hidden" name="tahun" value="{{ $tahun }}">
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

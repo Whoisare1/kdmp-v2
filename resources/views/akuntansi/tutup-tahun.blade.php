@@ -145,6 +145,7 @@
 
                     <form method="POST" action="{{ route('akuntansi.tutup-tahun.store') }}">
                         @csrf
+                        @idempotency
                         <input type="hidden" name="tahun" value="{{ $tahun }}">
 
                         <label class="flex items-start gap-2 cursor-pointer">

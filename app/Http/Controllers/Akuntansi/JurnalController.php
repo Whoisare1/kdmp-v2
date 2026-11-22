@@ -31,6 +31,7 @@ class JurnalController extends Controller
                    ->orWhere('keterangan', 'like', "%{$q}%")
                    ->orWhere('kode_transaksi', 'like', "%{$q}%");
             }))
+            ->with('entitas')
             ->orderByDesc('tanggal_jurnal')
             ->orderByDesc('id_jurnal');
 
@@ -74,6 +75,21 @@ class JurnalController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal membalik jurnal: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Memproses antrean outbox jurnal gudang (penerimaan, kerusakan, opname) secara langsung dari UI.
+     */
+    public function prosesGudang(\App\Services\Finance\GudangJurnalService $gudangJurnalService)
+    {
+        $idEntitas = app('entitas_aktif');
+        $sukses = $gudangJurnalService->prosesAntrean(50, $idEntitas ? (int) $idEntitas : null);
+
+        if ($sukses > 0) {
+            return redirect()->back()->with('status', "Berhasil memproses {$sukses} transaksi antrean gudang menjadi Jurnal Umum resmi dan menautkannya ke Kartu Stok.");
+        }
+
+        return redirect()->back()->with('info', 'Tidak ada antrean jurnal gudang berstatus MENUNGGU yang perlu diproses saat ini (atau cek log antrean bila ada yang GAGAL).');
     }
 }
 

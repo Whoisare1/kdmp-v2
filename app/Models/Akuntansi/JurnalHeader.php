@@ -39,5 +39,10 @@ class JurnalHeader extends Model
     {
         return $this->belongsTo(self::class, 'id_jurnal_asal', 'id_jurnal');
     }
+
+    public function entitas()
+    {
+        return $this->belongsTo(\App\Models\Tenant\Entitas::class, 'id_entitas', 'id_entitas');
+    }
 }
 

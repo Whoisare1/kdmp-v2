@@ -20,14 +20,14 @@
             'label' => 'Demografi Penduduk Desa',
             'route' => 'perencanaan.demografi.index',
             'icon' => '👥',
-            'info' => 'M1 Sesi 1',
+            'info' => 'Survei Sesi 1',
         ],
         [
             'id' => 'potensi',
             'label' => 'Potensi Produksi Panen',
             'route' => 'perencanaan.potensi-produksi.index',
             'icon' => '🌾',
-            'info' => 'M1 Sesi 2',
+            'info' => 'Survei Sesi 2',
         ],
         [
             'id' => 'standar',

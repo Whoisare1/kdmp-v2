@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Gudang;
 
 use App\Events\Gudang\BarangDiterimaGudang;
 use App\Http\Controllers\Concerns\ModuleCrudController;
+use App\Http\Controllers\Concerns\ResolvesEntitasAktif;
 use App\Models\Gudang\AntreanJurnalGudang;
 use App\Models\Gudang\PenerimaanBarang;
 use App\Models\Gudang\PenerimaanBarangDetail;
@@ -14,16 +15,19 @@ use App\Models\Master\Pihak;
 use App\Models\Master\Satuan;
 use App\Models\Pembelian\Pembelian;
 use App\Rules\TenantOwnershipRule;
-use App\Services\StokService;
 use App\Services\StokBatchService;
+use App\Services\StokService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PenerimaanBarangController extends ModuleCrudController
 {
+    use ResolvesEntitasAktif;
+
     public function __construct(private StokBatchService $stokBatch) {}
 
     protected string $model = PenerimaanBarang::class;
@@ -38,12 +42,15 @@ class PenerimaanBarangController extends ModuleCrudController
 
     public function index(Request $request): View
     {
+        $entitasId = $this->entitasAktifId();
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'bulan' => ['nullable', 'integer', 'between:1,12'],
             'tahun' => ['nullable', 'integer', 'between:2000,2100'],
         ]);
-        $query = PenerimaanBarang::query()->with(['gudang', 'pihak']);
+        $query = PenerimaanBarang::query()
+            ->when($entitasId, fn ($q) => $q->where('id_entitas', $entitasId))
+            ->with(['gudang', 'pihak']);
 
         if ($search = $filters['q'] ?? null) {
             $query->where(function ($q) use ($search) {
@@ -68,9 +75,8 @@ class PenerimaanBarangController extends ModuleCrudController
     public function create(): View
     {
         $request = request();
-        $entitasId = (int) (auth()->user()?->id_entitas
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : 0));
-        abort_if($entitasId <= 0, 403, 'Pilih entitas aktif untuk membuat penerimaan barang.');
+        $entitasId = $this->entitasAktifId();
+        abort_if(! $entitasId, 403, 'Pilih entitas aktif untuk membuat penerimaan barang.');
 
         $pembelianList = Pembelian::query()
             ->where('id_entitas', $entitasId)
@@ -79,6 +85,7 @@ class PenerimaanBarangController extends ModuleCrudController
             ->orderBy('tanggal_transaksi')
             ->orderBy('id_pembelian')
             ->get();
+
         $qtyDiterima = $this->qtyLayakTerkumpul($pembelianList->modelKeys());
         $pembelianTersedia = $pembelianList->map(function (Pembelian $pembelian) use ($qtyDiterima): array {
             $items = $this->sisaPerBarang($pembelian, $qtyDiterima[(int) $pembelian->id_pembelian] ?? []);
@@ -110,17 +117,26 @@ class PenerimaanBarangController extends ModuleCrudController
             ])->values()->all();
         }
 
-        $batchTrackingAvailable = true;
-        $pelacakanBarang = $entitasId !== null
+        $batchTrackingAvailable = Schema::hasColumn('barang_per_koperasi', 'lacak_batch');
+        $pelacakanBarang = $batchTrackingAvailable && $entitasId !== null
             ? DB::table('barang_per_koperasi')
                 ->where('id_entitas', $entitasId)
                 ->pluck('lacak_batch', 'id_barang')
             : collect();
 
-        $gudang = Gudang::query()->where('is_active', true)->orderBy('nama_gudang')->get();
-        $pihak = Pihak::query()->where('is_active', true)->orderBy('nama')->get();
+        $gudang = Gudang::query()
+            ->when($entitasId, fn ($q) => $q->where('id_entitas', $entitasId))
+            ->where('is_active', true)
+            ->orderBy('nama_gudang')
+            ->get();
+        $pihak = Pihak::query()
+            ->when($entitasId, fn ($q) => $q->where(fn ($sub) => $sub->where('id_entitas', $entitasId)->orWhereNull('id_entitas')))
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get();
         $barangQuery = Barang::query()
             ->with(['satuanDasar', 'konversiSatuan.satuan'])
+            ->forEntitas($entitasId)
             ->where('is_active', true)
             ->orderBy('nama_barang');
         if ($pembelianTerpilih) {
@@ -128,6 +144,7 @@ class PenerimaanBarangController extends ModuleCrudController
         }
         $barang = $barangQuery->get();
         $satuan = Satuan::query()
+            ->when($entitasId, fn ($q) => $q->forEntitas($entitasId))
             ->where('is_active', true)
             ->orderBy('kode_satuan')
             ->get(['id', 'kode_satuan']);
@@ -135,6 +152,21 @@ class PenerimaanBarangController extends ModuleCrudController
         return view('gudang.penerimaan.create', [
             'gudang' => $gudang,
             'pihak' => $pihak,
+            'pembelianData' => $pembelianList->map(fn (Pembelian $pb) => [
+                'id' => $pb->id_pembelian,
+                'kode' => $pb->kode_pembelian,
+                'tanggal' => $pb->tanggal_transaksi?->format('Y-m-d'),
+                'idGudang' => $pb->id_gudang,
+                'idPihak' => $pb->id_pihak,
+                'pihakNama' => $pb->pihak?->nama ?? '-',
+                'total' => (float) $pb->total_pembelian,
+                'items' => $pb->detail->map(fn ($detail) => [
+                    'id_barang' => $detail->id_barang,
+                    'id_satuan_input' => $detail->id_satuan_input,
+                    'qty' => (float) $detail->qty_input,
+                    'harga_satuan' => (float) $detail->harga_satuan_input,
+                ])->values(),
+            ])->values(),
             'barangData' => $barang->map(fn (Barang $item) => [
                 'id' => $item->id_barang,
                 'kode' => $item->kode_barang,
@@ -226,9 +258,14 @@ class PenerimaanBarangController extends ModuleCrudController
             'pembelian',
             'detail.barang.satuanDasar',
             'detail.satuanInput',
-            'detail.batchDetails.batch',
             'antreanJurnal.unitUsaha',
         ];
+        if (Schema::hasTable('penerimaan_batch_detail')) {
+            $relations[] = 'detail.batchDetails.batch';
+        }
+        if (Schema::hasTable('antrean_jurnal_gudang')) {
+            $relations[] = 'antreanJurnal.jurnal';
+        }
         $item = PenerimaanBarang::query()->with($relations)->findOrFail($id);
 
         return view('gudang.penerimaan.show', [
@@ -240,7 +277,13 @@ class PenerimaanBarangController extends ModuleCrudController
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id_pembelian' => ['nullable', 'integer', 'exists:pembelian,id_pembelian'],
+            'sumber_penerimaan' => ['nullable', 'in:pembelian,non_pembelian,saldo_awal'],
+            'id_pembelian' => [
+                'nullable',
+                'integer',
+                'required_if:sumber_penerimaan,pembelian',
+                new TenantOwnershipRule('pembelian', 'id_pembelian'),
+            ],
             'id_gudang' => ['required', 'integer', new TenantOwnershipRule('gudang', 'id_gudang')],
             'id_pihak' => ['required', 'integer', 'exists:master_pihak,id_pihak'],
             'kode_penerimaan' => ['required', 'string', 'max:30'],
@@ -264,18 +307,23 @@ class PenerimaanBarangController extends ModuleCrudController
             'items.*.batches.*.alasan_tidak_layak' => ['nullable', 'string'],
         ]);
 
-        $kodePenerimaan = $data['kode_penerimaan'];
-        $entitasId = (int) (auth()->user()?->id_entitas
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : 0));
-        abort_if($entitasId <= 0, 403, 'Pilih entitas aktif untuk mencatat penerimaan barang.');
+        $entitasId = $this->entitasAktifId();
+        abort_if(! $entitasId, 403, 'Pilih entitas aktif untuk mencatat penerimaan barang.');
 
-        return DB::transaction(function () use ($data, $kodePenerimaan, $entitasId) {
+        $kodePenerimaan = $data['kode_penerimaan'];
+        $sumberPenerimaan = $data['sumber_penerimaan']
+            ?? (! empty($data['id_pembelian']) ? 'pembelian' : 'non_pembelian');
+        $idPembelian = ! empty($data['id_pembelian'])
+            ? (int) $data['id_pembelian']
+            : null;
+
+        return DB::transaction(function () use ($data, $kodePenerimaan, $sumberPenerimaan, $idPembelian, $entitasId) {
             $pembelian = null;
             $sisaPembelian = [];
-            if (! empty($data['id_pembelian'])) {
+            if ($idPembelian !== null) {
                 $pembelian = Pembelian::query()
                     ->where('id_entitas', $entitasId)
-                    ->whereKey($data['id_pembelian'])
+                    ->whereKey($idPembelian)
                     ->lockForUpdate()
                     ->first();
 
@@ -321,8 +369,12 @@ class PenerimaanBarangController extends ModuleCrudController
                 'created_by' => auth()->id(),
             ]);
 
+            if ($pembelian && $pembelian->status === 'disetujui') {
+                $pembelian->update(['status' => 'diterima']);
+            }
+
             $service = app(StokService::class);
-            $antreanPerUnitUsaha = [];
+            $antreanGroup = [];
             $qtyDiterimaDalamForm = [];
 
             // Loop setiap item dan insert detail + update stok
@@ -383,7 +435,7 @@ class PenerimaanBarangController extends ModuleCrudController
                     }
                 }
                 $lacakBatch = $this->stokBatch->pelacakanAktif(
-                    (int) ($header->id_entitas ?? app('entitas_aktif')),
+                    $entitasId,
                     (int) $barang->id_barang,
                 );
                 $batchInputs = $item['batches'] ?? [];
@@ -494,7 +546,7 @@ class PenerimaanBarangController extends ModuleCrudController
                 $kartuStok = null;
                 if (bccomp($qtyLayak, '0', 4) > 0) {
                     $kartuStok = $service->masuk(
-                        entitasId: (int) ($header->id_entitas ?? app('entitas_aktif')),
+                        entitasId: (int) ($header->id_entitas ?? $entitasId),
                         gudangId: (int) $data['id_gudang'],
                         barangId: (int) $barang->id_barang,
                         qty: $qtyLayak,
@@ -515,54 +567,53 @@ class PenerimaanBarangController extends ModuleCrudController
                     );
                 }
 
-                if ($pembelian === null && $kartuStok !== null) {
-                    $idUnitUsaha = (int) ($barang->id_unit_usaha ?? 0);
-                    if ($idUnitUsaha <= 0) {
-                        throw ValidationException::withMessages([
-                            "items.{$index}.id_barang" => 'Barang ini belum terhubung ke unit usaha, sehingga belum dapat dikirim ke antrean Keuangan.',
-                        ]);
-                    }
-
-                    if (! isset($antreanPerUnitUsaha[$idUnitUsaha])) {
-                        $antreanPerUnitUsaha[$idUnitUsaha] = [
-                            'nilai' => '0.00',
+                // Kumpulkan antrean jika ada barang layak
+                if (bccomp($qtyLayak, '0', 4) > 0 && $barang->id_unit_usaha) {
+                    $unitId = (int) $barang->id_unit_usaha;
+                    $nilaiItem = (float) bcmul($qtyLayak, $hargaSatuanDasar, 2);
+                    if (! isset($antreanGroup[$unitId])) {
+                        $antreanGroup[$unitId] = [
+                            'unit_id' => $unitId,
+                            'nilai' => 0.0,
                             'items' => [],
                         ];
                     }
-
-                    $antreanPerUnitUsaha[$idUnitUsaha]['nilai'] = bcadd(
-                        $antreanPerUnitUsaha[$idUnitUsaha]['nilai'],
-                        (string) $kartuStok->nilai_mutasi,
-                        2,
-                    );
-                    $antreanPerUnitUsaha[$idUnitUsaha]['items'][] = [
-                        'id_barang' => (int) $kartuStok->id_barang,
-                        'qty' => (string) $kartuStok->qty_masuk,
-                        'hpp_satuan' => (string) $kartuStok->harga_satuan,
-                        'nilai' => (string) $kartuStok->nilai_mutasi,
-                        'id_kartu' => (int) $kartuStok->id_kartu,
+                    $antreanGroup[$unitId]['nilai'] += $nilaiItem;
+                    $antreanGroup[$unitId]['items'][] = [
+                        'id_barang' => (int) $barang->id_barang,
+                        'qty' => (float) $qtyLayak,
+                        'hpp_satuan' => (float) $hargaSatuanDasar,
+                        'nilai' => $nilaiItem,
+                        'id_kartu' => $kartuStok?->id_kartu,
                     ];
                 }
             }
 
-            foreach ($antreanPerUnitUsaha as $idUnitUsaha => $antrean) {
-                AntreanJurnalGudang::query()->create([
-                    'id_entitas' => (int) ($header->id_entitas ?? app('entitas_aktif')),
-                    'jenis_transaksi' => 'PENERIMAAN',
-                    'ref_tipe' => 'PENERIMAAN',
-                    'ref_id' => (int) $header->id_penerimaan,
-                    'no_dokumen' => $header->kode_penerimaan,
-                    'id_unit_usaha' => (int) $idUnitUsaha,
-                    'tanggal' => $header->tanggal_terima,
-                    'nilai' => $antrean['nilai'],
-                    'payload' => [
-                        'id_gudang' => (int) $header->id_gudang,
-                        'items' => $antrean['items'],
-                        'id_pembelian' => $header->id_pembelian,
-                        'kode_pembelian' => $pembelian?->kode_pembelian,
-                        'keterangan' => $header->catatan,
-                    ],
-                ]);
+            // Insert ke antrean jurnal per unit usaha
+            foreach ($antreanGroup as $g) {
+                if ($g['nilai'] > 0) {
+                    AntreanJurnalGudang::create([
+                        'id_entitas' => (int) ($header->id_entitas ?? $entitasId),
+                        'jenis_transaksi' => 'PENERIMAAN',
+                        'ref_tipe' => 'PENERIMAAN',
+                        'ref_id' => (int) $header->id_penerimaan,
+                        'no_dokumen' => $header->kode_penerimaan,
+                        'id_unit_usaha' => $g['unit_id'],
+                        'tanggal' => $data['tanggal_terima'],
+                        'nilai' => $g['nilai'],
+                        'payload' => [
+                            'sumber_penerimaan' => $sumberPenerimaan,
+                            'id_gudang' => (int) $data['id_gudang'],
+                            'id_pembelian' => $header->id_pembelian,
+                            'kode_pembelian' => $pembelian?->kode_pembelian,
+                            'id_pihak' => (int) $data['id_pihak'],
+                            'keterangan' => $header->catatan,
+                            'items' => $g['items'],
+                        ],
+                        'status' => 'MENUNGGU',
+                        'created_by' => auth()->id(),
+                    ]);
+                }
             }
 
             if ($pembelian !== null) {

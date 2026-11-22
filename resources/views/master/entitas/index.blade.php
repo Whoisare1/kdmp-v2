@@ -1,4 +1,14 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data (Super Admin)">
+<x-layouts.app :title="$title" eyebrow="Master Data (Super Admin)">
+    <div x-data="{
+        showDeleteModal: false,
+        deleteNama: '',
+        deleteUrl: '',
+        confirmDelete(nama, url) {
+            this.deleteNama = nama;
+            this.deleteUrl = url;
+            this.showDeleteModal = true;
+        }
+    }">
     @if (session('success'))
         <div class="mb-4 rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">
             {{ session('success') }}
@@ -39,6 +49,7 @@
                         <th class="px-4 py-3 font-medium">Kode &amp; Nama Entitas</th>
                         <th class="px-4 py-3 font-medium">Jenis</th>
                         <th class="px-4 py-3 font-medium">Wilayah Desa</th>
+                        <th class="px-4 py-3 font-medium">Administrator &amp; Akun</th>
                         <th class="px-4 py-3 text-center font-medium">Tahun Buku</th>
                         <th class="px-4 py-3 text-center font-medium">Status</th>
                         <th class="px-4 py-3 text-right font-medium">Aksi</th>
@@ -46,6 +57,9 @@
                 </thead>
                 <tbody class="divide-y divide-paper-200">
                     @forelse ($items as $item)
+                        @php
+                            $manajerUser = $item->pengguna?->first(fn($u) => $u->peran->contains('kode', 'manajer')) ?? $item->pengguna?->first();
+                        @endphp
                         <tr class="hover:bg-paper-100/70">
                             <td class="px-4 py-3">
                                 <div class="font-medium text-ink-900">{{ $item->nama_entitas }}</div>
@@ -55,6 +69,20 @@
                                 {{ $item->jenis_entitas ?? 'koperasi' }}
                             </td>
                             <td class="px-4 py-3 text-ink-800">{{ $item->wilayah?->nama ?? '—' }}</td>
+                            <td class="px-4 py-3 text-xs">
+                                @if($manajerUser)
+                                    <div class="font-medium text-ink-900">{{ $manajerUser->nama }}</div>
+                                    <div class="font-mono text-[11px] text-ink-500">{{ $manajerUser->email }}</div>
+                                    <span class="inline-block mt-0.5 rounded bg-paper-200 px-1.5 py-0.2 text-[10px] text-ink-700">
+                                        {{ $item->pengguna_count }} Akun Terdaftar
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                                        ⚠️ Belum ada akun
+                                    </span>
+                                    <a href="{{ route('master.entitas.edit', $item->id_entitas) }}" class="block mt-0.5 text-[11px] text-merah-600 hover:underline">+ Buat Akun</a>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-center font-mono text-ink-800">{{ $item->tahun_buku_awal }}</td>
                             <td class="px-4 py-3 text-center">
                                 <span class="rounded-full px-2.5 py-0.5 font-mono text-xs {{ $item->status === 'APPROVED' && $item->is_active ? 'bg-sawah-100 text-sawah-700' : ($item->status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-merah-100 text-merah-700') }}">
@@ -64,17 +92,16 @@
                             <td class="px-4 py-3 text-right space-x-2">
                                 <a href="{{ route('master.entitas.edit', $item->id_entitas) }}"
                                    class="text-xs font-medium text-ink-700 hover:text-merah-600">Ubah</a>
-                                <form action="{{ route('master.entitas.destroy', $item->id_entitas) }}" method="POST" class="inline"
-                                      onsubmit="return confirm('Hapus entitas {{ addslashes($item->nama_entitas) }}?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-xs font-medium text-merah-600 hover:text-merah-800">Hapus</button>
-                                </form>
+                                <button type="button"
+                                        @click="confirmDelete('{{ addslashes($item->nama_entitas) }}', '{{ route('master.entitas.destroy', $item->id_entitas) }}')"
+                                        class="text-xs font-medium text-merah-600 hover:text-merah-800">
+                                    Hapus
+                                </button>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-10 text-center text-sm text-ink-600/60">
+                            <td colspan="7" class="px-4 py-10 text-center text-sm text-ink-600/60">
                                 Belum ada data Entitas.
                             </td>
                         </tr>
@@ -87,5 +114,60 @@
     <div class="mt-4">
         {{ $items->links() }}
     </div>
-</x-layouts.app>
 
+    {{-- Modal Dialog Konfirmasi Hapus Entitas --}}
+    <div x-show="showDeleteModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/50 backdrop-blur-xs transition-opacity"
+         x-transition:enter="ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+
+        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl border border-paper-200"
+             @click.away="showDeleteModal = false"
+             x-transition:enter="ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95">
+
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-ink-900">Konfirmasi Hapus Entitas</h3>
+                    <p class="text-xs text-ink-500">Tindakan Super Administrator</p>
+                </div>
+            </div>
+
+            <div class="mb-5 text-sm text-ink-700 leading-relaxed">
+                <p>
+                    Apakah Anda yakin ingin menghapus entitas <span class="font-bold text-ink-900" x-text="deleteNama"></span>?
+                </p>
+                <p class="mt-2 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+                    ⚠️ <strong>Perhatian:</strong> Menghapus entitas akan menghapus seluruh data asosiasi koperasi ini. Tindakan ini tidak dapat dibatalkan.
+                </p>
+            </div>
+
+            <form :action="deleteUrl" method="POST" class="flex justify-end gap-2.5">
+                @csrf
+                @method('DELETE')
+                <button type="button" @click="showDeleteModal = false"
+                        class="rounded-lg border border-paper-300 px-4 py-2 text-xs font-medium text-ink-700 hover:bg-paper-100 transition-colors">
+                    Batal
+                </button>
+                <button type="submit"
+                        class="rounded-lg bg-rose-600 px-4 py-2 text-xs font-medium text-white hover:bg-rose-700 transition-colors shadow-xs">
+                    Ya, Hapus Entitas
+                </button>
+            </form>
+        </div>
+    </div>
+    </div>
+</x-layouts.app>

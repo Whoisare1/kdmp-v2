@@ -104,7 +104,7 @@ class JurnalService
         }
 
         // --- LANGKAH 5: Validasi periode masih OPEN ---
-        $tanggal = $payload['tanggal_jurnal'] ?? now()->toDateString();
+        $tanggal = \Carbon\Carbon::parse($payload['tanggal_jurnal'] ?? now())->toDateString();
         [$tahun, $bulan] = $this->parsePeriode($tanggal);
         $this->pastikanPeriodeTerbuka($tahun, $bulan, $entitasId);
 
@@ -164,7 +164,7 @@ class JurnalService
         }
 
         // Validasi periode
-        $tanggal = $header['tanggal_jurnal'];
+        $tanggal = \Carbon\Carbon::parse($header['tanggal_jurnal'] ?? now())->toDateString();
         [$tahun, $bulan] = $this->parsePeriode($tanggal);
         $this->pastikanPeriodeTerbuka($tahun, $bulan);
 
@@ -275,24 +275,52 @@ class JurnalService
             ->where('periode_bulan', $bulan)
             ->delete();
 
-        // Ambil saldo_akhir bulan lalu sebagai saldo_awal bulan ini
-        $bulanLalu       = $bulan === 1 ? 12 : $bulan - 1;
-        $tahunLalu       = $bulan === 1 ? $tahun - 1 : $tahun;
+        // Ambil saldo_akhir dari periode terakhir sebelum periode ini (< $bulan di tahun yang sama)
+        $subLatestPrior = DB::table('buku_besar_periode as b2')
+            ->select('b2.kode_anak', DB::raw('MAX(b2.periode_bulan) as max_bulan'))
+            ->where('b2.id_entitas', $idEntitas)
+            ->where('b2.periode_tahun', $tahun)
+            ->where('b2.periode_bulan', '<', $bulan)
+            ->groupBy('b2.kode_anak');
 
-        $saldoAwalBulanLalu = DB::table('buku_besar_periode')
-            ->where('id_entitas', $idEntitas)
-            ->where('periode_tahun', $tahunLalu)
-            ->where('periode_bulan', $bulanLalu)
+        $saldoAwalBulanLalu = DB::table('buku_besar_periode as bbp')
+            ->joinSub($subLatestPrior, 'prior', function ($join) {
+                $join->on('bbp.kode_anak', '=', 'prior.kode_anak')
+                     ->on('bbp.periode_bulan', '=', 'prior.max_bulan');
+            })
+            ->where('bbp.id_entitas', $idEntitas)
+            ->where('bbp.periode_tahun', $tahun)
             ->get()
-            ->keyBy('kode_anak');  // index by kode_anak untuk akses cepat
+            ->keyBy('kode_anak');
 
-        // Hitung mutasi bulan ini dari jurnal yang sudah POSTED
+        // Jika bulan 1 atau belum ada saldo di tahun ini, cari dari akhir tahun sebelumnya
+        if ($saldoAwalBulanLalu->isEmpty()) {
+            $priorTahun = $tahun - 1;
+            $subPriorYear = DB::table('buku_besar_periode as b2')
+                ->select('b2.kode_anak', DB::raw('MAX(b2.periode_bulan) as max_bulan'))
+                ->where('b2.id_entitas', $idEntitas)
+                ->where('b2.periode_tahun', $priorTahun)
+                ->groupBy('b2.kode_anak');
+
+            $saldoAwalBulanLalu = DB::table('buku_besar_periode as bbp')
+                ->joinSub($subPriorYear, 'prior', function ($join) {
+                    $join->on('bbp.kode_anak', '=', 'prior.kode_anak')
+                         ->on('bbp.periode_bulan', '=', 'prior.max_bulan');
+                })
+                ->where('bbp.id_entitas', $idEntitas)
+                ->where('bbp.periode_tahun', $priorTahun)
+                ->get()
+                ->keyBy('kode_anak');
+        }
+
+        // Hitung mutasi bulan ini dari jurnal yang POSTED dan REVERSED
+        // (Jurnal yang dibalik harus tetap dihitung karena jurnal pembaliknya juga dicatat sebagai POSTED)
         $mutasi = DB::table('jurnal_detail as jd')
             ->join('jurnal_header as jh', 'jh.id_jurnal', '=', 'jd.id_jurnal')
             ->where('jh.id_entitas', $idEntitas)
             ->where('jh.periode_tahun', $tahun)
             ->where('jh.periode_bulan', $bulan)
-            ->where('jh.status', 'POSTED')
+            ->whereIn('jh.status', ['POSTED', 'REVERSED'])
             ->selectRaw('jd.kode_anak, SUM(jd.debet) as mutasi_debet, SUM(jd.kredit) as mutasi_kredit')
             ->groupBy('jd.kode_anak')
             ->get();

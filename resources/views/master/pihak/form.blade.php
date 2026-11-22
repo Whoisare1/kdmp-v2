@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data">
+<x-layouts.app :title="$title" eyebrow="Master Data">
     <div class="mb-5">
         <a href="{{ route('master.pihak.index') }}" class="inline-flex items-center gap-1 text-sm text-ink-600 hover:text-ink-900">
             &larr; Kembali ke Daftar Pihak / Mitra
@@ -125,7 +125,7 @@
                 </div>
             </div>
 
-            {{-- Parameter Evaluasi Supplier / Petani (Opsional untuk M3) --}}
+            {{-- Parameter Evaluasi Supplier / Petani (Opsional untuk Perencanaan Pengadaan) --}}
             <div class="md:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-sm border border-paper-200 bg-white p-4"
                  x-show="jenisPihak === 'petani' || jenisPihak === 'supplier'">
                 <div>

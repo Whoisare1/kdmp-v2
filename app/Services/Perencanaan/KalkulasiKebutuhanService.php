@@ -220,6 +220,10 @@ class KalkulasiKebutuhanService
                     $versi = $existingHasil->versi;
                 }
 
+                $unitUsahaRekomendasi = DB::table('master_barang')->where('id_komoditas', $komoditas->id)->value('id_unit_usaha')
+                    ?? DB::table('master_unit_usaha')->where('kode_unit_usaha', 'SEMBAKO')->value('id_unit_usaha')
+                    ?? DB::table('master_unit_usaha')->value('id_unit_usaha');
+
                 $hasil = HasilKalkulasi::updateOrCreate(
                     [
                         'id_wilayah' => $idWilayah,
@@ -234,6 +238,9 @@ class KalkulasiKebutuhanService
                         'selisih' => $selisih,
                         'status_surplus_defisit' => $statusSurplusDefisit,
                         'persentase_kecukupan' => $persentaseKecukupan,
+                        'id_unit_usaha_rekomendasi' => $unitUsahaRekomendasi,
+                        'alasan_rekomendasi' => $statusSurplusDefisit === 'defisit' ? 'Kebutuhan melebihi ketersediaan lokal; rekomendasi pengadaan unit usaha.' : 'Produksi lokal mencukupi kebutuhan.',
+                        'prioritas' => $statusSurplusDefisit === 'defisit' ? 1 : 3,
                         'status' => 'draft',
                         'created_at' => now(),
                     ]

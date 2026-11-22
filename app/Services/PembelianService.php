@@ -127,6 +127,7 @@ class PembelianService
         ?string $tglJatuhTempo = null,
         ?int $idKasBank = null,
         string $sumberPembelian = 'warga_lokal',
+        float $diskon = 0,
     ): Pembelian {
         if (! in_array($sumberPembelian, ['desa_lain', 'warga_lokal', 'pengambilan_konsinyasi'], true)) {
             throw new \Exception('Sumber pembelian tidak valid.');
@@ -158,6 +159,19 @@ class PembelianService
             throw new \Exception('Harga yang ditetapkan desa pengirim harus lebih besar dari nol.');
         }
 
+        $totalBruto = 0;
+        foreach ($items as $item) {
+            $totalBruto += round(
+                ($item['qty_dasar'] ?? 0) * ($item['harga_satuan'] ?? 0),
+                2,
+            );
+        }
+        $totalBruto = round($totalBruto, 2);
+        $diskon = round($diskon, 2);
+        if ($diskon < 0 || $diskon > $totalBruto) {
+            throw new \Exception('Diskon pembelian tidak boleh melebihi total harga barang.');
+        }
+
         DB::beginTransaction();
 
         try {
@@ -165,14 +179,6 @@ class PembelianService
                 $idEntitas,
                 now()->toDateString(),
             );
-
-            $totalPembelian = 0;
-
-            foreach ($items as $item) {
-                $totalPembelian +=
-                    ($item['qty_dasar'] ?? 0)
-                    * ($item['harga_satuan'] ?? 0);
-            }
 
             $pembelian = Pembelian::create([
                 'id_entitas' => $idEntitas,
@@ -186,7 +192,8 @@ class PembelianService
                 'jenis_pembayaran' => $jenisPembayaran,
                 'id_kas_bank' => $idKasBank,
                 'tgl_jatuh_tempo' => $tglJatuhTempo,
-                'total_pembelian' => $totalPembelian,
+                'total_pembelian' => round($totalBruto - $diskon, 2),
+                'diskon' => $diskon,
                 'status' => 'draft',
                 'status_posting' => 'F',
                 'created_by' => auth()->id(),
@@ -206,8 +213,7 @@ class PembelianService
                     'faktor_konversi' => $faktorKonversi,
                     'qty_dasar' => $item['qty_dasar'] * $faktorKonversi,
                     'harga_satuan_input' => $item['harga_satuan'],
-                    'subtotal' =>
-                        $item['qty_dasar'] * $item['harga_satuan'],
+                    'subtotal' => round($item['qty_dasar'] * $item['harga_satuan'], 2),
                 ]);
             }
 
@@ -262,7 +268,7 @@ class PembelianService
                     $jurnal = app(JurnalService::class)->posting(
                         $transactionCode,
                         [
-                            'tanggal_jurnal' => $pembelian->tanggal_transaksi,
+                            'tanggal_jurnal' => \Carbon\Carbon::parse($pembelian->tanggal_transaksi)->toDateString(),
                             'nomor_nota' => $pembelian->kode_pembelian,
                             'total_pembelian' => (float) $pembelian->total_pembelian,
                             'id_kas_bank' => $idKasBank,
@@ -278,12 +284,8 @@ class PembelianService
                     $statusPosting = $idJurnal ? 'T' : 'F';
                 }
             } catch (\Throwable $e) {
-                if ($isConsignmentIntake) {
-                    throw $e;
-                }
-
-                $idJurnal = null;
-                $statusPosting = 'F';
+                \Illuminate\Support\Facades\Log::error("Gagal posting jurnal pembelian {$pembelian->kode_pembelian}: " . $e->getMessage());
+                throw $e;
             }
 
             $pembelian->update([
@@ -331,14 +333,19 @@ class PembelianService
             throw new \Exception('Pengambilan konsinyasi harus dicatat sebagai hutang tanpa kas/bank, dengan harga satuan dari desa pengirim.');
         }
 
+        $totalBruto = 0;
+        foreach ($data['items'] as $item) {
+            $totalBruto += round((float) ($item['qty_dasar'] ?? 0) * (float) ($item['harga_satuan'] ?? 0), 2);
+        }
+        $totalBruto = round($totalBruto, 2);
+        $diskon = round((float) ($data['diskon'] ?? 0), 2);
+        if ($diskon < 0 || $diskon > $totalBruto) {
+            throw new \Exception('Diskon pembelian tidak boleh melebihi total harga barang.');
+        }
+
         DB::beginTransaction();
 
         try {
-            $totalPembelian = 0;
-            foreach ($data['items'] as $item) {
-                $totalPembelian += (float) ($item['qty_dasar'] ?? 0) * (float) ($item['harga_satuan'] ?? 0);
-            }
-
             $updateData = [
                 'id_pihak' => $data['id_pihak'],
                 'jenis_pembayaran' => $data['jenis_pembayaran'],
@@ -348,7 +355,8 @@ class PembelianService
                 'tgl_jatuh_tempo' => $data['jenis_pembayaran'] === 'kredit'
                     ? ($data['tgl_jatuh_tempo'] ?? null)
                     : null,
-                'total_pembelian' => $totalPembelian,
+                'total_pembelian' => round($totalBruto - $diskon, 2),
+                'diskon' => $diskon,
             ];
 
             if (!empty($data['id_unit_usaha'])) {
@@ -377,7 +385,7 @@ class PembelianService
                     'faktor_konversi' => $faktorKonversi,
                     'qty_dasar' => (float) $item['qty_dasar'] * $faktorKonversi,
                     'harga_satuan_input' => $item['harga_satuan'],
-                    'subtotal' => (float) $item['qty_dasar'] * (float) $item['harga_satuan'],
+                    'subtotal' => round((float) $item['qty_dasar'] * (float) $item['harga_satuan'], 2),
                 ]);
             }
 
@@ -442,6 +450,26 @@ class PembelianService
                 return 1.0;
             }
 
+            // Fallback multi-entitas: Jika kode satuan input sama dengan kode satuan dasar barang (misal sama-sama 'KG')
+            $kodeInput = DB::table('satuan')->where('id', $idSatuan)->value('kode_satuan');
+            $kodeDasar = DB::table('satuan')->where('id', $idSatuanDasar)->value('kode_satuan');
+            if ($kodeInput && $kodeDasar && strtoupper(trim($kodeInput)) === strtoupper(trim($kodeDasar))) {
+                return 1.0;
+            }
+
+            // Fallback pencocokan konversi berdasarkan kode satuan jika ID berbeda
+            if ($kodeInput) {
+                $factorByCode = DB::table('konversi_satuan as ks')
+                    ->join('satuan as s', 's.id', '=', 'ks.id_satuan')
+                    ->where('ks.id_barang', $idBarang)
+                    ->whereRaw('UPPER(s.kode_satuan) = ?', [strtoupper(trim($kodeInput))])
+                    ->value('ks.faktor_ke_dasar');
+
+                if ($factorByCode !== null && (float) $factorByCode > 0) {
+                    return (float) $factorByCode;
+                }
+            }
+
             throw new \Exception('Konversi satuan untuk barang dan satuan yang dipilih tidak ditemukan. Pilih satuan yang tersedia untuk barang tersebut.');
         }
 
@@ -477,6 +505,7 @@ class PembelianService
         array $items,
         string $jenisPenyelesaian,
         string $alasan,
+        ?int $idPenerimaan = null,
     ): ReturPembelian {
         if (!in_array($pembelian->status, [
             'disetujui',
@@ -509,17 +538,25 @@ class PembelianService
                 ->firstOrFail();
 
             $idSatuanKg = DB::table('satuan')
+                ->where('id_entitas', $pembelian->id_entitas)
                 ->whereRaw('UPPER(kode_satuan) = ?', ['KG'])
-                ->value('id');
+                ->value('id')
+                ?? DB::table('satuan')
+                    ->whereRaw('UPPER(kode_satuan) = ?', ['KG'])
+                    ->value('id');
 
             if (! $idSatuanKg) {
                 throw new \Exception('Master satuan KG belum tersedia.');
             }
 
             $items = array_map(function (array $item) use ($idSatuanKg) {
+                $satuanId = isset($item['id_satuan']) && (int) $item['id_satuan'] > 0
+                    ? (int) $item['id_satuan']
+                    : (int) $idSatuanKg;
+
                 $factor = self::conversionFactor(
                     (int) $item['id_barang'],
-                    (int) $idSatuanKg,
+                    $satuanId,
                 );
                 $item['qty_dasar'] = (float) $item['qty_dasar'] * $factor;
 
@@ -591,6 +628,7 @@ class PembelianService
                 'id_entitas' => $pembelian->id_entitas,
                 'kode_retur' => $kodeRetur,
                 'id_pembelian' => $pembelian->id_pembelian,
+                'id_penerimaan' => $idPenerimaan,
                 'tgl_retur' => now()->toDateString(),
                 'jenis_penyelesaian' => $jenisPenyelesaian,
                 'total_nilai' => $totalNilai,

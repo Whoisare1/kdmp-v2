@@ -1,4 +1,4 @@
-<x-layouts.app :title="$title" eyebrow="M0 Master Data">
+<x-layouts.app :title="$title" eyebrow="Master Data">
     <div class="mb-5">
         <a href="{{ route('master.gudang.index') }}" class="inline-flex items-center gap-1 text-sm text-ink-600 hover:text-ink-900">
             &larr; Kembali ke Daftar Gudang
