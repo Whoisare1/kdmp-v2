@@ -6,6 +6,14 @@
         <div class="mb-4 rounded-sm border border-merah-300 bg-merah-50 px-4 py-3 text-sm text-merah-800">{{ session('error') }}</div>
     @endif
 
+    @if (! $item->id_jurnal)
+        <form id="post-jurnal-after-print" method="POST" action="{{ route("$routeBase.post-jurnal", $item) }}" class="hidden">
+            @csrf
+            @method('PATCH')
+        </form>
+        <p class="no-print mb-3 text-xs text-amber-800">Jurnal akan diposting otomatis setelah proses cetak struk selesai.</p>
+    @endif
+
     <div class="no-print mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
             <div class="flex items-center gap-2">
@@ -369,14 +377,26 @@
     </style>
 
     <script>
+        let printRequested = false;
+        let journalRequestSent = false;
+
         window.printReceipt = function () {
+            printRequested = true;
             window.print();
         };
+
+        window.addEventListener('afterprint', function () {
+            if (!printRequested || journalRequestSent) return;
+            const form = document.getElementById('post-jurnal-after-print');
+            if (!form) return;
+            journalRequestSent = true;
+            form.submit();
+        });
 
         @if ($autoPrint ?? false)
             window.addEventListener('load', function () {
                 setTimeout(function () {
-                    window.print();
+                    window.printReceipt();
                 }, 400);
             });
         @endif

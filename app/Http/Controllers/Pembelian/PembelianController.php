@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Pembelian;
 
 use App\Http\Controllers\Concerns\ModuleCrudController;
+use App\Models\Gudang\PenerimaanBarang;
 use App\Models\Master\Gudang;
 use App\Models\Pembelian\Pembelian;
 use App\Models\Master\Barang;
 use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
+use App\Services\Pembelian\PurchaseRecommendation;
+use App\Services\Pembelian\PurchaseRecommendationProvider;
 use App\Rules\TenantOwnershipRule;
 use App\Services\PembelianService;
 use Illuminate\Http\Request;
@@ -26,13 +29,18 @@ class PembelianController extends ModuleCrudController
     protected string $routeBase = 'pembelian.pembelian';
     protected array $withRelations = ['pihak', 'unitUsaha', 'gudang', 'kasBank', 'detail.barang.satuanDasar', 'detail.satuanInput'];
 
+    // TEMPORARY: nonaktifkan syarat modal/saldo awal selama uji coba Pembelian.
+    private const REQUIRE_INITIAL_BALANCE_FOR_PURCHASE = true;
+
     public function index(Request $request): View
     {
         $idEntitas = auth()->user()->id_entitas
             ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
             ?? session('entitas_aktif_pilihan');
 
-        $hasModalAwal = $idEntitas ? $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas) : true;
+        $hasModalAwal = ! self::REQUIRE_INITIAL_BALANCE_FOR_PURCHASE
+            || ! $idEntitas
+            || $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas);
 
         $filters = $request->validate([
             'archive' => ['sometimes', 'in:1'],
@@ -166,7 +174,7 @@ class PembelianController extends ModuleCrudController
             ?? session('entitas_aktif_pilihan')
             ?? \App\Models\Tenant\Entitas::value('id_entitas');
 
-        if ($idEntitas && ! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
+        if (self::REQUIRE_INITIAL_BALANCE_FOR_PURCHASE && $idEntitas && ! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
             throw new \Illuminate\Http\Exceptions\HttpResponseException(
                 redirect()->route("{$this->routeBase}.index")
                     ->with('error', 'Koperasi baru wajib mencatat transaksi Setoran Simpanan Pokok atau Saldo Awal Kas terlebih dahulu sebelum diizinkan membuat Order Pembelian.')
@@ -197,7 +205,7 @@ class PembelianController extends ModuleCrudController
             $kasBanks = KasBank::where('is_active', true)->orderBy('jenis')->orderBy('nama')->get();
         }
 
-        $permintaanPembelianPending = $this->dummyPurchaseRequests($barangs, $gudangs, $pihaks, (int) $idEntitas);
+        $permintaanPembelianPending = $this->purchaseRequestOptions($barangs, $gudangs, $pihaks, (int) $idEntitas);
         $permintaanPembelian = $permintaanPembelianPending
             ->firstWhere('id_permintaan_pembelian', request()->query('permintaan'));
 
@@ -226,12 +234,42 @@ class PembelianController extends ModuleCrudController
                 throw new \RuntimeException('Entitas aktif tidak ditemukan. Masuk menggunakan akun koperasi yang terhubung ke entitas.');
             }
 
-            if (! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
+            if (self::REQUIRE_INITIAL_BALANCE_FOR_PURCHASE && ! $this->hasSimpananPokokOrSaldoAwal((int) $idEntitas)) {
                 return redirect()->route("{$this->routeBase}.index")
                     ->with('error', 'Koperasi baru wajib mencatat transaksi Setoran Simpanan Pokok atau Saldo Awal Kas terlebih dahulu sebelum diizinkan membuat Order Pembelian.');
             }
 
             $source = $request->input('source');
+            $namaPihakSumber = trim((string) $request->input('nama_pihak_sumber'));
+            $jenisPihakDiizinkan = in_array($source, ['desa_lain', 'pengambilan_konsinyasi'], true)
+                ? ['entitas_lain']
+                : ['petani', 'warga'];
+            $pihakMatches = Pihak::query()
+                ->where('id_entitas', $idEntitas)
+                ->where('is_active', true)
+                ->whereIn('jenis_pihak', $jenisPihakDiizinkan)
+                ->whereRaw('LOWER(TRIM(nama)) = ?', [mb_strtolower($namaPihakSumber)])
+                ->when($source === 'pengambilan_konsinyasi', fn ($query) => $query->whereNotNull('id_entitas_mitra'))
+                ->get();
+            $request->merge(['id_pihak' => $pihakMatches->count() === 1 ? $pihakMatches->first()->id_pihak : null]);
+
+            $catalogBarang = Barang::with(['satuanDasar', 'konversiSatuan.satuan'])
+                ->where('is_active', true)
+                ->get();
+            $barangKgIds = $this->barangKgIds($catalogBarang);
+            $itemsManual = $request->input('items', []);
+            foreach ($itemsManual as $index => $itemManual) {
+                $namaBarang = trim((string) ($itemManual['nama_barang'] ?? ''));
+                $barangMatches = Barang::query()
+                    ->where('is_active', true)
+                    ->whereIn('id_barang', $barangKgIds)
+                    ->where('id_unit_usaha', $request->input('id_unit_usaha'))
+                    ->whereRaw('LOWER(TRIM(nama_barang)) = ?', [mb_strtolower($namaBarang)])
+                    ->get();
+                $itemsManual[$index]['id_barang'] = $barangMatches->count() === 1 ? $barangMatches->first()->id_barang : null;
+            }
+            $request->merge(['items' => $itemsManual]);
+
             $pihakExistsRule = Rule::exists('master_pihak', 'id_pihak')
                 ->where('id_entitas', $idEntitas)
                 ->where('is_active', true)
@@ -303,10 +341,11 @@ class PembelianController extends ModuleCrudController
                     Rule::exists('gudang', 'id_gudang')->where('id_entitas', $idEntitas)->where('is_active', true),
                 ],
                 'items' => ['required', 'array', 'min:1'],
+                'items.*.nama_barang' => ['required', 'string', 'max:150'],
                 'items.*.id_barang' => ['required', 'exists:master_barang,id_barang'],
                 'items.*.id_satuan' => ['required', 'exists:satuan,id'],
                 'items.*.qty_dasar' => ['required', 'numeric', 'min:0.01'],
-                'items.*.harga_satuan' => [
+                'items.*.total_harga' => [
                     'required',
                     'numeric',
                     'min:' . ($request->input('source') === 'pengambilan_konsinyasi' ? '0.01' : '0'),
@@ -328,7 +367,7 @@ class PembelianController extends ModuleCrudController
                     ->whereIn('jenis_pihak', ['entitas_lain', 'petani', 'warga'])
                     ->orderBy('nama')
                     ->get();
-                $permintaanPembelian = $this->dummyPurchaseRequests(
+                $permintaanPembelian = $this->purchaseRequestOptions(
                     $barangs,
                     $gudangs,
                     $pihaks,
@@ -336,26 +375,40 @@ class PembelianController extends ModuleCrudController
                 )->firstWhere('id_permintaan_pembelian', $validated['id_permintaan_pembelian']);
 
                 if (! $permintaanPembelian) {
-                    throw new \RuntimeException('Permintaan dummy tidak ditemukan atau sudah diproses.');
+                    throw new \RuntimeException('Rekomendasi pembelian tidak ditemukan atau sudah diproses.');
                 }
 
-                if ($validated['source'] !== $permintaanPembelian->sumber_pembelian) {
+                $supplierRecommendation = $permintaanPembelian->supplier_recommendations
+                    ->firstWhere('id_pihak', (int) $validated['id_pihak']);
+                $requestedItems = array_values($validated['items']);
+                if ($permintaanPembelian->is_external_recommendation) {
+                    if (! $supplierRecommendation) {
+                        throw new \RuntimeException('Pilih pihak sumber yang direkomendasikan Gudang untuk permintaan ini.');
+                    }
+                    if ($validated['source'] !== $supplierRecommendation->sumber_rekomendasi) {
+                        throw new \RuntimeException('Jenis sumber harus sesuai dengan pihak yang direkomendasikan.');
+                    }
+                    $availableQuantity = $supplierRecommendation->jumlah_tersedia_rekomendasi;
+                    if ($availableQuantity !== null
+                        && (float) $requestedItems[0]['qty_dasar'] > (float) $availableQuantity + 0.00005) {
+                        throw new \RuntimeException('Jumlah tersedia dari pemasok rekomendasi belum mencukupi permintaan.');
+                    }
+                } elseif ($validated['source'] !== $permintaanPembelian->sumber_pembelian) {
                     throw new \RuntimeException('Sumber pembelian harus sesuai rekomendasi permintaan.');
                 }
 
-                $requestedItems = array_values($validated['items']);
                 if (
                     (int) $validated['id_gudang'] !== (int) $permintaanPembelian->gudang->id_gudang
-                    || (int) $validated['id_unit_usaha'] !== (int) $permintaanPembelian->barang->id_unit_usaha
+                    || (int) $validated['id_unit_usaha'] !== (int) ($permintaanPembelian->id_unit_usaha ?? $permintaanPembelian->barang->id_unit_usaha)
                     || count($requestedItems) !== 1
                     || (int) $requestedItems[0]['id_barang'] !== (int) $permintaanPembelian->id_barang
-                    || (int) $requestedItems[0]['id_satuan'] !== (int) $permintaanPembelian->barang->id_satuan_dasar
+                    || (int) $requestedItems[0]['id_satuan'] !== (int) ($permintaanPembelian->id_satuan ?? $permintaanPembelian->barang->id_satuan_dasar)
                     || abs((float) $requestedItems[0]['qty_dasar'] - (float) $permintaanPembelian->qty_diminta) > 0.00005
                 ) {
                     throw new \RuntimeException('Barang, jumlah, unit usaha, dan gudang harus sesuai notifikasi yang dipilih.');
                 }
 
-                if (! $permintaanPembelian->supplier_recommendations->contains('id_pihak', (int) $validated['id_pihak'])) {
+                if (! $supplierRecommendation && ! $permintaanPembelian->is_external_recommendation) {
                     throw new \RuntimeException('Pilih pemasok yang termasuk dalam rekomendasi permintaan.');
                 }
             }
@@ -375,7 +428,7 @@ class PembelianController extends ModuleCrudController
                         'id_barang' => (int) $item['id_barang'],
                         'id_satuan' => (int) $item['id_satuan'],
                         'qty_dasar' => (float) $item['qty_dasar'],
-                        'harga_satuan' => (float) $item['harga_satuan'],
+                        'total_harga' => (float) $item['total_harga'],
                     ];
                 })
                 ->values()
@@ -395,30 +448,28 @@ class PembelianController extends ModuleCrudController
             );
 
             if ($permintaanPembelian) {
-                $processed = collect(session('pembelian_dummy_requests_processed', []))
-                    ->push($permintaanPembelian->id_permintaan_pembelian)
-                    ->unique()
-                    ->values()
-                    ->all();
-                session(['pembelian_dummy_requests_processed' => $processed]);
+                if ($permintaanPembelian->is_external_recommendation) {
+                    $provider = app(PurchaseRecommendationProvider::class);
+                    $provider->markProcessed((int) $idEntitas, $permintaanPembelian->recommendation_id, $pembelian);
+                } else {
+                    $processed = collect(session('pembelian_dummy_requests_processed', []))
+                        ->push($permintaanPembelian->id_permintaan_pembelian)
+                        ->unique()
+                        ->values()
+                        ->all();
+                    session(['pembelian_dummy_requests_processed' => $processed]);
 
-                if (str_starts_with((string) $permintaanPembelian->id_permintaan_pembelian, 'PR-')) {
-                    $idPr = (int) str_replace('PR-', '', $permintaanPembelian->id_permintaan_pembelian);
-                    \App\Models\Perencanaan\PermintaanPengadaan::where('id_permintaan', $idPr)
-                        ->update(['status' => 'jadi_pembelian']);
-                    $pembelian->update(['id_permintaan' => $idPr]);
+                    if (str_starts_with((string) $permintaanPembelian->id_permintaan_pembelian, 'PR-')) {
+                        $idPr = (int) str_replace('PR-', '', $permintaanPembelian->id_permintaan_pembelian);
+                        \App\Models\Perencanaan\PermintaanPengadaan::where('id_permintaan', $idPr)
+                            ->update(['status' => 'jadi_pembelian']);
+                        $pembelian->update(['id_permintaan' => $idPr]);
+                    }
                 }
             }
 
-            // Otomatis setujui dan posting ke Jurnal Akuntansi & Kas/Hutang
-            try {
-                $pembelian = PembelianService::approvePembelian($pembelian);
-            } catch (\Throwable $approveEx) {
-                \Illuminate\Support\Facades\Log::warning("Pembelian {$pembelian->kode_pembelian} disimpan sebagai draft: " . $approveEx->getMessage());
-            }
-
             return redirect()->route("{$this->routeBase}.show", $pembelian)
-                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil dibuat dan otomatis diposting ke Jurnal Akuntansi.");
+                ->with('success', "Pembelian {$pembelian->kode_pembelian} berhasil dibuat sebagai draft. Setujui pembelian, lalu posting jurnal secara terpisah.");
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -473,6 +524,8 @@ class PembelianController extends ModuleCrudController
 
                     $realItems->push((object) [
                         'id_permintaan_pembelian' => "PR-{$pr->id_permintaan}",
+                        'recommendation_id' => null,
+                        'is_external_recommendation' => false,
                         'kode_permintaan' => $pr->kode_permintaan,
                         'sumber_pembelian' => 'warga_lokal',
                         'barang' => $barang,
@@ -481,6 +534,9 @@ class PembelianController extends ModuleCrudController
                         'gudang' => $pr->gudang ?? $gudangs->first(),
                         'qty_diminta' => (float) $detail->jumlah_diminta,
                         'supplier_recommendations' => $pihaks->take(5)->values(),
+                        'pihak_rekomendasi' => null,
+                        'harga_total_rekomendasi' => null,
+                        'id_unit_usaha' => $barang->id_unit_usaha,
                     ]);
                 }
             }
@@ -492,16 +548,79 @@ class PembelianController extends ModuleCrudController
     }
 
     /**
+     * Future Gudang integration point. When a provider is bound, its approved
+     * purchase recommendations become the source of the purchase worklist.
+     */
+    private function purchaseRequestOptions(
+        Collection $barangs,
+        Collection $gudangs,
+        Collection $pihaks,
+        int $idEntitas,
+    ): Collection {
+        if (! app()->bound(PurchaseRecommendationProvider::class)) {
+            return $this->dummyPurchaseRequests($barangs, $gudangs, $pihaks, $idEntitas);
+        }
+
+        return app(PurchaseRecommendationProvider::class)
+            ->pendingForEntity($idEntitas)
+            ->filter(fn ($recommendation) => $recommendation instanceof PurchaseRecommendation
+                && $recommendation->idEntitasTujuan === $idEntitas)
+            ->map(function (PurchaseRecommendation $recommendation): object {
+                $supplierCandidates = $recommendation->supplierCandidates->map(function ($candidate) {
+                    $party = clone $candidate->pihak;
+                    $party->setAttribute('sumber_rekomendasi', $candidate->sourceType);
+                    $party->setAttribute('asal_rekomendasi', $candidate->originName);
+                    $party->setAttribute('jumlah_tersedia_rekomendasi', $candidate->availableQuantity);
+                    $party->setAttribute('satuan_rekomendasi', $candidate->unit);
+                    $party->setAttribute('harga_standar_rekomendasi', $candidate->standardSellingPrice);
+
+                    return $party;
+                })->values();
+                $preferredCandidate = $recommendation->preferredSupplier();
+                $preferred = $preferredCandidate
+                    ? $supplierCandidates->firstWhere('id_pihak', (int) $preferredCandidate->pihak->id_pihak)
+                    : null;
+
+                return (object) [
+                    'id_permintaan_pembelian' => 'REK-' . $recommendation->id,
+                    'recommendation_id' => $recommendation->id,
+                    'is_external_recommendation' => true,
+                    'kode_permintaan' => $recommendation->requestCode,
+                    'sumber_pembelian' => $preferred?->sumber_rekomendasi ?? 'warga_lokal',
+                    'barang' => $recommendation->barang,
+                    'id_barang' => $recommendation->barang->id_barang,
+                    'id_satuan' => $recommendation->idSatuan,
+                    'id_unit_usaha' => $recommendation->unitUsaha->id_unit_usaha,
+                    'gudang' => $recommendation->gudang,
+                    'qty_diminta' => $recommendation->quantity,
+                    'supplier_recommendations' => $supplierCandidates,
+                    'pihak_rekomendasi' => $preferred,
+                    'harga_total_rekomendasi' => $preferred?->harga_standar_rekomendasi !== null
+                        ? round((float) $preferred->harga_standar_rekomendasi * $recommendation->quantity, 2)
+                        : null,
+                ];
+            })
+            ->values();
+    }
+
+    /**
      * Tampilkan detail pembelian
      */
     public function show(int|string $id): View
     {
         $pembelian = Pembelian::with($this->withRelations)->findOrFail($id);
+        $penerimaanGudang = PenerimaanBarang::query()
+            ->where('id_pembelian', $pembelian->id_pembelian)
+            ->latest('id_penerimaan')
+            ->get();
+        $canAccessGudang = auth()->user()?->hasAnyPeran(['admin_gudang']) ?? false;
 
         return view('pembelian.show', [
             'title' => "Pembelian {$pembelian->kode_pembelian}",
             'routeBase' => $this->routeBase,
             'item' => $pembelian,
+            'penerimaanGudang' => $penerimaanGudang,
+            'canAccessGudang' => $canAccessGudang,
         ]);
     }
 
@@ -699,12 +818,23 @@ class PembelianController extends ModuleCrudController
         try {
             PembelianService::approvePembelian($pembelian);
 
-            return redirect()->route("{$this->routeBase}.invoice", $pembelian)
-                ->with('success', 'Pembelian disetujui dan invoice siap ditinjau Akuntansi.');
+            return redirect()->route("{$this->routeBase}.show", $pembelian)
+                ->with('success', 'Pembelian disetujui. Ajukan Jurnal untuk memposting jurnal secara otomatis.');
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
 
+    public function ajukanAkuntansi(Pembelian $pembelian): RedirectResponse
+    {
+        try {
+            $posted = PembelianService::ajukanPostingAkuntansi($pembelian, auth()->id());
+
+            return redirect()->route("{$this->routeBase}.show", $posted)
+                ->with('success', "Jurnal pembelian {$posted->kode_pembelian} berhasil diposting.");
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 
     /**
@@ -741,8 +871,27 @@ class PembelianController extends ModuleCrudController
      */
     public function createGrn(Pembelian $pembelian): RedirectResponse
     {
-        return redirect()->route("{$this->routeBase}.show", $pembelian)
-            ->with('info', 'Penerimaan Gudang belum dihubungkan pada tahap ini. Pembelian tetap tersimpan di modul Pembelian.');
+        if ($pembelian->status !== 'disetujui') {
+            return redirect()->route("{$this->routeBase}.show", $pembelian)
+                ->with('error', 'GRN hanya dapat dibuat untuk pembelian yang sudah disetujui dan belum diterima.');
+        }
+
+        if (! $pembelian->id_jurnal) {
+            return redirect()->route("{$this->routeBase}.show", $pembelian)
+                ->with('error', 'GRN belum dapat dibuat karena jurnal pembelian belum tersedia.');
+        }
+
+        $penerimaanSudahAda = PenerimaanBarang::query()
+            ->where('id_pembelian', $pembelian->id_pembelian)
+            ->exists();
+        if ($penerimaanSudahAda) {
+            return redirect()->route("{$this->routeBase}.show", $pembelian)
+                ->with('info', 'Penerimaan gudang untuk pembelian ini sudah tercatat.');
+        }
+
+        return redirect()->route('gudang.penerimaan.create', [
+            'id_pembelian' => $pembelian->id_pembelian,
+        ]);
     }
 
     /**
@@ -762,3 +911,7 @@ class PembelianController extends ModuleCrudController
         return redirect()->route('pembelian.retur.index');
     }
 }
+
+
+
+

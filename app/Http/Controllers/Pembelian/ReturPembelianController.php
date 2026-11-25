@@ -241,16 +241,38 @@ class ReturPembelianController extends ModuleCrudController
         })->filter()->values();
     }
 
-    public function approve(ReturPembelian $retur): RedirectResponse
+    public function ajukanAkuntansi(ReturPembelian $retur): RedirectResponse
     {
         try {
-            PembelianService::approveRetur($retur);
+            $processed = PembelianService::ajukanReturAkuntansi($retur, auth()->id());
 
-            return redirect()->route('pembelian.retur.invoice', $retur)
-                ->with('success', 'Retur pembelian selesai dan invoice siap ditinjau Akuntansi.');
-        } catch (\Exception $e) {
+            $message = $processed->id_jurnal
+                ? "Jurnal retur {$processed->kode_retur} berhasil diposting."
+                : ($processed->jenis_penyelesaian === 'ganti_barang'
+                    ? "Retur {$processed->kode_retur} selesai diproses; ganti barang tidak membuat jurnal keuangan."
+                    : "Retur {$processed->kode_retur} selesai diproses, tetapi jurnal belum terbentuk.");
+
+            return redirect()->route('pembelian.retur.show', $processed)
+                ->with('success', $message);
+        } catch (\Throwable $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    public function show(int|string $id): View
+    {
+        $retur = ReturPembelian::with([
+            'pembelian.pihak',
+            'pembelian.unitUsaha',
+            'pembelian.gudang',
+            'detail.barang.satuanDasar',
+        ])->findOrFail($id);
+
+        return view('pembelian.retur.show', [
+            'title' => "Retur {$retur->kode_retur}",
+            'routeBase' => $this->routeBase,
+            'item' => $retur,
+        ]);
     }
 
     public function invoice(ReturPembelian $retur): View

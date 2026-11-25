@@ -251,49 +251,6 @@ class PenjualanService
 
             $sale->update(['total_hpp' => $totalHpp]);
 
-            // Realtime Auto-Posting Jurnal Akuntansi (Opsi A)
-            $kodeTransaksi = match ($metodeBayar) {
-                'transfer' => 'JTFW',
-                'kredit' => 'JKW',
-                default => 'JTW',
-            };
-            $unitUsaha = DB::table('master_unit_usaha')->where('id_unit_usaha', $idUnitUsaha)->first();
-
-            $idJurnal = null;
-            $statusPosting = 'F';
-
-            try {
-                if (class_exists(JurnalService::class)) {
-                    $jurnal = app(JurnalService::class)->posting(
-                        $kodeTransaksi,
-                        [
-                            'tanggal_jurnal' => $sale->tanggal_transaksi ? Carbon::parse($sale->tanggal_transaksi)->toDateString() : now()->toDateString(),
-                            'nomor_nota' => $sale->kode_penjualan,
-                            'total_bayar' => (float) $sale->total_bayar,
-                            'total_hpp' => (float) $totalHpp,
-                            'id_kas_bank' => $sale->id_kas_bank,
-                            'kode_unit' => $unitUsaha?->kode_unit_usaha,
-                            'is_anggota' => (bool) $pembeli->is_anggota,
-                            'id_pihak' => $pembeli->id_pihak,
-                        ],
-                        Penjualan::class,
-                        (int) $sale->id_penjualan,
-                        "Penjualan {$sale->kode_penjualan} ({$pembeli->nama})",
-                        $idEntitas,
-                    );
-                    $idJurnal = $jurnal?->id_jurnal;
-                    $statusPosting = $idJurnal ? 'T' : 'F';
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error("Gagal posting jurnal penjualan {$sale->kode_penjualan}: " . $e->getMessage());
-                throw $e;
-            }
-
-            $sale->update([
-                'status_posting' => $statusPosting,
-                'id_jurnal' => $idJurnal,
-            ]);
-
             if ($metodeBayar === 'kredit') {
                 Piutang::updateOrCreate(
                     ['sumber_tipe' => 'PENJUALAN', 'sumber_id' => $sale->id_penjualan],
@@ -311,6 +268,62 @@ class PenjualanService
             }
 
             return $sale->load(['pihak', 'detail.barang.satuanDasar']);
+        });
+    }
+
+    public static function postSaleJournal(Penjualan $sale): Penjualan
+    {
+        return DB::transaction(function () use ($sale) {
+            $sale = Penjualan::query()
+                ->whereKey($sale->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($sale->id_jurnal) {
+                return $sale;
+            }
+
+            if ($sale->status !== 'selesai') {
+                throw new RuntimeException('Jurnal hanya dapat diposting untuk penjualan yang selesai.');
+            }
+
+            $sale->loadMissing(['pihak', 'unitUsaha']);
+            $kodeTransaksi = match ($sale->metode_bayar) {
+                'transfer' => 'JTFW',
+                'kredit' => 'JKW',
+                'tunai' => 'JTW',
+                default => throw new RuntimeException('Metode pembayaran penjualan tidak valid.'),
+            };
+
+            try {
+                $jurnal = app(JurnalService::class)->posting(
+                    $kodeTransaksi,
+                    [
+                        'tanggal_jurnal' => $sale->tanggal_transaksi ? Carbon::parse($sale->tanggal_transaksi)->toDateString() : now()->toDateString(),
+                        'nomor_nota' => $sale->kode_penjualan,
+                        'total_bayar' => (float) $sale->total_bayar,
+                        'total_hpp' => (float) $sale->total_hpp,
+                        'id_kas_bank' => $sale->id_kas_bank,
+                        'kode_unit' => $sale->unitUsaha?->kode_unit_usaha,
+                        'is_anggota' => (bool) $sale->is_pembeli_anggota,
+                        'id_pihak' => $sale->id_pihak,
+                    ],
+                    Penjualan::class,
+                    (int) $sale->id_penjualan,
+                    "Penjualan {$sale->kode_penjualan} (" . ($sale->nama_pembeli ?: $sale->pihak?->nama ?: 'Pembeli') . ")",
+                    (int) $sale->id_entitas,
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Gagal posting jurnal penjualan {$sale->kode_penjualan}: " . $e->getMessage());
+                throw $e;
+            }
+
+            $sale->update([
+                'status_posting' => $jurnal?->id_jurnal ? 'T' : 'F',
+                'id_jurnal' => $jurnal?->id_jurnal,
+            ]);
+
+            return $sale->fresh();
         });
     }
 

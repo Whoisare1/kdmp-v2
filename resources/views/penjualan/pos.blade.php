@@ -194,8 +194,10 @@
 
                 <label class="block rounded-sm border border-amber-200 bg-amber-50/70 p-3 text-sm">
                     <span class="mb-1 block text-xs font-semibold uppercase text-amber-950">Diskon Transaksi (Rp)</span>
-                    <input id="discount-input" type="number" name="diskon" min="0" step="0.01" value="{{ old('diskon', '0') }}" class="w-full rounded-sm border border-amber-300 bg-white px-3 py-2 text-right font-mono text-lg font-bold text-ink-900">
-                    <span class="mt-1 block text-xs text-amber-900">Isi nominal diskon yang diberikan; masukkan 0 jika tidak ada diskon.</span>
+                    <input id="discount-input" type="number" name="diskon" min="0" step="1" value="{{ old('diskon', '0') }}" class="w-full rounded-sm border border-amber-300 bg-white px-3 py-2 text-right font-mono text-lg font-bold text-ink-900">
+                    <span class="mb-1 mt-3 block text-xs font-semibold uppercase text-amber-950">Diskon Transaksi (%)</span>
+                    <input id="discount-percent-input" type="number" min="0" max="100" step="0.01" value="{{ old('diskon_persen', '0') }}" class="w-full rounded-sm border border-amber-300 bg-white px-3 py-2 text-right font-mono text-lg font-bold text-ink-900">
+                    <span class="mt-1 block text-xs text-amber-900">Masukkan diskon dalam rupiah atau persentase; kolom lainnya dihitung otomatis.</span>
                 </label>
 
                 {{-- Data Pelanggan & Metode Pembayaran --}}
@@ -582,6 +584,7 @@
             const transferConfirmation = document.getElementById('transfer-confirmed');
             const cashInput = document.getElementById('cash-input');
             const discountInput = document.getElementById('discount-input');
+            const discountPercentInput = document.getElementById('discount-percent-input');
             const hiddenNominalInput = document.getElementById('input_nominal_bayar');
             const autoPrintCheckbox = document.getElementById('check-auto-print');
             const hiddenAutoPrint = document.getElementById('input_auto_print');
@@ -882,11 +885,10 @@
                 });
 
                 const requestedDiscount = Number.parseFloat(discountInput.value) || 0;
-                currentDiscount = Math.min(Math.max(0, requestedDiscount), currentSubtotal);
-                if (requestedDiscount > currentSubtotal) {
-                    discountInput.value = currentSubtotal.toFixed(2);
-                }
-                discountInput.max = currentSubtotal.toFixed(2);
+                currentDiscount = Math.min(Math.max(0, Math.round(requestedDiscount)), Math.floor(currentSubtotal));
+                discountInput.value = currentDiscount.toFixed(0);
+                discountInput.max = Math.floor(currentSubtotal).toFixed(0);
+                discountPercentInput.value = currentSubtotal > 0 ? (currentDiscount / currentSubtotal * 100).toFixed(2) : '0.00';
                 currentTotal = Math.max(0, Math.round((currentSubtotal - currentDiscount) * 100) / 100);
                 emptyState.classList.toggle('hidden', cart.size > 0);
                 document.getElementById('cart-subtotal-display').textContent = `Rp ${formatNumber(currentSubtotal)}`;
@@ -929,9 +931,16 @@
                 cart.clear();
                 cashInput.value = '0';
                 discountInput.value = '0';
+                discountPercentInput.value = '0';
                 renderCart();
             });
             discountInput.addEventListener('input', renderCart);
+            discountPercentInput.addEventListener('input', () => {
+                const percent = Math.min(100, Math.max(0, Number.parseFloat(discountPercentInput.value) || 0));
+                discountPercentInput.value = percent.toFixed(2);
+                discountInput.value = Math.min(Math.floor(currentSubtotal), Math.round(currentSubtotal * percent / 100)).toFixed(0);
+                renderCart();
+            });
 
             // Ganti Unit Usaha
             unitSelect.addEventListener('change', () => {

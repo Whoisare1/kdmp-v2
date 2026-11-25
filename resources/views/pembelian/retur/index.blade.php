@@ -30,12 +30,7 @@
                                 <td class="px-3 py-2">Rp {{ number_format($retur->total_nilai, 2, ',', '.') }}</td>
                                 <td class="px-3 py-2">{{ ucfirst($retur->status) }}</td>
                                 <td class="px-3 py-2">
-                                    @if ($retur->status === 'diajukan')
-                                        <form method="POST" action="{{ route('pembelian.retur.approve', $retur) }}" class="flex gap-2">
-                                            @csrf @method('PATCH')
-                                            <button class="text-xs font-medium text-emerald-700 hover:text-emerald-800">Setujui</button>
-                                        </form>
-                                    @endif
+                                    <a href="{{ route('pembelian.retur.show', $retur) }}" class="text-xs font-medium text-emerald-700 hover:text-emerald-800">Detail Retur</a>
                                 </td>
                             </tr>
                         @empty

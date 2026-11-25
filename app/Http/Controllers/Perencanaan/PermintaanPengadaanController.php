@@ -321,6 +321,7 @@ class PermintaanPengadaanController extends ModuleCrudController
                 'harga_perkiraan' => $harga,
                 'subtotal' => $total,
             ]);
+
         });
 
         $statusMsg = $isSetujui
@@ -351,4 +352,5 @@ class PermintaanPengadaanController extends ModuleCrudController
             abort(422, 'Hanya komoditas dengan status defisit yang dapat dibuatkan PR.');
         }
     }
+
 }

@@ -274,7 +274,12 @@
                 </h4>
 
                 <p class="mt-1 text-sm text-ink-700">
-                    Pembelian sudah tercatat dan disetujui di modul Pembelian.
+                    Pembelian sudah disetujui.
+                    @if ($item->id_jurnal)
+                        Jurnal pembelian sudah terposting dan transaksi siap diproses oleh Gudang.
+                    @else
+                        Klik Ajukan Jurnal untuk membuat jurnal sebelum Gudang mencatat penerimaan.
+                    @endif
                 </p>
             </div>
 
@@ -305,6 +310,50 @@
             </h3>
 
             <div class="space-y-2">
+
+                @if ($penerimaanGudang->isNotEmpty())
+                    <div class="rounded-sm border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                        <p class="font-semibold">Penerimaan Gudang tercatat</p>
+                        @foreach ($penerimaanGudang as $penerimaan)
+                            @if ($canAccessGudang)
+                                <a href="{{ route('gudang.penerimaan.show', $penerimaan) }}" class="mt-1 block underline">
+                                    {{ $penerimaan->kode_penerimaan }}
+                                </a>
+                            @else
+                                <p class="mt-1">{{ $penerimaan->kode_penerimaan }}</p>
+                            @endif
+                        @endforeach
+                    </div>
+                @elseif ($item->status === 'disetujui' && ! $item->id_jurnal)
+                    <div class="rounded-sm border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        @if ($item->diajukan_jurnal_pada)
+                            Pengajuan tercatat pada {{ $item->diajukan_jurnal_pada->format('d M Y H:i') }}, tetapi jurnal belum terbentuk. Klik Ajukan Jurnal untuk mencoba lagi.
+                        @else
+                            Ajukan jurnal pembelian sebelum transaksi diproses oleh Gudang.
+                        @endif
+                    </div>
+                @elseif ($item->status === 'disetujui' && $canAccessGudang)
+                    <a
+                        href="{{ route('pembelian.create-grn', $item) }}"
+                        class="block w-full rounded-sm bg-sawah-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-sawah-700"
+                    >
+                        Catat Penerimaan Gudang (GRN)
+                    </a>
+                @elseif ($item->status === 'disetujui')
+                    <div class="rounded-sm border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                        PO siap diterima. Minta pengguna dengan akses Admin Gudang untuk mencatat GRN.
+                    </div>
+                @endif
+
+                @if ($item->status === 'disetujui' && ! $item->id_jurnal)
+                    <form action="{{ route('pembelian.ajukan-akuntansi', $item) }}" method="POST" onsubmit="return confirm('Ajukan dan posting jurnal pembelian ini sekarang?')">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit" class="w-full rounded-sm bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                            Ajukan Jurnal
+                        </button>
+                    </form>
+                @endif
 
                 @if (in_array($item->status, ['disetujui', 'diterima', 'selesai'], true))
                     <a href="{{ route("$routeBase.invoice", $item) }}" class="block w-full rounded-sm bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-700">
