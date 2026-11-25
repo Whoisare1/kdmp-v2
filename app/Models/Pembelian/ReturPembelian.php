@@ -16,12 +16,12 @@ class ReturPembelian extends Model
     protected $fillable = [
         'id_entitas', 'kode_retur', 'id_pembelian', 'id_penerimaan', 'tgl_retur',
         'jenis_penyelesaian', 'total_nilai', 'alasan', 'foto_bukti', 'status',
-        'status_posting', 'id_jurnal',
+        'status_posting', 'id_jurnal', 'diajukan_jurnal_pada', 'diajukan_jurnal_oleh',
     ];
 
     protected function casts(): array
     {
-        return ['tgl_retur' => 'date', 'total_nilai' => 'decimal:2'];
+        return ['tgl_retur' => 'date', 'total_nilai' => 'decimal:2', 'diajukan_jurnal_pada' => 'datetime'];
     }
 
     public function pembelian()

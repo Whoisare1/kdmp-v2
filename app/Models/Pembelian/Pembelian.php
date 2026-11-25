@@ -21,7 +21,7 @@ class Pembelian extends Model
         'id_entitas', 'kode_pembelian', 'id_permintaan', 'sumber_pembelian', 'id_pihak', 'id_unit_usaha',
         'id_gudang', 'tanggal_transaksi', 'jenis_pembayaran', 'id_kas_bank',
         'tgl_jatuh_tempo', 'total_pembelian', 'diskon', 'status', 'status_posting',
-        'id_jurnal', 'created_by',
+        'id_jurnal', 'created_by', 'diajukan_jurnal_pada', 'diajukan_jurnal_oleh',
     ];
 
     protected function casts(): array
@@ -29,6 +29,7 @@ class Pembelian extends Model
         return [
             'tanggal_transaksi' => 'date',
             'tgl_jatuh_tempo' => 'date',
+            'diajukan_jurnal_pada' => 'datetime',
             'total_pembelian' => 'decimal:2',
             'diskon' => 'decimal:2',
         ];

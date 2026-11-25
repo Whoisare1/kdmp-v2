@@ -122,8 +122,12 @@
                 <div class="rounded-sm border border-paper-300 bg-paper-50 p-4">
                     <label class="block max-w-sm text-sm">
                         <span class="font-medium text-ink-700">Diskon (Rp)</span>
-                        <input type="number" name="diskon" min="0" step="0.01" value="{{ old('diskon', $item->diskon ?? 0) }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-white px-3 py-2">
-                        <span class="mt-1 block text-xs text-ink-500">Masukkan nominal potongan dari supplier. Isi 0 jika tidak ada diskon.</span>
+                        <input id="purchase-discount-amount" type="number" name="diskon" min="0" step="1" value="{{ old('diskon', $item->diskon ?? 0) }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-white px-3 py-2">
+                    </label>
+                    <label class="mt-3 block max-w-sm text-sm">
+                        <span class="font-medium text-ink-700">Diskon (%)</span>
+                        <input id="purchase-discount-percent" type="number" min="0" max="100" step="0.01" value="{{ old('diskon_persen', '0') }}" class="mt-1 w-full rounded-sm border border-paper-300 bg-white px-3 py-2">
+                        <span class="mt-1 block text-xs text-ink-500">Nilai rupiah dan persentase mengikuti subtotal barang.</span>
                     </label>
                 </div>
 
@@ -341,9 +345,32 @@
             }
         }
 
+        function syncPurchaseDiscount(source) {
+            const amountInput = document.getElementById('purchase-discount-amount');
+            const percentInput = document.getElementById('purchase-discount-percent');
+            const subtotal = Array.from(document.querySelectorAll('#purchase_rows .purchase-row')).reduce((sum, row) => {
+                const qty = Number.parseFloat(row.querySelector('input[name$="[qty_dasar]"]')?.value) || 0;
+                const price = Number.parseFloat(row.querySelector('input[name$="[harga_satuan]"]')?.value) || 0;
+                return sum + qty * price;
+            }, 0);
+            if (source === 'percent') {
+                const percent = Math.min(100, Math.max(0, Number.parseFloat(percentInput.value) || 0));
+                percentInput.value = percent.toFixed(2);
+                amountInput.value = Math.min(Math.floor(subtotal), Math.round(subtotal * percent / 100)).toFixed(0);
+            } else {
+                const amount = Math.min(Math.floor(subtotal), Math.max(0, Math.round(Number.parseFloat(amountInput.value) || 0)));
+                amountInput.value = amount.toFixed(0);
+                percentInput.value = subtotal > 0 ? (amount / subtotal * 100).toFixed(2) : '0.00';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             togglePaymentFields();
             document.querySelectorAll('.purchase-barang').forEach(updatePurchaseUnits);
+            document.getElementById('purchase-discount-amount').addEventListener('input', () => syncPurchaseDiscount('amount'));
+            document.getElementById('purchase-discount-percent').addEventListener('input', () => syncPurchaseDiscount('percent'));
+            document.getElementById('purchase_rows').addEventListener('input', () => syncPurchaseDiscount('amount'));
+            syncPurchaseDiscount('amount');
         });
     </script>
 </x-layouts.app>

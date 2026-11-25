@@ -174,15 +174,7 @@
                                 <td class="whitespace-nowrap px-4 py-3 text-right">Rp {{ number_format((float) $return->total_nilai, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3"><span class="inline-flex rounded-sm px-2 py-1 text-xs font-medium {{ $return->status === 'selesai' ? 'bg-emerald-50 text-emerald-800' : ($return->status === 'disetujui' ? 'bg-cyan-50 text-cyan-800' : 'bg-amber-50 text-amber-800') }}">{{ ucfirst($return->status) }}</span></td>
                                 <td class="px-4 py-3">
-                                    @if ($return->status === 'diajukan')
-                                        <form method="POST" action="{{ route('pembelian.retur.approve', $return) }}" class="flex min-w-28 flex-col gap-2">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button class="text-left text-xs font-semibold text-emerald-700 hover:text-emerald-900">Tandai selesai</button>
-                                        </form>
-                                    @else
-                                        <a href="{{ route('pembelian.retur.invoice', $return) }}" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Invoice / Jurnal</a>
-                                    @endif
+                                    <a href="{{ route('pembelian.retur.show', $return) }}" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Detail Retur</a>
                                 </td>
                             </tr>
                         @empty

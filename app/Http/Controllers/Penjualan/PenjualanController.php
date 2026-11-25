@@ -268,4 +268,19 @@ class PenjualanController extends ModuleCrudController
             'entitas' => $entitas,
         ]);
     }
+    public function postJurnal(Penjualan $penjualan): RedirectResponse
+    {
+        try {
+            $posted = PenjualanService::postSaleJournal($penjualan);
+
+            return redirect()->route("{$this->routeBase}.show", $posted)
+                ->with('success', $posted->id_jurnal
+                    ? "Jurnal penjualan {$posted->kode_penjualan} berhasil diposting."
+                    : 'Jurnal belum berhasil dibuat. Silakan cetak ulang struk untuk mencoba kembali.');
+        } catch (\Throwable $exception) {
+            return redirect()->route("{$this->routeBase}.show", $penjualan)
+                ->with('error', 'Gagal memposting jurnal penjualan: ' . $exception->getMessage());
+        }
+    }
+
 }

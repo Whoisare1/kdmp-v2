@@ -183,6 +183,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('pembelian/{pembelian}/approve', [PembelianController::class, 'approve'])
         ->name('approve');
 
+    Route::patch('pembelian/{pembelian}/ajukan-akuntansi', [PembelianController::class, 'ajukanAkuntansi'])
+        ->name('ajukan-akuntansi');
+
     Route::patch('pembelian/{pembelian}/cancel', [PembelianController::class, 'cancel'])
         ->name('cancel');
 
@@ -198,12 +201,13 @@ Route::middleware('auth')->group(function () {
     Route::resource('retur', ReturPembelianController::class);
     Route::get('retur/{retur}/invoice', [ReturPembelianController::class, 'invoice'])
         ->name('retur.invoice');
-    Route::patch('retur/{retur}/approve', [ReturPembelianController::class, 'approve'])
-        ->name('retur.approve');
+    Route::patch('retur/{retur}/ajukan-akuntansi', [ReturPembelianController::class, 'ajukanAkuntansi'])
+        ->name('retur.ajukan-akuntansi');
     });
 
     // ===== M6 â€” Penjualan =====
     Route::prefix('penjualan')->name('penjualan.')->middleware('peran:kasir')->group(function () {
+        Route::patch('penjualan/{penjualan}/post-jurnal', [PenjualanController::class, 'postJurnal'])->name('penjualan.post-jurnal');
         Route::resource('penjualan', PenjualanController::class);
         Route::resource('retur', ReturPenjualanController::class);
     });
