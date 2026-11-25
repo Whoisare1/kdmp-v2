@@ -55,7 +55,7 @@
                 ['label' => 'Standar AKG', 'route' => 'perencanaan.standar-kebutuhan.index', 'match' => 'perencanaan.standar-kebutuhan.*'],
                 ['label' => 'Kalkulasi Kebutuhan Desa', 'route' => 'perencanaan.kebutuhan-komoditas.index', 'match' => 'perencanaan.kebutuhan-komoditas.*,perencanaan.neraca-komoditas.*'],
                 ['label' => 'Laporan Surplus Defisit', 'route' => 'perencanaan.laporan.index', 'match' => 'perencanaan.laporan.*'],
-                ['label' => 'Rekomendasi Pengadaan', 'route' => 'perencanaan.permintaan-pengadaan.index', 'match' => 'perencanaan.permintaan-pengadaan.*'],
+                ['label' => 'Rekomendasi Pengadaan Antar-Desa', 'route' => 'perencanaan.rekomendasi-pengadaan.index', 'match' => 'perencanaan.rekomendasi-pengadaan.index,perencanaan.rekomendasi-pengadaan.store'],
             ]
         ],
         [

@@ -132,6 +132,8 @@ Route::middleware('auth')->group(function () {
             ->name('neraca-komoditas.ajukan-ke-gudang');
         Route::get('laporan', [LaporanM2Controller::class, 'index'])->name('laporan.index');
         Route::resource('perbandingan-harga', PerbandinganHargaController::class);
+        Route::get('rekomendasi-pengadaan', [PermintaanPengadaanController::class, 'index'])
+            ->name('rekomendasi-pengadaan.index');
         Route::get('permintaan-pengadaan/from-hasil/{hasil}', [PermintaanPengadaanController::class, 'fromHasil'])
             ->name('permintaan-pengadaan.from-hasil');
         Route::post('rekomendasi-pengadaan', [RekomendasiPengadaanDesaController::class, 'store'])

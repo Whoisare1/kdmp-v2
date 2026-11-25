@@ -45,7 +45,18 @@ class DashboardM2Controller extends Controller
         $bulanQuery = $request->query('bulan');
         $periode = $request->query('periode');
         $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
-        $kategori = $request->query('kategori');
+        $kategori = strtolower(trim((string) $request->query('kategori', '')));
+        $daftarKategori = Komoditas::where('is_active', true)
+            ->whereNotNull('kategori')
+            ->selectRaw('LOWER(TRIM(kategori)) AS kategori')
+            ->distinct()
+            ->orderBy('kategori')
+            ->pluck('kategori')
+            ->map(fn (string $sektor): string => strtolower(trim($sektor)))
+            ->merge(['pertanian', 'perkebunan', 'peternakan', 'perikanan'])
+            ->unique()
+            ->sort()
+            ->values();
 
         // Query dasar hasil kalkulasi
         $queryHasil = HasilKalkulasi::with(['komoditas', 'wilayah'])
@@ -57,12 +68,12 @@ class DashboardM2Controller extends Controller
         }
 
         if (!empty($kategori)) {
-            $queryHasil->whereHas('komoditas', fn ($q) => $q->where('kategori', $kategori));
+            $queryHasil->whereHas('komoditas', fn ($q) => $q->whereRaw('LOWER(TRIM(kategori)) = ?', [$kategori]));
         }
 
         $daftarHasil = (clone $queryHasil)->orderBy('id_komoditas')->get();
         $distribusiNeraca = $daftarHasil
-            ->groupBy(fn (HasilKalkulasi $hasil): string => (string) ($hasil->komoditas?->kategori ?: 'lainnya'))
+            ->groupBy(fn (HasilKalkulasi $hasil): string => strtolower(trim((string) ($hasil->komoditas?->kategori ?: 'lainnya'))))
             ->sortKeys()
             ->map(function ($hasilSektor) {
                 return $hasilSektor
@@ -82,6 +93,44 @@ class DashboardM2Controller extends Controller
                     ->sortBy(fn (array $komoditas): string => $komoditas['komoditas']?->nama ?? '')
                     ->values();
             });
+        $produksiTersedia = KetersediaanKomoditas::query()
+            ->with('komoditas')
+            ->where('id_wilayah', $idWilayah)
+            ->where('tahun', $tahun)
+            ->when($bulan, fn ($query) => $query->where('bulan', $bulan))
+            ->whereHas('komoditas', fn ($query) => $query->where('is_active', true))
+            ->get()
+            ->groupBy('id_komoditas');
+
+        foreach ($produksiTersedia as $idKomoditas => $catatanProduksi) {
+            $komoditas = $catatanProduksi->first()->komoditas;
+            $sektor = strtolower(trim((string) ($komoditas?->kategori ?: 'lainnya')));
+            $ringkasanSektor = $distribusiNeraca->get($sektor, collect());
+            $sudahDihitung = $ringkasanSektor->contains(
+                fn (array $ringkasan): bool => (int) $ringkasan['komoditas']?->id === (int) $idKomoditas
+            );
+
+            if (! $sudahDihitung && $komoditas) {
+                $ringkasanSektor->push([
+                    'komoditas' => $komoditas,
+                    'items' => collect(),
+                    'total_kebutuhan' => null,
+                    'total_ketersediaan' => (float) $catatanProduksi->sum('jumlah_produksi'),
+                    'status_count' => collect(),
+                    'status_terbaru' => 'belum_dihitung',
+                    'produksi_tanpa_kalkulasi' => $catatanProduksi,
+                ]);
+                $distribusiNeraca[$sektor] = $ringkasanSektor;
+            }
+        }
+
+        foreach ($daftarKategori as $sektor) {
+            $distribusiNeraca[$sektor] ??= collect();
+        }
+        $distribusiNeraca = $distribusiNeraca->map(
+            fn ($komoditasKategori) => $komoditasKategori->sortBy(fn (array $item): string => $item['komoditas']?->nama ?? '')->values()
+        );
+        $distribusiNeraca = $distribusiNeraca->sortKeys();
 
         // 1. Ringkasan Status Komoditas
         $totalKomoditasTerhitung = $daftarHasil->count();
@@ -119,10 +168,7 @@ class DashboardM2Controller extends Controller
         ];
 
         // 4. Sumber data survei: potensi produksi panen
-        $jumlahCatatanProduksi = KetersediaanKomoditas::where('id_wilayah', $idWilayah)
-            ->where('tahun', $tahun)
-            ->when($bulan, fn ($q) => $q->where('bulan', $bulan))
-            ->count();
+        $jumlahCatatanProduksi = $produksiTersedia->sum(fn ($catatan) => $catatan->count());
 
         // 5. Informasi Waktu Kalkulasi & Versi Terakhir
         $kalkulasiTerakhir = HasilKalkulasi::where('id_wilayah', $idWilayah)
@@ -141,18 +187,12 @@ class DashboardM2Controller extends Controller
 
         // Master Data untuk Dropdown & Filter
         $daftarKomoditas = Komoditas::where('is_active', true)->orderBy('nama')->get();
-        $daftarKategori = Komoditas::where('is_active', true)
-            ->whereNotNull('kategori')
-            ->select('kategori')
-            ->distinct()
-            ->pluck('kategori');
-
         // Pengelompokan Defisit & Surplus per Kategori/Sektor untuk Desa yang dipilih
         $daftarDefisitSektor = $daftarHasil->where('status_surplus_defisit', 'defisit')
-            ->groupBy(fn ($h) => ucwords(str_replace('_', ' ', $h->komoditas?->kategori ?? 'Lainnya')));
+            ->groupBy(fn ($h) => strtolower(trim((string) ($h->komoditas?->kategori ?: 'lainnya'))));
 
         $daftarSurplusSektor = $daftarHasil->where('status_surplus_defisit', 'surplus')
-            ->groupBy(fn ($h) => ucwords(str_replace('_', ' ', $h->komoditas?->kategori ?? 'Lainnya')));
+            ->groupBy(fn ($h) => strtolower(trim((string) ($h->komoditas?->kategori ?: 'lainnya'))));
 
         $satuanMap = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)

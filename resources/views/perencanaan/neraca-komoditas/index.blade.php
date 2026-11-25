@@ -244,7 +244,7 @@
                                 </a>
 
                                 @if ($item->status_surplus_defisit === 'defisit')
-                                    <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}"
+                                    <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}"
                                        class="inline-flex items-center gap-1 rounded-sm border border-merah-300 px-2.5 py-1 text-xs font-semibold text-merah-700 hover:bg-merah-50"
                                        title="Lihat rekomendasi pengadaan untuk kebutuhan defisit">
                                        <span>Lihat Rekomendasi Pengadaan</span>

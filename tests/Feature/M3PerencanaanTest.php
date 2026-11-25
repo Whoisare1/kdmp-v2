@@ -11,6 +11,7 @@ use App\Models\Perencanaan\PermintaanPengadaan;
 use App\Models\Perencanaan\RekomendasiPengadaanDesa;
 use App\Models\Survei\PemenuhanKomoditas;
 use App\Models\Survei\SesiSurvei;
+use App\Models\Tenant\Entitas;
 use App\Models\Tenant\Wilayah;
 use App\Services\Perencanaan\PerbandinganHargaService;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
@@ -295,12 +296,24 @@ class M3PerencanaanTest extends TestCase
         $response = $this->actingAs($user)->get(route('perencanaan.permintaan-pengadaan.index'));
 
         $response->assertOk()
-            ->assertSee('Kebutuhan yang Perlu Direncanakan')
-            ->assertSee('Belum ada pasangan surplus')
-            ->assertSee('Ajukan rekomendasi ke Admin Gudang untuk ditinjau.')
+            ->assertSee('Rekomendasi Surplus dan Defisit Antar-Desa')
+            ->assertSee('Belum ada pasangan untuk direkomendasikan')
+            ->assertSee('Pengajuan masuk ke antrean Admin Gudang')
             ->assertDontSee('Buat draft PR')
             ->assertSee('Periode Genap')
             ->assertSee('komoditas');
+    }
+
+    public function test_halaman_rekomendasi_dapat_dibuka_dari_menu_sidebar_perencanaan(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $urlRekomendasi = route('perencanaan.rekomendasi-pengadaan.index');
+
+        $this->actingAs($user)
+            ->get($urlRekomendasi)
+            ->assertOk()
+            ->assertSee('Rekomendasi Pengadaan Antar-Desa')
+            ->assertSee($urlRekomendasi, false);
     }
 
     public function test_rekomendasi_mengelompokkan_semua_kategori_komoditas(): void
@@ -327,12 +340,49 @@ class M3PerencanaanTest extends TestCase
         $response = $this->actingAs($user)->get(route('perencanaan.permintaan-pengadaan.index'));
 
         $response->assertOk()
-            ->assertSee('perikanan')
+            ->assertSee('Perikanan')
+            ->assertSee('Pertanian')
+            ->assertSee('Perkebunan')
+            ->assertSee('Peternakan')
+            ->assertSee('Belum ada hasil surplus atau defisit pada sektor ini')
             ->assertSee('Ikan Uji Rekomendasi')
-            ->assertSee('Belum ada pasangan surplus')
+            ->assertSee('Belum ada pasangan untuk direkomendasikan')
             ->assertDontSee(route('perencanaan.permintaan-pengadaan.from-hasil', $hasil->id_hasil))
             ->assertDontSee('Setujui PR')
             ->assertDontSee('<details open', false);
+    }
+
+    public function test_rekomendasi_menampilkan_nama_komoditas_satu_kali_dengan_dropdown_periode_panen(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $komoditas = Komoditas::create([
+            'nama' => 'Komoditas Uji Periode Panen',
+            'kategori' => 'pertanian',
+            'is_active' => true,
+        ]);
+
+        foreach ([1, 7] as $bulan) {
+            HasilKalkulasi::create([
+                'id_wilayah' => $this->idWilayahAktif($user),
+                'id_komoditas' => $komoditas->id,
+                'tahun' => 2099,
+                'bulan' => $bulan,
+                'total_kebutuhan' => 100,
+                'total_ketersediaan' => 25,
+                'selisih' => -75,
+                'status_surplus_defisit' => 'defisit',
+                'id_unit_usaha_rekomendasi' => 1,
+                'status' => 'disetujui',
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('perencanaan.rekomendasi-pengadaan.index'));
+
+        $response->assertOk()
+            ->assertSee('2 periode panen')
+            ->assertSee('Periode Ganjil · Tahun 2099')
+            ->assertSee('Periode Genap · Tahun 2099');
+        $this->assertSame(1, substr_count($response->getContent(), $komoditas->nama));
     }
 
     public function test_rekomendasi_mencocokkan_defisit_dengan_desa_surplus_seperiode(): void
@@ -401,8 +451,85 @@ class M3PerencanaanTest extends TestCase
 
         $response->assertOk()
             ->assertSee($desaSurplus->nama)
-            ->assertSee('Desa surplus yang cocok')
+            ->assertSee('Komoditas Defisit Desa Sendiri')
+            ->assertSee('Periode Genap')
+            ->assertSee('Tahun 2026')
+            ->assertSee('Surplus Komoditas Desa Lain')
+            ->assertSee('Pilih desa dengan status surplus')
+            ->assertSee('Rekomendasikan ke Desa Lain')
+            ->assertSee('Surplus 75,00')
+            ->assertSee('Tersedia 100,00')
             ->assertDontSee($desaBedaPeriode->nama);
+    }
+
+    public function test_desa_dengan_surplus_dapat_merekomendasikan_ke_desa_defisit(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $idWilayahSendiri = $this->idWilayahAktif($user);
+        $desaDefisit = Wilayah::firstOrCreate(
+            ['nama' => 'Desa Defisit Pasangan Surplus Uji'],
+            ['tingkat' => 'desa', 'is_active' => true]
+        );
+        $tahun = 2098;
+        $versiSurplus = (int) HasilKalkulasi::where('id_wilayah', $idWilayahSendiri)
+            ->where('id_komoditas', 1)
+            ->where('tahun', $tahun)
+            ->where('bulan', 1)
+            ->max('versi') + 1;
+        $versiDefisit = (int) HasilKalkulasi::where('id_wilayah', $desaDefisit->id)
+            ->where('id_komoditas', 1)
+            ->where('tahun', $tahun)
+            ->where('bulan', 1)
+            ->max('versi') + 1;
+        $surplusSendiri = HasilKalkulasi::create([
+            'id_wilayah' => $idWilayahSendiri,
+            'id_komoditas' => 1,
+            'tahun' => $tahun,
+            'bulan' => 1,
+            'total_kebutuhan' => 25,
+            'total_ketersediaan' => 100,
+            'selisih' => 75,
+            'status_surplus_defisit' => 'surplus',
+            'versi' => $versiSurplus,
+            'id_unit_usaha_rekomendasi' => 1,
+            'status' => 'disetujui',
+        ]);
+        $defisitDesaLain = HasilKalkulasi::create([
+            'id_wilayah' => $desaDefisit->id,
+            'id_komoditas' => 1,
+            'tahun' => $tahun,
+            'bulan' => 1,
+            'total_kebutuhan' => 100,
+            'total_ketersediaan' => 25,
+            'selisih' => -75,
+            'status_surplus_defisit' => 'defisit',
+            'versi' => $versiDefisit,
+            'id_unit_usaha_rekomendasi' => 1,
+            'status' => 'disetujui',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('perencanaan.permintaan-pengadaan.index'))
+            ->assertOk()
+            ->assertSee('Komoditas Surplus Desa Sendiri')
+            ->assertSee('Defisit Komoditas Desa Lain')
+            ->assertSee($desaDefisit->nama)
+            ->assertSee('Pilih desa dengan status defisit')
+            ->assertSee('Rekomendasikan ke Desa Lain');
+
+        $jumlahPrSebelumnya = PermintaanPengadaan::count();
+        $this->actingAs($user)->post(route('perencanaan.rekomendasi-pengadaan.store'), [
+            'id_hasil_defisit' => $defisitDesaLain->id_hasil,
+            'id_hasil_surplus' => $surplusSendiri->id_hasil,
+        ])->assertRedirect(route('perencanaan.rekomendasi-pengadaan.index'));
+
+        $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
+            'id_hasil_defisit' => $defisitDesaLain->id_hasil,
+            'id_hasil_surplus' => $surplusSendiri->id_hasil,
+            'id_pengaju' => $user->id,
+            'status' => 'diajukan',
+        ]);
+        $this->assertSame($jumlahPrSebelumnya, PermintaanPengadaan::count());
     }
 
     public function test_desa_dapat_mengajukan_rekomendasi_tanpa_membuat_pr(): void
@@ -416,7 +543,7 @@ class M3PerencanaanTest extends TestCase
             'id_hasil_surplus' => $surplus->id_hasil,
         ]);
 
-        $response->assertRedirect(route('perencanaan.permintaan-pengadaan.index'));
+        $response->assertRedirect(route('perencanaan.rekomendasi-pengadaan.index'));
         $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
             'id_hasil_defisit' => $defisit->id_hasil,
             'id_hasil_surplus' => $surplus->id_hasil,
@@ -448,6 +575,57 @@ class M3PerencanaanTest extends TestCase
         $response = $this->actingAs($adminGudang)->post(route('gudang.rekomendasi-pengadaan.setujui', $rekomendasi->id_rekomendasi));
 
         $response->assertRedirect();
+        $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
+            'id_rekomendasi' => $rekomendasi->id_rekomendasi,
+            'status' => 'disetujui',
+            'diputuskan_oleh' => $adminGudang->id,
+        ]);
+        $this->assertSame($jumlahPrSebelumnya, PermintaanPengadaan::count());
+    }
+
+    public function test_admin_gudang_dapat_meninjau_rekomendasi_dari_desa_lain(): void
+    {
+        $pengaju = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        [$defisit, $surplus] = $this->buatPasanganHasilRekomendasi();
+        $this->actingAs($pengaju)->post(route('perencanaan.rekomendasi-pengadaan.store'), [
+            'id_hasil_defisit' => $defisit->id_hasil,
+            'id_hasil_surplus' => $surplus->id_hasil,
+        ])->assertRedirect();
+        $rekomendasi = RekomendasiPengadaanDesa::where('id_hasil_defisit', $defisit->id_hasil)->firstOrFail();
+
+        $wilayahGudang = Wilayah::create([
+            'nama' => 'Desa Admin Gudang Lintas Wilayah Uji',
+            'tingkat' => 'desa',
+            'is_active' => true,
+        ]);
+        $entitasGudang = Entitas::create([
+            'kode_entitas' => 'AG-'.strtoupper(substr(md5(uniqid('', true)), 0, 8)),
+            'nama_entitas' => 'Entitas Admin Gudang Lintas Wilayah Uji',
+            'id_wilayah' => $wilayahGudang->id,
+            'tahun_buku_awal' => 2026,
+            'is_active' => true,
+            'status' => 'APPROVED',
+        ]);
+        $adminGudang = Pengguna::create([
+            'id_entitas' => $entitasGudang->id_entitas,
+            'nama' => 'Admin Gudang Lintas Wilayah Uji',
+            'email' => 'admin-gudang-lintas-'.strtolower(substr(md5(uniqid('', true)), 0, 8)).'@kdmp.test',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $peran = Peran::firstOrCreate(['kode' => 'admin_gudang'], ['nama' => 'Admin Gudang']);
+        $adminGudang->peran()->syncWithoutDetaching([$peran->id_peran]);
+
+        $jumlahPrSebelumnya = PermintaanPengadaan::count();
+        $this->actingAs($adminGudang)
+            ->get(route('gudang.rekomendasi-pengadaan.index'))
+            ->assertOk()
+            ->assertSee($rekomendasi->hasilDefisit->wilayah->nama);
+
+        $this->actingAs($adminGudang)
+            ->post(route('gudang.rekomendasi-pengadaan.setujui', $rekomendasi->id_rekomendasi))
+            ->assertRedirect();
+
         $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
             'id_rekomendasi' => $rekomendasi->id_rekomendasi,
             'status' => 'disetujui',
@@ -606,7 +784,7 @@ class M3PerencanaanTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Lihat rekomendasi pengadaan')
-            ->assertSee(route('perencanaan.permintaan-pengadaan.index'))
+            ->assertSee(route('perencanaan.rekomendasi-pengadaan.index'))
             ->assertDontSee(route('perencanaan.permintaan-pengadaan.from-hasil', $hasil->id_hasil));
     }
 

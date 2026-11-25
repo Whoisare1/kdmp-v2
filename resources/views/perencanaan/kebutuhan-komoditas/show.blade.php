@@ -298,7 +298,7 @@
 
             <div class="flex flex-wrap items-center gap-3">
                 @if ($hasilNeraca && $hasilNeraca->status_surplus_defisit === 'defisit')
-                    <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}"
+                    <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}"
                        class="rounded-sm border border-merah-300 px-4 py-2 text-xs font-semibold text-merah-700 hover:bg-merah-50">
                         Lihat Rekomendasi Pengadaan
                     </a>

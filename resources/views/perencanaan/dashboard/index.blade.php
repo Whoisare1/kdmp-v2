@@ -181,11 +181,11 @@
             @foreach ($distribusiNeraca as $kategoriKomoditas => $komoditasKategori)
                 <details class="rounded-sm border border-paper-300 bg-paper-50">
                     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-paper-100">
-                        <span class="font-semibold capitalize text-ink-900">{{ str_replace('_', ' ', $kategoriKomoditas) }}</span>
+                        <span class="font-semibold text-ink-900">{{ ucwords(str_replace('_', ' ', $kategoriKomoditas)) }}</span>
                         <span class="text-xs text-ink-600">{{ $komoditasKategori->count() }} komoditas <span aria-hidden="true">⌄</span></span>
                     </summary>
                     <div class="space-y-2 border-t border-paper-200 bg-paper-100/40 p-3">
-                        @foreach ($komoditasKategori as $ringkasanKomoditas)
+                        @forelse ($komoditasKategori as $ringkasanKomoditas)
                             @php
                                 $statusKomoditas = $ringkasanKomoditas['status_terbaru'];
                                 $kelasStatus = match ($statusKomoditas) {
@@ -198,34 +198,50 @@
                                 <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-3 py-2">
                                     <span class="font-medium text-ink-900">{{ $ringkasanKomoditas['komoditas']?->nama ?? 'Komoditas' }}</span>
                                     <span class="flex flex-wrap items-center gap-3 text-[11px] text-ink-600">
-                                        <span>Kebutuhan {{ number_format($ringkasanKomoditas['total_kebutuhan'], 1, ',', '.') }}</span>
+                                        <span>
+                                            @if ($ringkasanKomoditas['total_kebutuhan'] === null)
+                                                Kebutuhan belum dihitung
+                                            @else
+                                                Kebutuhan {{ number_format($ringkasanKomoditas['total_kebutuhan'], 1, ',', '.') }}
+                                            @endif
+                                        </span>
                                         <span>Tersedia {{ number_format($ringkasanKomoditas['total_ketersediaan'], 1, ',', '.') }}</span>
-                                        <span class="rounded px-1.5 py-0.5 font-semibold uppercase {{ $kelasStatus }}">{{ $statusKomoditas }}</span>
+                                        <span class="rounded px-1.5 py-0.5 font-semibold {{ $kelasStatus }}">{{ $statusKomoditas === 'belum_dihitung' ? 'Belum dihitung' : ucfirst($statusKomoditas) }}</span>
                                         <span aria-hidden="true">⌄</span>
                                     </span>
                                 </summary>
                                 <div class="divide-y divide-paper-200 border-t border-paper-200 px-3">
-                                    @foreach ($ringkasanKomoditas['items'] as $hasilPeriode)
-                                        <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
-                                            <span class="text-ink-700">{{ $namaBulanList[$hasilPeriode->bulan] ?? "Bulan {$hasilPeriode->bulan}" }} {{ $hasilPeriode->tahun }}</span>
-                                            <span class="text-ink-600">Kebutuhan {{ number_format((float) $hasilPeriode->total_kebutuhan, 1, ',', '.') }} · Tersedia {{ number_format((float) $hasilPeriode->total_ketersediaan, 1, ',', '.') }}</span>
-                                        </div>
-                                    @endforeach
+                                    @if ($ringkasanKomoditas['items']->isNotEmpty())
+                                        @foreach ($ringkasanKomoditas['items'] as $hasilPeriode)
+                                            <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
+                                                <span class="text-ink-700">{{ $namaBulanList[$hasilPeriode->bulan] ?? "Bulan {$hasilPeriode->bulan}" }} {{ $hasilPeriode->tahun }}</span>
+                                                <span class="text-ink-600">Kebutuhan {{ number_format((float) $hasilPeriode->total_kebutuhan, 1, ',', '.') }} · Tersedia {{ number_format((float) $hasilPeriode->total_ketersediaan, 1, ',', '.') }}</span>
+                                            </div>
+                                        @endforeach
+                                    @elseif (!empty($ringkasanKomoditas['produksi_tanpa_kalkulasi']))
+                                        @foreach ($ringkasanKomoditas['produksi_tanpa_kalkulasi'] as $catatanProduksi)
+                                            <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
+                                                <span class="text-ink-700">{{ $namaBulanList[$catatanProduksi->bulan] ?? "Bulan {$catatanProduksi->bulan}" }} {{ $catatanProduksi->tahun }}</span>
+                                                <span class="text-ink-600">Produksi tercatat {{ number_format((float) $catatanProduksi->jumlah_produksi, 1, ',', '.') }} {{ $catatanProduksi->satuan }} · Belum ada hasil kalkulasi</span>
+                                            </div>
+                                        @endforeach
+                                    @endif
                                 </div>
                             </details>
-                        @endforeach
+                        @empty
+                            <p class="rounded-sm bg-paper-50 px-3 py-2 text-xs text-ink-600">
+                                Belum ada hasil kalkulasi untuk sektor ini pada filter yang dipilih.
+                            </p>
+                        @endforelse
                     </div>
                 </details>
             @endforeach
         </div>
     @endif
 
-    {{-- Grid 2 Kolom: Grafik Distribusi Status & Daftar Top Defisit --}}
-    <div class="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {{-- Kolom Kiri (7 Kolom): Visualisasi & Perbandingan Volume Komoditas --}}
-        <div class="space-y-6 lg:col-span-7">
-            {{-- Visualisasi Distribusi Status --}}
-            <div class="rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs">
+    {{-- Ringkasan status dan defisit ditampilkan berurutan agar mudah dibaca. --}}
+    <div class="mb-6 space-y-4">
+        <section class="rounded-sm border border-paper-300 bg-paper-50 p-5 shadow-2xs">
                 <div class="flex items-center justify-between border-b border-paper-200 pb-3">
                     <div>
                         <h3 class="font-display text-base font-semibold text-ink-900">Distribusi Status Neraca Komoditas</h3>
@@ -263,13 +279,9 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
+        </section>
 
-        {{-- Kolom Kanan (5 Kolom): Daftar Defisit Terbesar & Info Sumber Data Survei --}}
-        <div class="space-y-6 lg:col-span-5">
-            {{-- Tabel Komoditas Defisit Terbesar (Top Deficits) --}}
-            <div class="rounded-sm border border-merah-500/30 bg-paper-50 p-5 shadow-2xs">
+        <section class="rounded-sm border border-merah-500/30 bg-paper-50 p-5 shadow-2xs">
                 <div class="flex items-center justify-between border-b border-paper-200 pb-3">
                     <div>
                         <h3 class="font-display text-base font-semibold text-merah-700">Defisit Terbesar (Prioritas Pengadaan)</h3>
@@ -287,6 +299,7 @@
                                 <div>
                                     <p class="font-semibold text-ink-950">{{ $item->komoditas?->nama }}</p>
                                     <p class="text-xs text-ink-600">
+                                        Sektor: {{ ucfirst(str_replace('_', ' ', strtolower(trim((string) ($item->komoditas?->kategori ?: 'lainnya'))))) }} ·
                                         Kebutuhan: {{ number_format($item->total_kebutuhan, 1, ',', '.') }} | Ketersediaan: {{ number_format($item->total_ketersediaan, 1, ',', '.') }}
                                     </p>
                                 </div>
@@ -305,7 +318,7 @@
                                 @if (!empty($isKomparasi))
                                     <span class="text-[11px] text-ink-600">Desa pembanding · lihat saja</span>
                                 @else
-                                    <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}" class="text-xs font-semibold text-merah-700 hover:underline">
+                                    <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}" class="text-xs font-semibold text-merah-700 hover:underline">
                                         Lihat rekomendasi pengadaan
                                     </a>
                                 @endif
@@ -318,9 +331,7 @@
                         </div>
                     @endforelse
                 </div>
-            </div>
-
-        </div>
+        </section>
     </div>
 
 </x-layouts.app>

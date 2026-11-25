@@ -58,7 +58,7 @@
         @endif
 
         <div class="flex items-center justify-between gap-4">
-            <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}" class="inline-block rounded-sm border border-paper-300 px-4 py-2 text-sm text-ink-700 hover:border-merah-400">Kembali</a>
+            <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}" class="inline-block rounded-sm border border-paper-300 px-4 py-2 text-sm text-ink-700 hover:border-merah-400">Kembali</a>
             @if (in_array($item->status, ['draft', 'diajukan']))
                 <div class="flex items-center gap-3">
                     <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.tolak', $item->id_permintaan) }}" onsubmit="return confirm('Apakah Anda yakin ingin menolak permintaan pengadaan ini?');" class="inline">

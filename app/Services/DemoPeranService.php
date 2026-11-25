@@ -125,7 +125,7 @@ class DemoPeranService
                         'langkah' => 4,
                         'judul' => 'Perbandingan Harga & Pengadaan',
                         'deskripsi' => 'Bandingkan harga penawaran desa mitra dan ajukan Permintaan Pengadaan (PR) ke Gudang.',
-                        'route' => 'perencanaan.permintaan-pengadaan.index',
+                        'route' => 'perencanaan.rekomendasi-pengadaan.index',
                         'route_sekunder' => 'perencanaan.perbandingan-harga.index',
                         'label_sekunder' => 'Perbandingan Harga',
                         'ikon' => '📑',
@@ -528,7 +528,7 @@ class DemoPeranService
                         'step' => '3C',
                         'judul' => 'Perbandingan Harga & Terbitkan Permintaan Pengadaan (PR)',
                         'deskripsi' => 'Bandingkan harga pemasok/desa mitra dan buat serta setujui PR untuk komoditas defisit.',
-                        'route' => 'perencanaan.permintaan-pengadaan.index',
+                        'route' => 'perencanaan.rekomendasi-pengadaan.index',
                         'route_sekunder' => 'perencanaan.perbandingan-harga.index',
                         'label_sekunder' => 'Perbandingan Harga',
                         'peran_akses' => 'manajer',
@@ -875,4 +875,3 @@ class DemoPeranService
         return $newUser->fresh(['peran', 'entitas']);
     }
 }
-

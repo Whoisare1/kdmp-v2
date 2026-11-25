@@ -317,7 +317,7 @@
                             <td class="py-2 px-3 text-[11px] text-ink-700">
                                 @if ($item->status_surplus_defisit === 'defisit')
                                     @if ($idWilayah === $idWilayahAsal)
-                                        <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}" class="font-semibold text-merah-700 underline print:hidden">Lihat rekomendasi pengadaan</a>
+                                        <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}" class="font-semibold text-merah-700 underline print:hidden">Lihat rekomendasi pengadaan</a>
                                     @else
                                         <span class="font-medium text-merah-700">Defisit desa pembanding</span>
                                     @endif

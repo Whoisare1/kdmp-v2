@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Models\Master\Barang;
 use App\Models\Master\Gudang;
+use App\Models\Master\Komoditas;
 use App\Models\Master\UnitUsaha;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\PermintaanPengadaan;
@@ -41,66 +42,87 @@ class PermintaanPengadaanController extends ModuleCrudController
     {
         $idWilayah = $this->wilayahAktifId();
 
-        $calonPerencanaan = HasilKalkulasi::query()
+        $hasilWilayahSendiri = HasilKalkulasi::query()
             ->with(['komoditas', 'wilayah'])
-            ->where('status_surplus_defisit', 'defisit')
+            ->whereIn('status_surplus_defisit', ['defisit', 'surplus'])
             ->where('id_wilayah', $idWilayah)
             ->whereRaw(
                 'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
             )
             ->latest('id_hasil')
             ->get();
-        $desaSurplusPerKomoditasPeriode = collect();
+        $pasanganAntarDesa = collect();
 
-        if ($calonPerencanaan->isNotEmpty()) {
-            $desaSurplusPerKomoditasPeriode = HasilKalkulasi::query()
-                ->with('wilayah')
-                ->where('status_surplus_defisit', 'surplus')
+        if ($hasilWilayahSendiri->isNotEmpty()) {
+            $pasanganAntarDesa = HasilKalkulasi::query()
+                ->with(['wilayah', 'komoditas'])
                 ->where('id_wilayah', '!=', $idWilayah)
-                ->whereIn('id_komoditas', $calonPerencanaan->pluck('id_komoditas')->unique())
-                ->whereIn('tahun', $calonPerencanaan->pluck('tahun')->unique())
-                ->whereIn('bulan', $calonPerencanaan->pluck('bulan')->unique())
-                ->orderByDesc('selisih')
+                ->whereIn('status_surplus_defisit', ['defisit', 'surplus'])
+                ->whereIn('id_komoditas', $hasilWilayahSendiri->pluck('id_komoditas')->unique())
+                ->whereIn('tahun', $hasilWilayahSendiri->pluck('tahun')->unique())
+                ->whereIn('bulan', $hasilWilayahSendiri->pluck('bulan')->unique())
                 ->whereRaw(
                     'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
                 )
                 ->get()
                 ->groupBy(fn (HasilKalkulasi $hasil): string => implode('|', [
+                    $hasil->status_surplus_defisit,
                     $hasil->id_komoditas,
                     $hasil->tahun,
                     $hasil->bulan,
                 ]));
         }
 
-        $calonPerencanaan = $calonPerencanaan->map(function (HasilKalkulasi $hasil) use ($desaSurplusPerKomoditasPeriode): array {
+        $calonPerencanaan = $hasilWilayahSendiri->map(function (HasilKalkulasi $hasil) use ($pasanganAntarDesa): array {
             $periode = PeriodeKalkulasi::fromMonth((int) $hasil->bulan);
-            $key = implode('|', [$hasil->id_komoditas, $hasil->tahun, $hasil->bulan]);
+            $statusPasangan = $hasil->status_surplus_defisit === 'defisit' ? 'surplus' : 'defisit';
+            $key = implode('|', [$statusPasangan, $hasil->id_komoditas, $hasil->tahun, $hasil->bulan]);
 
             return [
                 'hasil' => $hasil,
                 'sektor' => strtolower(trim((string) ($hasil->komoditas?->kategori ?: 'lainnya'))),
                 'periode' => $periode,
-                'calonSupplier' => $desaSurplusPerKomoditasPeriode->get($key, collect()),
+                'statusPasangan' => $statusPasangan,
+                'calonSupplier' => $pasanganAntarDesa->get($key, collect())->sortByDesc(
+                    fn (HasilKalkulasi $calon): float => abs((float) $calon->selisih)
+                )->values(),
             ];
         });
         $rekomendasiTerkini = collect();
         if ($calonPerencanaan->isNotEmpty()) {
             $rekomendasiTerkini = RekomendasiPengadaanDesa::query()
-                ->whereIn('id_hasil_defisit', $calonPerencanaan->pluck('hasil')->map->id_hasil)
+                ->where(function ($query) use ($calonPerencanaan): void {
+                    $idHasilSendiri = $calonPerencanaan->pluck('hasil')->map->id_hasil;
+                    $query->whereIn('id_hasil_defisit', $idHasilSendiri)
+                        ->orWhereIn('id_hasil_surplus', $idHasilSendiri);
+                })
                 ->latest('id_rekomendasi')
                 ->get()
-                ->unique('id_hasil_defisit')
-                ->keyBy('id_hasil_defisit');
+                ->unique(fn (RekomendasiPengadaanDesa $item): string => $item->id_hasil_defisit.'|'.$item->id_hasil_surplus)
+                ->keyBy(fn (RekomendasiPengadaanDesa $item): string => $item->id_hasil_defisit.'|'.$item->id_hasil_surplus);
         }
-        $calonPerencanaanSektor = $calonPerencanaan
+        $kategoriSektor = Komoditas::query()
+            ->where('is_active', true)
+            ->whereNotNull('kategori')
+            ->pluck('kategori')
+            ->map(fn (string $sektor): string => strtolower(trim($sektor)))
+            ->merge(['pertanian', 'perkebunan', 'peternakan', 'perikanan'])
+            ->filter()
+            ->unique()
+            ->values();
+        $calonPerencanaanSektor = $kategoriSektor
+            ->mapWithKeys(fn (string $sektor): array => [$sektor => collect()])
+            ->merge($calonPerencanaan
             ->groupBy('sektor')
+            ->sortKeys())
             ->sortKeys()
             ->map(function ($items) {
                 return $items
-                    ->groupBy(fn (array $rencana): int => (int) $rencana['hasil']->id_komoditas)
+                    ->groupBy(fn (array $rencana): string => mb_strtolower(trim((string) ($rencana['hasil']->komoditas?->nama ?: 'Komoditas tidak ditemukan'))))
                     ->map(fn ($komoditasItems) => $komoditasItems->sortBy([
                         ['periode', 'asc'],
                         ['hasil.bulan', 'asc'],
+                        ['hasil.status_surplus_defisit', 'asc'],
                     ])->values())
                     ->sortBy(fn ($komoditasItems) => $komoditasItems->first()['hasil']->komoditas?->nama ?? '')
                     ->values();
@@ -110,6 +132,7 @@ class PermintaanPengadaanController extends ModuleCrudController
             'title' => 'Rekomendasi Pengadaan Desa',
             'calonPerencanaanSektor' => $calonPerencanaanSektor,
             'rekomendasiTerkini' => $rekomendasiTerkini,
+            'wilayahAktif' => $hasilWilayahSendiri->first()?->wilayah,
         ]);
     }
 

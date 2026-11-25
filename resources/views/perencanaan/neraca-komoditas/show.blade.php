@@ -178,7 +178,7 @@
                             Komoditas ini kekurangan pasokan sebesar <strong>{{ number_format(abs((float) $hasil->selisih), 2, ',', '.') }} {{ $satuan }}</strong>. Lihat rekomendasi desa pemasok; keputusan pengadaan tetap memerlukan persetujuan.
                         </p>
                     </div>
-                    <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}"
+                    <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}"
                        class="rounded-sm border border-merah-300 px-4 py-2 text-xs font-semibold text-merah-700 hover:bg-merah-50">
                         Lihat Rekomendasi Pengadaan
                     </a>

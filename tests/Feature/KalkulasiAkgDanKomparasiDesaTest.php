@@ -6,6 +6,7 @@ use App\Models\Master\Komoditas;
 use App\Models\Pengguna;
 use App\Models\Perencanaan\DemografiDesa;
 use App\Models\Perencanaan\HasilKalkulasi;
+use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Perencanaan\StandarKebutuhanKomoditas;
 use App\Models\Tenant\Entitas;
 use App\Models\Tenant\Wilayah;
@@ -86,6 +87,64 @@ class KalkulasiAkgDanKomparasiDesaTest extends TestCase
         $response->assertOk();
         $response->assertSee('Mode Komparasi');
         $response->assertSee($desa2->nama);
+    }
+
+    public function test_dashboard_menampilkan_sektor_perikanan_dan_komoditasnya(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $komoditas = Komoditas::create([
+            'nama' => 'Ikan Uji Dashboard',
+            'kategori' => 'Perikanan',
+            'is_active' => true,
+        ]);
+        HasilKalkulasi::create([
+            'id_wilayah' => Entitas::findOrFail($user->id_entitas)->id_wilayah,
+            'id_komoditas' => $komoditas->id,
+            'tahun' => 2026,
+            'bulan' => 1,
+            'total_kebutuhan' => 100,
+            'total_ketersediaan' => 25,
+            'selisih' => -75,
+            'status_surplus_defisit' => 'defisit',
+            'id_unit_usaha_rekomendasi' => 1,
+            'status' => 'disetujui',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('perencanaan.dashboard'));
+
+        $response->assertOk()
+            ->assertSee('Perikanan')
+            ->assertSee('Pertanian')
+            ->assertSee('Perkebunan')
+            ->assertSee('Peternakan')
+            ->assertSee('Ikan Uji Dashboard')
+            ->assertSee('Sektor: Perikanan');
+    }
+
+    public function test_dashboard_menampilkan_produksi_perikanan_yang_belum_dikalkulasi(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $idWilayah = Entitas::findOrFail($user->id_entitas)->id_wilayah;
+        $komoditas = Komoditas::create([
+            'nama' => 'Ikan Produksi Belum Kalkulasi',
+            'kategori' => 'perikanan',
+            'is_active' => true,
+        ]);
+        KetersediaanKomoditas::create([
+            'id_wilayah' => $idWilayah,
+            'id_komoditas' => $komoditas->id,
+            'tahun' => 2026,
+            'bulan' => 1,
+            'jumlah_produksi' => 125,
+            'satuan' => 'KG',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('perencanaan.dashboard'));
+
+        $response->assertOk()
+            ->assertSee('Ikan Produksi Belum Kalkulasi')
+            ->assertSee('Produksi tercatat 125,0 KG')
+            ->assertSee('Belum ada hasil kalkulasi');
     }
 
     public function test_laporan_menampilkan_pemilahan_sektor_defisit_dan_surplus(): void
