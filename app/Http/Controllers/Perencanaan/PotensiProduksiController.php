@@ -19,17 +19,40 @@ class PotensiProduksiController extends Controller
 
     public function index(Request $request): View
     {
-        $idWilayah = $this->wilayahAktifId();
+        $idWilayahAsal = $this->wilayahAktifId();
+        $daftarWilayah = Wilayah::where('tingkat', 'desa')->orderBy('nama')->get();
+        if (! $daftarWilayah->contains('id', $idWilayahAsal)) {
+            $wilayahAktif = Wilayah::find($idWilayahAsal);
+            if ($wilayahAktif) {
+                $daftarWilayah->prepend($wilayahAktif);
+            }
+        }
+
+        $validated = $request->validate([
+            'id_wilayah' => ['nullable', 'integer'],
+            'tahun' => ['nullable', 'integer', 'min:2020', 'max:2100'],
+            'kategori' => ['nullable', 'in:pertanian,perkebunan,peternakan,perikanan'],
+        ]);
+
+        $idWilayah = $idWilayahAsal;
+        if (array_key_exists('id_wilayah', $validated) && $validated['id_wilayah'] !== null) {
+            $idWilayahDiminta = (int) $validated['id_wilayah'];
+            abort_unless($daftarWilayah->contains('id', $idWilayahDiminta), 404);
+            $idWilayah = $idWilayahDiminta;
+        }
+        $isKomparasi = ($idWilayah !== $idWilayahAsal);
         $wilayah = Wilayah::find($idWilayah);
 
-        $tahun = (int) $request->query('tahun', 2026);
+        $tahun = (int) ($validated['tahun'] ?? 2026);
         $bulan = $request->filled('bulan') ? (int) $request->query('bulan') : null;
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
         $search = $request->query('q');
+        $kategori = $validated['kategori'] ?? null;
 
         $query = KetersediaanKomoditas::with(['komoditas', 'sesiSurvei'])
             ->where('id_wilayah', $idWilayah)
-            ->where('tahun', $tahun);
+            ->where('tahun', $tahun)
+            ->when($kategori, fn ($q) => $q->whereHas('komoditas', fn ($komoditas) => $komoditas->where('kategori', $kategori)));
 
         if ($bulan !== null) {
             $query->where('bulan', $bulan);
@@ -48,12 +71,27 @@ class PotensiProduksiController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $baseStat = KetersediaanKomoditas::where('id_wilayah', $idWilayah)->where('tahun', $tahun);
+        $daftarTahun = KetersediaanKomoditas::where('id_wilayah', $idWilayah)
+            ->distinct()
+            ->pluck('tahun')
+            ->merge(range(2025, 2030))
+            ->push($tahun)
+            ->map(fn ($tahunData) => (int) $tahunData)
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $baseStat = KetersediaanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('tahun', $tahun)
+            ->when($kategori, fn ($q) => $q->whereHas('komoditas', fn ($komoditas) => $komoditas->where('kategori', $kategori)));
         $totalCatatan = (clone $baseStat)->when($bulan, fn ($q) => $q->where('bulan', $bulan))->count();
         $totalVolume = (float) (clone $baseStat)->when($bulan, fn ($q) => $q->where('bulan', $bulan))->sum('jumlah_produksi');
         $jumlahKomoditas = (clone $baseStat)->when($bulan, fn ($q) => $q->where('bulan', $bulan))->distinct('id_komoditas')->count('id_komoditas');
 
-        $daftarKomoditas = Komoditas::where('is_active', true)->orderBy('nama')->get();
+        $daftarKomoditas = Komoditas::where('is_active', true)
+            ->when($kategori, fn ($q) => $q->where('kategori', $kategori))
+            ->orderBy('nama')
+            ->get();
         $daftarSatuan = DB::table('satuan')->where('is_active', true)->pluck('kode_satuan')->toArray();
         if (empty($daftarSatuan)) {
             $daftarSatuan = ['KG', 'LTR', 'BUTIR', 'TON', 'IKAT'];
@@ -62,10 +100,22 @@ class PotensiProduksiController extends Controller
         return view('perencanaan.potensi-produksi.index', [
             'items' => $items,
             'wilayah' => $wilayah,
+            'daftarWilayah' => $daftarWilayah,
+            'idWilayah' => $idWilayah,
+            'idWilayahAsal' => $idWilayahAsal,
+            'isKomparasi' => $isKomparasi,
             'tahun' => $tahun,
+            'daftarTahun' => $daftarTahun,
             'bulan' => $bulan,
             'idKomoditas' => $idKomoditas,
+            'kategori' => $kategori,
             'search' => $search,
+            'daftarKategori' => [
+                'pertanian' => 'Pertanian',
+                'perkebunan' => 'Perkebunan',
+                'peternakan' => 'Peternakan',
+                'perikanan' => 'Perikanan',
+            ],
             'daftarKomoditas' => $daftarKomoditas,
             'daftarSatuan' => $daftarSatuan,
             'totalCatatan' => $totalCatatan,

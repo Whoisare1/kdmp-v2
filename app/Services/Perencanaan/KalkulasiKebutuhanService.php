@@ -23,13 +23,13 @@ class KalkulasiKebutuhanService
      * @param int $idWilayah ID wilayah desa
      * @param int $tahun Tahun perencanaan (contoh: 2026)
      * @param string $periode Periode ganjil (Januari-Juni) atau genap (Juli-Desember)
-     * @param int|null $idKomoditas ID komoditas spesifik (opsional, jika null hitung semua komoditas aktif)
+     * @param int|array<int>|null $idKomoditas ID/daftar komoditas spesifik; null menghitung semua komoditas aktif
      * @return array Ringkasan hasil kalkulasi
      *
      * @throws InvalidArgumentException
      * @throws RuntimeException
      */
-    public function hitungKebutuhan(int $idWilayah, int $tahun, string|int $periode, ?int $idKomoditas = null): array
+    public function hitungKebutuhan(int $idWilayah, int $tahun, string|int $periode, int|array|null $idKomoditas = null): array
     {
         $legacyMonthly = is_int($periode);
         $bulanLegacy = $legacyMonthly ? $periode : null;
@@ -69,7 +69,12 @@ class KalkulasiKebutuhanService
 
             // 2. Tentukan komoditas yang akan dikalkulasi
             $queryKomoditas = Komoditas::where('is_active', true);
-            if ($idKomoditas !== null) {
+            if (is_array($idKomoditas)) {
+                if ($idKomoditas === []) {
+                    throw new RuntimeException('Pilih minimal satu komoditas untuk dikalkulasi.');
+                }
+                $queryKomoditas->whereIn('id', $idKomoditas);
+            } elseif ($idKomoditas !== null) {
                 $queryKomoditas->where('id', $idKomoditas);
             }
             $daftarKomoditas = $queryKomoditas->get();
@@ -114,7 +119,7 @@ class KalkulasiKebutuhanService
                 }
 
                 $kelompokTanpaStandar = collect($standarPerKelompokUmur)
-                    ->filter(fn ($standar) => $standar === null || (float) $standar->per_kapita_harian <= 0)
+                    ->filter(fn ($standar) => $standar === null || (float) $standar->per_kapita_harian < 0)
                     ->keys()
                     ->all();
 

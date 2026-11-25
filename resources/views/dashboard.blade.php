@@ -806,11 +806,11 @@
                         <span class="text-[11px] font-bold text-padi-600">Buka →</span>
                     </a>
 
-                    <a href="{{ route('perencanaan.perbandingan-harga.index') }}" class="rounded-xl border border-paper-300 bg-paper-50 p-4 hover:border-padi-500 transition-all flex flex-col justify-between gap-2">
+                    <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}" class="rounded-xl border border-paper-300 bg-paper-50 p-4 hover:border-padi-500 transition-all flex flex-col justify-between gap-2">
                         <div>
                             <span class="text-2xl">📑</span>
-                            <h4 class="font-display text-xs font-bold text-ink-950 mt-1">Perbandingan Harga</h4>
-                            <p class="text-[11px] text-ink-600 mt-0.5">Penawaran suplier/mitra.</p>
+                            <h4 class="font-display text-xs font-bold text-ink-950 mt-1">Rekomendasi Pengadaan</h4>
+                            <p class="text-[11px] text-ink-600 mt-0.5">Rencana pengadaan desa.</p>
                         </div>
                         <span class="text-[11px] font-bold text-padi-600">Buka →</span>
                     </a>
@@ -1023,7 +1023,7 @@
                                                 Tawarkan Konsinyasi →
                                             </a>
                                         @else
-                                            <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}" class="inline-flex items-center gap-1 rounded bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-ink-950 hover:bg-amber-600">
+                                            <a href="{{ route('perencanaan.rekomendasi-pengadaan.index') }}" class="inline-flex items-center gap-1 rounded bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-ink-950 hover:bg-amber-600">
                                                 Ajukan Pengadaan →
                                             </a>
                                         @endif

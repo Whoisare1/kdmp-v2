@@ -196,14 +196,15 @@ Siapkan/daftarkan 4 kartu aset tetap awal berikut:
 
 > **Tujuan:** Mengkalkulasi kebutuhan pangan desa, memetakan status **SURPLUS / DEFISIT**, membandingkan harga antar-desa/pemasok, dan menerbitkan **Permintaan Pengadaan (PR)** resmi. *(Tahap ini juga belum menghasilkan jurnal akuntansi.)*
 
-1. Buka **Kalkulasi & Perencanaan ➔ Data & Parameter** (`Demografi`, `Potensi Produksi`, `Standar Kebutuhan`): verifikasi data hasil sinkronisasi survei (jumlah penduduk, konsumsi per kapita, hasil panen lokal).
-2. Buka **Kalkulasi & Perencanaan ➔ Kalkulasi Kebutuhan**: pilih periode dan klik tombol **Kalkulasi** untuk menghasilkan *snapshot* total kebutuhan bulanan komoditas (misal kebutuhan Beras desa = `1.200 kg`).
-3. Buka **Kalkulasi & Perencanaan ➔ Surplus Defisit** *(Neraca Komoditas)*:
+1. Buka **Kalkulasi & Perencanaan ➔ Data Dasar Desa**: verifikasi rekap penduduk dan komoditi/panen hasil sinkronisasi survei.
+2. Pada **Kalkulasi Kebutuhan**, atur **Master Kalkulasi Desa** dengan memilih komoditas yang relevan untuk desa yang sedang login. Master ini berlaku per desa; komoditas lain tidak ikut dihitung.
+3. Pilih periode, tentukan satu atau beberapa komoditas dari master desa, lalu klik **Proses Kalkulasi** untuk membuat *snapshot* kebutuhan desa sendiri (misal kebutuhan Beras = `1.200 kg`). Dashboard dapat dipakai untuk melihat hasil desa lain dalam mode baca-saja.
+4. Buka **Kalkulasi & Perencanaan ➔ Surplus Defisit** *(Neraca Komoditas)*:
    - Sistem membandingkan `Produksi Lokal (500 kg) - Kebutuhan (1.200 kg) = -700 kg` ➔ Status **`DEFISIT`**.
    - Untuk komoditas lain yang produksinya > kebutuhan ➔ Status **`SURPLUS`** *(siap dikonsinyasikan ke desa mitra di Tahap 7)*.
    - Cek juga **Laporan Kalkulasi**.
-4. Buka **Kalkulasi & Perencanaan ➔ Perbandingan Harga**: bandingkan harga penawaran supplier lokal vs koperasi desa mitra (`KDMP-B`) untuk komoditas Beras.
-5. Buka **Kalkulasi & Perencanaan ➔ Permintaan Pengadaan** *(atau klik tombol Ajukan/Buat Permintaan dari hasil Neraca)*:
+5. Buka **Kalkulasi & Perencanaan ➔ Perbandingan Harga**: bandingkan harga penawaran supplier lokal vs koperasi desa mitra (`KDMP-B`) untuk komoditas Beras.
+6. Buka **Kalkulasi & Perencanaan ➔ Permintaan Pengadaan** *(atau klik tombol Ajukan/Buat Permintaan dari hasil Neraca)*:
    - Buat Permintaan Pengadaan (PR) untuk `Beras Medium` sebesar **`500 kg`**, pilih gudang tujuan `Gudang Koperasi Desa Mekar Jaya`.
    - Ubah status/setujui PR menjadi **`disetujui`** agar dapat dipilih saat membuat Order Pembelian (PO).
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Perencanaan;
 use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Http\Controllers\Controller;
 use App\Models\Perencanaan\DemografiDesa;
+use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Survei\SesiSurvei;
 use App\Models\Tenant\Wilayah;
 use Illuminate\Http\RedirectResponse;
@@ -17,8 +18,24 @@ class DemografiController extends Controller
 
     public function index(Request $request): View
     {
-        $idWilayah = $this->wilayahAktifId();
+        $idWilayahAsal = $this->wilayahAktifId();
+        $daftarWilayah = Wilayah::where('tingkat', 'desa')->orderBy('nama')->get();
+        if (! $daftarWilayah->contains('id', $idWilayahAsal)) {
+            $wilayahAktif = Wilayah::find($idWilayahAsal);
+            if ($wilayahAktif) {
+                $daftarWilayah->prepend($wilayahAktif);
+            }
+        }
+
+        $idWilayah = $idWilayahAsal;
+        if ($request->filled('id_wilayah')) {
+            $idWilayahDiminta = (int) $request->query('id_wilayah');
+            abort_unless($daftarWilayah->contains('id', $idWilayahDiminta), 404);
+            $idWilayah = $idWilayahDiminta;
+        }
+
         $wilayah = Wilayah::find($idWilayah);
+        $isKomparasi = ($idWilayah !== $idWilayahAsal);
 
         $tahun = (int) $request->query('tahun', 2026);
 
@@ -29,9 +46,17 @@ class DemografiController extends Controller
 
         $daftarTahun = DemografiDesa::where('id_wilayah', $idWilayah)
             ->distinct()
-            ->orderBy('tahun', 'desc')
-            ->pluck('tahun')
-            ->toArray();
+            ->pluck('tahun');
+
+        $daftarTahun = $daftarTahun->merge(
+            KetersediaanKomoditas::where('id_wilayah', $idWilayah)
+                ->distinct()
+                ->pluck('tahun')
+        )->map(fn ($tahunData) => (int) $tahunData)
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
 
         if (!in_array($tahun, $daftarTahun, true)) {
             $daftarTahun[] = $tahun;
@@ -59,6 +84,10 @@ class DemografiController extends Controller
 
         return view('perencanaan.demografi.index', [
             'wilayah' => $wilayah,
+            'daftarWilayah' => $daftarWilayah,
+            'idWilayahAsal' => $idWilayahAsal,
+            'idWilayah' => $idWilayah,
+            'isKomparasi' => $isKomparasi,
             'tahun' => $tahun,
             'daftarTahun' => $daftarTahun,
             'records' => $records,
@@ -113,4 +142,3 @@ class DemografiController extends Controller
         return back()->with('status', "Populasi kelompok umur " . ucfirst($record->kelompok_umur) . " berhasil diperbarui.");
     }
 }
-

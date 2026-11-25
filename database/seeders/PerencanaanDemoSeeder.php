@@ -8,6 +8,7 @@ use App\Models\Tenant\Entitas;
 use App\Models\Tenant\Wilayah;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class PerencanaanDemoSeeder extends Seeder
 {
@@ -21,6 +22,16 @@ class PerencanaanDemoSeeder extends Seeder
         $wilayah = Wilayah::whereIn('nama', ['Desa Mekar Jaya', 'Desa Sukamaju'])->get()->keyBy('nama');
         $entitas = Entitas::whereIn('kode_entitas', ['KDMP-A', 'KDMP-B'])->get()->keyBy('kode_entitas');
 
+        if ($unitUsaha === 0 || $satuanKg === 0) {
+            throw new RuntimeException('Master Unit Usaha SEMBAKO dan satuan KG harus tersedia sebelum menjalankan data demo Perencanaan.');
+        }
+
+        $desaMekar = $wilayah->get('Desa Mekar Jaya');
+        $desaSukamaju = $wilayah->get('Desa Sukamaju');
+        if (! $desaMekar || ! $desaSukamaju || ! $entitas->has('KDMP-A') || ! $entitas->has('KDMP-B')) {
+            throw new RuntimeException('Data demo membutuhkan Desa Mekar Jaya, Desa Sukamaju, serta entitas KDMP-A dan KDMP-B. Jalankan seeder data awal terlebih dahulu.');
+        }
+
         $komoditasData = [
             ['nama' => 'Beras', 'kategori' => 'pertanian', 'kode' => 'BRG-DEMO-BERAS', 'produksi' => [18000, 15000], 'kebutuhan' => 15000, 'harga' => 13500],
             ['nama' => 'Gula Pasir', 'kategori' => 'pertanian', 'kode' => 'BRG-DEMO-GULA', 'produksi' => [0, 250], 'kebutuhan' => 1500, 'harga' => 16000],
@@ -31,6 +42,7 @@ class PerencanaanDemoSeeder extends Seeder
             ['nama' => 'Telur Ayam', 'kategori' => 'peternakan', 'kode' => 'BRG-DEMO-TELUR', 'produksi' => [3200, 2400], 'kebutuhan' => 2700, 'harga' => 28000],
             ['nama' => 'Daging Sapi', 'kategori' => 'peternakan', 'kode' => 'BRG-DEMO-SAPI', 'produksi' => [450, 700], 'kebutuhan' => 1000, 'harga' => 125000],
             ['nama' => 'Kambing', 'kategori' => 'peternakan', 'kode' => 'BRG-DEMO-KAMBING', 'produksi' => [60, 110], 'kebutuhan' => 120, 'harga' => 95000],
+            ['nama' => 'Ikan Nila', 'kategori' => 'perikanan', 'kode' => 'BRG-DEMO-IKAN-NILA', 'produksi' => [1800, 700], 'kebutuhan' => 1000, 'harga' => 32000],
         ];
 
         $komoditas = [];
@@ -53,7 +65,7 @@ class PerencanaanDemoSeeder extends Seeder
             );
         }
 
-        foreach ($wilayah->values() as $index => $desa) {
+        foreach ([$desaMekar, $desaSukamaju] as $index => $desa) {
             for ($bulan = 1; $bulan <= 12; $bulan++) {
                 foreach ($komoditasData as $data) {
                     $item = $komoditas[$data['nama']];
