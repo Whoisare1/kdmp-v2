@@ -64,6 +64,14 @@
                 .print-report tr {
                     break-inside: avoid;
                 }
+
+                .print-report details:not([open]) > :not(summary) {
+                    display: block !important;
+                }
+
+                .print-report details > summary {
+                    display: none !important;
+                }
             }
     </style>
 
@@ -83,6 +91,18 @@
     {{-- Filter & Action Bar (Disembunyikan saat Print) --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs print:hidden">
         <form method="GET" class="flex flex-wrap items-center gap-2">
+            {{-- Pemilah Desa --}}
+            <div class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 px-3 py-1.5 text-xs font-medium text-ink-800">
+                <span class="font-mono text-[10px] uppercase text-ink-600/70">Desa:</span>
+                <select name="id_wilayah" onchange="this.form.submit()" class="bg-transparent font-semibold text-ink-950 focus:outline-none cursor-pointer">
+                    @foreach ($daftarWilayah as $dw)
+                        <option value="{{ $dw->id }}" {{ $idWilayah == $dw->id ? 'selected' : '' }}>
+                            Desa {{ $dw->nama }} {{ $dw->id == $idWilayahAsal ? '(Desa Anda)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
             <select name="tahun" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
                 @foreach (range(2025, 2030) as $t)
                     <option value="{{ $t }}" {{ $tahun == $t ? 'selected' : '' }}>Tahun {{ $t }}</option>
@@ -175,8 +195,75 @@
             </div>
         </div>
 
+        {{-- Ringkasan status dapat dibuka saat diperlukan agar laporan lebih ringkas. --}}
+        <div class="my-6 space-y-3">
+            <details class="rounded-sm border border-merah-300 bg-merah-50/40">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                    <span class="font-display text-sm font-bold text-merah-800">🔴 Komoditas Defisit</span>
+                    <span class="font-mono text-xs font-semibold text-merah-800">{{ $totalDefisit }} komoditas <span aria-hidden="true">⌄</span></span>
+                </summary>
+                <div class="space-y-2 border-t border-merah-200 p-3">
+                    @forelse ($daftarDefisitPerSektor as $sektor => $listDefisit)
+                        <details class="rounded-sm border border-merah-200 bg-white">
+                            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-semibold text-ink-900">
+                                <span>Sektor {{ $sektor }}</span>
+                                <span class="font-normal text-ink-600">{{ $listDefisit->count() }} komoditas <span aria-hidden="true">⌄</span></span>
+                            </summary>
+                            <div class="divide-y divide-paper-100 border-t border-paper-200 px-3">
+                                @foreach ($listDefisit as $hDef)
+                                    <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
+                                        <div>
+                                            <span class="font-semibold text-ink-950">{{ $hDef->komoditas?->nama }}</span>
+                                            <span class="text-[11px] text-ink-600">(Butuh {{ number_format($hDef->total_kebutuhan, 1, ',', '.') }} · Panen {{ number_format($hDef->total_ketersediaan, 1, ',', '.') }})</span>
+                                        </div>
+                                        <span class="font-mono font-bold text-merah-700">−{{ number_format(abs($hDef->selisih), 1, ',', '.') }} {{ $satuanMap[$hDef->id_komoditas] ?? 'KG' }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </details>
+                    @empty
+                        <p class="py-2 text-center text-xs text-ink-600">Tidak ada komoditas defisit pada periode ini.</p>
+                    @endforelse
+                </div>
+            </details>
+
+            <details class="rounded-sm border border-sawah-300 bg-sawah-50/40">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                    <span class="font-display text-sm font-bold text-sawah-800">🟢 Komoditas Surplus</span>
+                    <span class="font-mono text-xs font-semibold text-sawah-800">{{ $totalSurplus }} komoditas <span aria-hidden="true">⌄</span></span>
+                </summary>
+                <div class="space-y-2 border-t border-sawah-200 p-3">
+                    @forelse ($daftarSurplusPerSektor as $sektor => $listSurplus)
+                        <details class="rounded-sm border border-sawah-200 bg-white">
+                            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-semibold text-ink-900">
+                                <span>Sektor {{ $sektor }}</span>
+                                <span class="font-normal text-ink-600">{{ $listSurplus->count() }} komoditas <span aria-hidden="true">⌄</span></span>
+                            </summary>
+                            <div class="divide-y divide-paper-100 border-t border-paper-200 px-3">
+                                @foreach ($listSurplus as $hSur)
+                                    <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
+                                        <div>
+                                            <span class="font-semibold text-ink-950">{{ $hSur->komoditas?->nama }}</span>
+                                            <span class="text-[11px] text-ink-600">(Panen {{ number_format($hSur->total_ketersediaan, 1, ',', '.') }} · Butuh {{ number_format($hSur->total_kebutuhan, 1, ',', '.') }})</span>
+                                        </div>
+                                        <span class="font-mono font-bold text-sawah-700">+{{ number_format($hSur->selisih, 1, ',', '.') }} {{ $satuanMap[$hSur->id_komoditas] ?? 'KG' }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </details>
+                    @empty
+                        <p class="py-2 text-center text-xs text-ink-600">Tidak ada komoditas surplus pada periode ini.</p>
+                    @endforelse
+                </div>
+            </details>
+        </div>
+
         {{-- Tabel Matriks Rekapitulasi --}}
-        <div class="overflow-hidden">
+        <details class="overflow-hidden rounded-sm border border-paper-200">
+            <summary class="cursor-pointer list-none bg-paper-100 px-3 py-3 text-sm font-semibold text-ink-900">
+                Rincian lengkap neraca ({{ $items->count() }} baris) <span class="float-right font-normal text-ink-600">Klik untuk melihat ⌄</span>
+            </summary>
+            <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
                 <thead>
                     <tr class="border-b-2 border-paper-300 bg-paper-100 font-mono text-[11px] uppercase tracking-wide text-ink-700">
@@ -229,9 +316,17 @@
                             </td>
                             <td class="py-2 px-3 text-[11px] text-ink-700">
                                 @if ($item->status_surplus_defisit === 'defisit')
-                                    <span class="text-merah-700 font-medium">Ajukan Permintaan Pengadaan</span>
+                                    @if ($idWilayah === $idWilayahAsal)
+                                        <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}" class="font-semibold text-merah-700 underline print:hidden">Lihat rekomendasi pengadaan</a>
+                                    @else
+                                        <span class="font-medium text-merah-700">Defisit desa pembanding</span>
+                                    @endif
                                 @elseif ($item->status_surplus_defisit === 'surplus')
-                                    <span class="text-sawah-700">Potensi Konsinyasi Antar Desa</span>
+                                    @if ($idWilayah === $idWilayahAsal)
+                                        <a href="{{ route('perencanaan.neraca-komoditas.show', $item->id_hasil) }}" class="font-semibold text-sawah-700 underline print:hidden">Lihat tindak lanjut Gudang</a>
+                                    @else
+                                        <span class="text-sawah-700">Potensi tindak lanjut Gudang</span>
+                                    @endif
                                 @else
                                     <span class="text-ink-600">Kebutuhan Mandiri Tercukupi</span>
                                 @endif
@@ -246,7 +341,8 @@
                     @endforelse
                 </tbody>
             </table>
-        </div>
+            </div>
+        </details>
 
         {{-- Lembar Pengesahan / Tanda Tangan --}}
         <div class="mt-12 grid grid-cols-2 gap-8 border-t border-paper-300 pt-6 text-xs text-ink-800">

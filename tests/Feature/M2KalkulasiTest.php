@@ -4,18 +4,22 @@ namespace Tests\Feature;
 
 use App\Models\Pengguna;
 use App\Models\Perencanaan\HasilKalkulasi;
+use App\Models\Perencanaan\KomoditasKalkulasiDesa;
 use App\Models\Perencanaan\KebutuhanKomoditas;
+use App\Models\Master\Komoditas;
 use App\Services\Perencanaan\KalkulasiKebutuhanService;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class M2KalkulasiTest extends TestCase
 {
     public function test_service_kalkulasi_kebutuhan_menghitung_dengan_benar(): void
     {
+        $idWilayah = $this->idWilayahManajer();
         $service = app(KalkulasiKebutuhanService::class);
-        $result = $service->hitungKebutuhan(1, 2026, 3);
+        $result = $service->hitungKebutuhan($idWilayah, 2026, 3);
 
-        $this->assertEquals(1, $result['id_wilayah']);
+        $this->assertEquals($idWilayah, $result['id_wilayah']);
         $this->assertEquals(2026, $result['tahun']);
         $this->assertEquals(3, $result['bulan']);
         $this->assertEquals(31, $result['jumlah_hari']);
@@ -23,14 +27,14 @@ class M2KalkulasiTest extends TestCase
         $this->assertGreaterThan(0, $result['total_hasil_kalkulasi']);
 
         // Cek bahwa kebutuhan_komoditas terisi
-        $countKebutuhan = KebutuhanKomoditas::where('id_wilayah', 1)
+        $countKebutuhan = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
             ->where('tahun', 2026)
             ->where('bulan', 3)
             ->count();
         $this->assertGreaterThan(0, $countKebutuhan);
 
         // Cek bahwa hasil_kalkulasi terisi dengan status surplus/defisit
-        $hasilBeras = HasilKalkulasi::where('id_wilayah', 1)
+        $hasilBeras = HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('tahun', 2026)
             ->where('bulan', 3)
             ->whereHas('komoditas', fn ($q) => $q->where('nama', 'Beras'))
@@ -42,7 +46,7 @@ class M2KalkulasiTest extends TestCase
         $this->assertEquals(18000.0, (float) $hasilBeras->total_ketersediaan);
 
         // Cek Gula Pasir defisit
-        $hasilGula = HasilKalkulasi::where('id_wilayah', 1)
+        $hasilGula = HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('tahun', 2026)
             ->where('bulan', 3)
             ->whereHas('komoditas', fn ($q) => $q->where('nama', 'Gula Pasir'))
@@ -55,17 +59,18 @@ class M2KalkulasiTest extends TestCase
 
     public function test_kalkulasi_bersifat_idempotent_tidak_duplikasi(): void
     {
+        $idWilayah = $this->idWilayahManajer();
         $service = app(KalkulasiKebutuhanService::class);
 
         // Jalankan kalkulasi pertama
-        $service->hitungKebutuhan(1, 2026, 3);
-        $count1 = KebutuhanKomoditas::where('id_wilayah', 1)->where('tahun', 2026)->where('bulan', 3)->count();
-        $countHasil1 = HasilKalkulasi::where('id_wilayah', 1)->where('tahun', 2026)->where('bulan', 3)->count();
+        $service->hitungKebutuhan($idWilayah, 2026, 3);
+        $count1 = KebutuhanKomoditas::where('id_wilayah', $idWilayah)->where('tahun', 2026)->where('bulan', 3)->count();
+        $countHasil1 = HasilKalkulasi::where('id_wilayah', $idWilayah)->where('tahun', 2026)->where('bulan', 3)->count();
 
         // Jalankan kalkulasi kedua dengan parameter sama
-        $service->hitungKebutuhan(1, 2026, 3);
-        $count2 = KebutuhanKomoditas::where('id_wilayah', 1)->where('tahun', 2026)->where('bulan', 3)->count();
-        $countHasil2 = HasilKalkulasi::where('id_wilayah', 1)->where('tahun', 2026)->where('bulan', 3)->count();
+        $service->hitungKebutuhan($idWilayah, 2026, 3);
+        $count2 = KebutuhanKomoditas::where('id_wilayah', $idWilayah)->where('tahun', 2026)->where('bulan', 3)->count();
+        $countHasil2 = HasilKalkulasi::where('id_wilayah', $idWilayah)->where('tahun', 2026)->where('bulan', 3)->count();
 
         $this->assertEquals($count1, $count2);
         $this->assertEquals($countHasil1, $countHasil2);
@@ -83,6 +88,8 @@ class M2KalkulasiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Kebutuhan Komoditas (Hasil Kalkulasi)');
+        $response->assertSee('Komoditas Desa');
+        $response->assertSee('berdasarkan Kategori');
         $response->assertSee('Beras');
     }
 
@@ -105,27 +112,42 @@ class M2KalkulasiTest extends TestCase
     public function test_post_kalkulasi_berhasil_via_controller(): void
     {
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $idWilayah = $this->idWilayahManajer();
 
-        $response = $this->actingAs($user)->post(route('perencanaan.kebutuhan-komoditas.kalkulasi'), [
-            'tahun' => 2026,
-            'bulan' => 4, // April 30 hari
-        ]);
+        DB::beginTransaction();
+        try {
+            foreach (Komoditas::where('is_active', true)->get() as $komoditas) {
+                KomoditasKalkulasiDesa::firstOrCreate(
+                    ['id_wilayah' => $idWilayah, 'id_komoditas' => $komoditas->id],
+                    ['created_at' => now()]
+                );
+            }
 
-        $response->assertRedirect();
-        $response->assertSessionHas('status');
+            $response = $this->actingAs($user)->post(route('perencanaan.kebutuhan-komoditas.kalkulasi'), [
+                'tahun' => 2026,
+                'bulan' => 4, // April 30 hari
+            ]);
 
-        // Verifikasi bulan 4 terisi
-        $countKebutuhanBulan4 = KebutuhanKomoditas::where('id_wilayah', 1)
-            ->where('tahun', 2026)
-            ->where('bulan', 4)
-            ->count();
-        $this->assertGreaterThan(0, $countKebutuhanBulan4);
+            $response->assertRedirect(route('perencanaan.neraca-komoditas.index', [
+                'tahun' => 2026,
+                'periode' => 'ganjil',
+            ]));
+            $response->assertSessionHas('status');
+
+            $countKebutuhanBulan4 = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
+                ->where('tahun', 2026)
+                ->where('bulan', 4)
+                ->count();
+            $this->assertGreaterThan(0, $countKebutuhanBulan4);
+        } finally {
+            DB::rollBack();
+        }
     }
 
     public function test_defisit_dapat_memicu_buat_permintaan_pengadaan_dengan_data_terisi(): void
     {
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
-        $hasilDefisit = HasilKalkulasi::where('id_wilayah', 1)
+        $hasilDefisit = HasilKalkulasi::where('id_wilayah', $this->idWilayahManajer())
             ->where('status_surplus_defisit', 'defisit')
             ->first();
 
@@ -137,7 +159,8 @@ class M2KalkulasiTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('Buat Permintaan Pengadaan');
+        $response->assertSee('Lihat rekomendasi pengadaan');
+        $response->assertDontSee('Buat Permintaan Pengadaan');
 
         $redirect = $this->actingAs($user)->get(route('perencanaan.permintaan-pengadaan.from-hasil', [
             'hasil' => $hasilDefisit->id_hasil,
@@ -159,24 +182,43 @@ class M2KalkulasiTest extends TestCase
     public function test_dashboard_m2_dapat_diakses_dan_menampilkan_ringkasan_komoditas(): void
     {
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
+        $idWilayah = $this->idWilayahManajer();
         $this->assertNotNull($user);
+        DB::transaction(function () use ($user, $idWilayah): void {
+            foreach (Komoditas::where('is_active', true)->get() as $komoditas) {
+                KomoditasKalkulasiDesa::firstOrCreate(
+                    ['id_wilayah' => $idWilayah, 'id_komoditas' => $komoditas->id],
+                    ['created_at' => now()]
+                );
+            }
 
-        // Pastikan ada data kalkulasi
-        $service = app(KalkulasiKebutuhanService::class);
-        $service->hitungKebutuhan(1, 2026, 3);
+            // Pastikan ada data kalkulasi
+            $service = app(KalkulasiKebutuhanService::class);
+            $service->hitungKebutuhan($idWilayah, 2026, 3);
 
-        $response = $this->actingAs($user)->get(route('perencanaan.dashboard', [
-            'tahun' => 2026,
-            'bulan' => 3,
-        ]));
+            $response = $this->actingAs($user)->get(route('perencanaan.dashboard', [
+                'tahun' => 2026,
+                'bulan' => 3,
+            ]));
 
-        $response->assertStatus(200);
-        $response->assertSee('Dashboard Kalkulasi dan Perencanaan');
-        $response->assertSee('Distribusi Status Neraca Komoditas');
-        $response->assertSee('Surplus');
-        $response->assertSee('Defisit');
-        $response->assertSee('Sumber Data Survei Lapangan');
-        $response->assertSee('Jalankan Kalkulasi');
+            $response->assertStatus(200);
+            $response->assertSee('Ringkasan Desa');
+            $response->assertSee('Distribusi Status Neraca Komoditas');
+            $response->assertSee('Surplus');
+            $response->assertSee('Defisit');
+            $response->assertSee('Hasil Survei');
+            $response->assertSee('Jumlah Penduduk');
+            $response->assertSee('Potensi Komoditi');
+            $response->assertSee('<details', false);
+            $response->assertDontSee('<details open', false);
+            $response->assertSee('Kalkulasi & Neraca');
+            $content = $response->getContent();
+            $this->assertLessThan(
+                strpos($content, 'Rekomendasi Pengadaan'),
+                strpos($content, 'Laporan Surplus Defisit')
+            );
+            $response->assertDontSee('Jalankan Kalkulasi Desa Saya');
+        });
     }
 
     public function test_laporan_m2_dapat_diakses_dan_menampilkan_rekapitulasi(): void
@@ -200,7 +242,7 @@ class M2KalkulasiTest extends TestCase
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
         $this->assertNotNull($user);
 
-        $itemKebutuhan = KebutuhanKomoditas::where('id_wilayah', 1)->first();
+        $itemKebutuhan = KebutuhanKomoditas::where('id_wilayah', $this->idWilayahManajer())->first();
         $this->assertNotNull($itemKebutuhan);
 
         $response = $this->actingAs($user)->get(route('perencanaan.kebutuhan-komoditas.show', [
@@ -217,7 +259,7 @@ class M2KalkulasiTest extends TestCase
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->first();
         $this->assertNotNull($user);
 
-        $hasilNeraca = HasilKalkulasi::where('id_wilayah', 1)->first();
+        $hasilNeraca = HasilKalkulasi::where('id_wilayah', $this->idWilayahManajer())->first();
         $this->assertNotNull($hasilNeraca);
 
         $response = $this->actingAs($user)->get(route('perencanaan.neraca-komoditas.show', [
@@ -229,5 +271,12 @@ class M2KalkulasiTest extends TestCase
         $response->assertSee('Ketersediaan Produksi Panen');
         $response->assertSee('Selisih Neraca');
         $response->assertSee($hasilNeraca->komoditas->nama ?? 'Komoditas');
+    }
+
+    private function idWilayahManajer(): int
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+
+        return (int) DB::table('entitas')->where('id_entitas', $user->id_entitas)->value('id_wilayah');
     }
 }

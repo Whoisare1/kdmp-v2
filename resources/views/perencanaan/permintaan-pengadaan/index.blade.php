@@ -1,5 +1,5 @@
 <x-layouts.app :title="$title" eyebrow="Perencanaan Pengadaan">
-    <div class="mx-auto max-w-6xl space-y-6">
+    <div class="mx-auto max-w-6xl space-y-4">
         @if (session('status'))
             <div class="rounded-sm border border-sawah-500/40 bg-sawah-100 px-4 py-3 text-sm text-ink-900">
                 <span class="font-semibold text-sawah-700">Berhasil:</span> {{ session('status') }}
@@ -10,121 +10,95 @@
                 <span class="font-semibold">Gagal:</span> {{ session('error') }}
             </div>
         @endif
-        <div class="flex items-center justify-between gap-4">
-            <div><p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Perencanaan Pengadaan</p><h1 class="mt-1 font-display text-2xl font-semibold text-ink-900">{{ $title }}</h1></div>
+        <div>
+            <p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Perencanaan Pengadaan</p>
+            <h1 class="mt-1 font-display text-2xl font-semibold text-ink-900">Rekomendasi Pengadaan Desa</h1>
         </div>
         <section class="space-y-4">
             <div>
                 <h2 class="font-display text-xl font-semibold text-ink-900">Kebutuhan yang Perlu Direncanakan</h2>
-                <p class="mt-1 text-sm text-ink-600">Data berikut berasal dari hasil Kalkulasi berstatus defisit. Potensi produksi hanya menjadi calon sumber desa dan bukan penetapan supplier.</p>
+                <p class="mt-1 text-sm text-ink-600">Daftar ini menunjukkan komoditas defisit desa aktif dan desa yang berpotensi memasok dari surplusnya.</p>
+                <p class="mt-1 text-xs text-ink-600">Ajukan rekomendasi ke Admin Gudang untuk ditinjau. Persetujuan hanya mengubah status rekomendasi; PR atau transaksi tidak dibuat.</p>
             </div>
             @if ($calonPerencanaanSektor->isEmpty())
-                <div class="rounded-sm border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Belum ada hasil Kalkulasi berstatus defisit untuk wilayah entitas aktif. Jalankan Kalkulasi terlebih dahulu atau periksa periode yang dipilih.</div>
+                <div class="rounded-sm border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Belum ada hasil kalkulasi berstatus defisit untuk desa aktif. Lengkapi data dasar dan standar AKG, lalu jalankan kalkulasi terlebih dahulu.
+                    <a href="{{ route('perencanaan.kebutuhan-komoditas.index') }}" class="ml-1 font-semibold underline">Buka Kalkulasi Kebutuhan Desa</a>
+                </div>
             @else
                 <div class="space-y-3">
                     @foreach ($calonPerencanaanSektor as $sektor => $rencanaSektor)
-                        <details class="group rounded-sm border border-paper-300 bg-paper-50" @if ($loop->first) open @endif>
-                            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
-                                <div class="flex items-center gap-3">
-                                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-sawah-100 text-sawah-700">🌾</span>
-                                    <div>
-                                        <h3 class="font-display text-xl font-semibold capitalize text-ink-900">{{ $sektor }}</h3>
-                                        <p class="text-xs text-ink-600">{{ $rencanaSektor->count() }} komoditas perlu direncanakan</p>
-                                    </div>
-                                </div>
-                                <span class="text-lg text-ink-600 transition-transform group-open:rotate-180">⌄</span>
+                        <details class="rounded-sm border border-paper-300 bg-paper-50">
+                            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-paper-100">
+                                <span class="font-display text-base font-semibold capitalize text-ink-900">{{ str_replace('_', ' ', $sektor) }}</span>
+                                <span class="text-xs text-ink-600">{{ $rencanaSektor->count() }} komoditas defisit <span aria-hidden="true">⌄</span></span>
                             </summary>
-                            <div class="border-t border-paper-200 p-4">
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div class="divide-y divide-paper-200 border-t border-paper-200">
                                 @foreach ($rencanaSektor as $rencanaKomoditas)
                                     @php
                                         $contoh = $rencanaKomoditas->first();
                                         $namaKomoditas = $contoh['hasil']->komoditas?->nama ?? 'Komoditas tidak ditemukan';
                                         $totalDefisit = $rencanaKomoditas->sum(fn ($rencana) => abs((float) $rencana['hasil']->selisih));
-                                        $desaSumber = $rencanaKomoditas
-                                            ->flatMap(fn ($rencana) => $rencana['calonSupplier']->map(fn ($supplier) => $supplier->wilayah?->nama ?? '—'))
-                                            ->unique()
-                                            ->values();
                                     @endphp
-                                    <details class="group rounded-sm border border-merah-200 bg-merah-50">
-                                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
-                                            <div>
-                                                <h4 class="font-display text-lg font-semibold text-ink-900">{{ $namaKomoditas }}</h4>
-                                                <p class="text-xs text-ink-700">{{ $rencanaKomoditas->count() }} periode · {{ $desaSumber->join(', ') ?: 'Sumber belum tersedia' }}</p>
-                                            </div>
-                                            <div class="text-right">
-                                                <p class="text-xs uppercase tracking-wide text-ink-600/70">Total defisit</p>
-                                                <p class="text-lg font-semibold text-merah-700">{{ number_format($totalDefisit, 2, ',', '.') }}</p>
-                                                <span class="text-xs text-ink-600 transition-transform group-open:rotate-180">⌄ rincian</span>
-                                            </div>
-                                        </summary>
-                                        <div class="border-t border-merah-200 px-4 pb-4">
+                                    <div class="px-4 py-3">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <h3 class="text-sm font-semibold text-ink-950">{{ $namaKomoditas }}</h3>
+                                            <span class="text-xs font-medium text-merah-700">Total defisit: {{ number_format($totalDefisit, 2, ',', '.') }}</span>
+                                        </div>
+                                        <div class="mt-2 space-y-2">
                                             @foreach ($rencanaKomoditas as $rencana)
-                                                @php($hasil = $rencana['hasil'])
-                                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-merah-200/70 bg-paper-50 p-3">
+                                                @php
+                                                    $hasil = $rencana['hasil'];
+                                                    $desaSumber = $rencana['calonSupplier']
+                                                        ->map(fn ($supplier) => $supplier->wilayah?->nama ?? '—')
+                                                        ->unique()
+                                                        ->join(', ');
+                                                    $pengajuan = $rekomendasiTerkini->get($hasil->id_hasil);
+                                                @endphp
+                                                <div class="flex flex-wrap items-center justify-between gap-3 rounded-sm bg-paper-100/70 px-3 py-2 text-xs">
                                                     <div>
-                                                        <p class="text-sm font-semibold text-ink-900">Periode {{ ucfirst($rencana['periode']) }} · {{ $hasil->wilayah?->nama ?? '—' }}</p>
-                                                        <p class="text-xs text-ink-700">Defisit {{ number_format(abs((float) $hasil->selisih), 2, ',', '.') }} · Calon sumber: {{ $rencana['calonSupplier']->map(fn ($supplier) => $supplier->wilayah?->nama ?? '—')->unique()->join(', ') ?: 'Belum tersedia' }}</p>
+                                                        <span class="font-medium text-ink-800">Periode {{ ucfirst($rencana['periode']) }} {{ $hasil->tahun }}</span>
+                                                        <span class="text-ink-600">· Kurang {{ number_format(abs((float) $hasil->selisih), 2, ',', '.') }}</span>
+                                                        <span class="block text-[11px] text-ink-600">Desa surplus yang cocok: {{ $desaSumber ?: 'Belum ada desa surplus terhitung pada periode ini' }}</span>
                                                     </div>
-                                                    <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', $hasil->id_hasil) }}" class="rounded-sm bg-merah-500 px-3 py-2 text-xs font-medium text-paper-50 hover:bg-merah-600">Buat draft PR</a>
+                                                    @if ($pengajuan && $pengajuan->status !== 'ditolak')
+                                                        <span class="shrink-0 rounded-sm px-3 py-1.5 font-semibold {{ $pengajuan->status === 'disetujui' ? 'bg-sawah-100 text-sawah-800' : 'bg-amber-50 text-amber-800' }}">
+                                                            {{ $pengajuan->status === 'disetujui' ? 'Disetujui Admin Gudang' : 'Menunggu Admin Gudang' }}
+                                                        </span>
+                                                    @elseif ($rencana['calonSupplier']->isNotEmpty())
+                                                        <form method="POST" action="{{ route('perencanaan.rekomendasi-pengadaan.store') }}" class="flex flex-wrap items-center gap-2">
+                                                            @csrf
+                                                            <input type="hidden" name="id_hasil_defisit" value="{{ $hasil->id_hasil }}">
+                                                            <label class="sr-only" for="sumber-surplus-{{ $hasil->id_hasil }}">Pilih desa surplus</label>
+                                                            <select id="sumber-surplus-{{ $hasil->id_hasil }}" name="id_hasil_surplus" required class="max-w-52 rounded-sm border border-paper-300 bg-white px-2 py-1.5 text-xs text-ink-800">
+                                                                <option value="">Pilih desa surplus</option>
+                                                                @foreach ($rencana['calonSupplier'] as $sumberSurplus)
+                                                                    <option value="{{ $sumberSurplus->id_hasil }}">{{ $sumberSurplus->wilayah?->nama ?? 'Desa' }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                            <button type="submit" class="rounded-sm bg-merah-500 px-3 py-1.5 font-semibold text-white hover:bg-merah-600">
+                                                                Ajukan Rekomendasi
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        <span class="shrink-0 rounded-sm bg-paper-200 px-3 py-1.5 text-ink-600">Belum ada pasangan surplus</span>
+                                                    @endif
+                                                    @if ($pengajuan?->status === 'ditolak')
+                                                        <div class="w-full rounded-sm border border-merah-200 bg-merah-50 px-3 py-2 text-[11px] text-merah-800">
+                                                            Pengajuan sebelumnya ditolak{{ $pengajuan->catatan_penyetuju ? ': ' . $pengajuan->catatan_penyetuju : '.' }}
+                                                            Silakan ajukan kembali jika diperlukan.
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             @endforeach
                                         </div>
-                                    </details>
+                                    </div>
                                 @endforeach
-                                </div>
                             </div>
                         </details>
                     @endforeach
                 </div>
             @endif
         </section>
-        <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50">
-            <table class="w-full text-left text-sm">
-                <thead class="border-b border-paper-300 bg-paper-200/60"><tr><th class="px-4 py-3">Kode</th><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Tujuan</th><th class="px-4 py-3">Total</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Aksi</th></tr></thead>
-                <tbody>
-                    @forelse ($items as $item)
-                        <tr class="border-b border-paper-200 last:border-0">
-                            <td class="px-4 py-3 font-medium">{{ $item->kode_permintaan }}</td>
-                            <td class="px-4 py-3">{{ $item->tgl_pengajuan?->format('d M Y') }}</td>
-                            <td class="px-4 py-3">{{ $item->gudang?->nama_gudang ?? '—' }}<span class="block text-xs text-ink-600/60">{{ $item->unitUsaha?->nama_unit_usaha ?? '—' }}</span></td>
-                            <td class="px-4 py-3">Rp {{ number_format((float) $item->total_nilai, 2, ',', '.') }}</td>
-                            <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs {{ $item->status_badge_class }}">{{ $item->status_label }}</span></td>
-                            <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ route('perencanaan.permintaan-pengadaan.show', $item->id_permintaan) }}" class="rounded-xs border border-paper-300 px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-merah-400 hover:text-merah-600 transition">
-                                        Lihat detail
-                                    </a>
-                                    @if (in_array($item->status, ['draft', 'diajukan']))
-                                        <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.setujui', $item->id_permintaan) }}" class="inline">
-                                            @csrf
-                                            <button type="submit" class="rounded-xs bg-sawah-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-sawah-700 shadow-sm transition" title="Setujui PR ini">
-                                                ✓ Setujui
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.tolak', $item->id_permintaan) }}" onsubmit="return confirm('Apakah Anda yakin ingin menolak PR {{ $item->kode_permintaan }}?');" class="inline">
-                                            @csrf
-                                            <button type="submit" class="rounded-xs border border-merah-300 bg-white px-2 py-1 text-xs font-medium text-merah-700 hover:bg-merah-50 shadow-sm transition" title="Tolak PR ini">
-                                                ✕ Tolak
-                                            </button>
-                                        </form>
-                                    @elseif ($item->status === 'ditolak')
-                                        <form method="POST" action="{{ route('perencanaan.permintaan-pengadaan.draft', $item->id_permintaan) }}" class="inline">
-                                            @csrf
-                                            <button type="submit" class="rounded-xs border border-paper-300 bg-white px-2 py-1 text-xs font-medium text-ink-700 hover:bg-paper-100 shadow-sm transition" title="Kembalikan ke status draft">
-                                                ↺ Draft
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-ink-600/60">Belum ada perencanaan pengadaan.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $items->links() }}
     </div>
 </x-layouts.app>

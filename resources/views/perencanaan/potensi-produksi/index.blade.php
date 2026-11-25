@@ -1,4 +1,4 @@
-<x-layouts.app title="Potensi Produksi Panen" eyebrow="Kalkulasi — Data & Parameter">
+<x-layouts.app title="Data Komoditi & Kategori Panen" eyebrow="Kalkulasi — Data Dasar">
     {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="parameter" subActive="potensi" />
 
@@ -31,15 +31,19 @@
     @endphp
 
     {{-- Filter & Action Bar --}}
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
-        <form method="GET" action="{{ route('perencanaan.potensi-produksi.index') }}" class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800">
-                <span class="font-mono text-[10px] uppercase text-ink-600/70">Desa:</span>
-                <span class="font-semibold text-ink-950">{{ $wilayah?->nama ?? 'Desa Terdaftar' }}</span>
-            </div>
+    <div class="mb-4 flex flex-wrap items-center gap-2 rounded-sm border border-paper-300 bg-paper-50 p-3 shadow-2xs">
+        <form method="GET" action="{{ route('perencanaan.potensi-produksi.index') }}" class="flex flex-wrap items-center gap-2">
+            <label for="id_wilayah" class="font-mono text-xs text-ink-600/80">Desa:</label>
+            <select name="id_wilayah" id="id_wilayah" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                @foreach ($daftarWilayah as $pilihanWilayah)
+                    <option value="{{ $pilihanWilayah->id }}" {{ $idWilayah == $pilihanWilayah->id ? 'selected' : '' }}>
+                        {{ $pilihanWilayah->nama }}{{ $pilihanWilayah->id == $idWilayahAsal ? ' (Desa Saya)' : '' }}
+                    </option>
+                @endforeach
+            </select>
 
             <select name="tahun" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
-                @foreach (range(2025, 2030) as $t)
+                @foreach ($daftarTahun as $t)
                     <option value="{{ $t }}" {{ $tahun == $t ? 'selected' : '' }}>Tahun {{ $t }}</option>
                 @endforeach
             </select>
@@ -48,6 +52,13 @@
                 <option value="">Semua Bulan Panen</option>
                 @foreach ($namaBulanList as $num => $nama)
                     <option value="{{ $num }}" {{ $bulan == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                @endforeach
+            </select>
+
+            <select name="kategori" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">Semua Kategori Panen</option>
+                @foreach ($daftarKategori as $kodeKategori => $namaKategori)
+                    <option value="{{ $kodeKategori }}" {{ $kategori === $kodeKategori ? 'selected' : '' }}>{{ $namaKategori }}</option>
                 @endforeach
             </select>
 
@@ -70,28 +81,36 @@
                 Filter
             </button>
 
-            @if ($bulan || $idKomoditas || $search)
-                <a href="{{ route('perencanaan.potensi-produksi.index', ['tahun' => $tahun]) }}" class="text-xs text-ink-600 hover:text-merah-600 hover:underline">
+            @if ($bulan || $kategori || $idKomoditas || $search)
+                <a href="{{ route('perencanaan.potensi-produksi.index', ['id_wilayah' => $idWilayah, 'tahun' => $tahun]) }}" class="text-xs text-ink-600 hover:text-merah-600 hover:underline">
                     Reset
                 </a>
             @endif
         </form>
 
-        <div class="flex items-center gap-2">
+        <div class="ml-auto flex items-center gap-2">
             <a href="{{ route('survei.sesi.index') }}"
                class="inline-flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-700 hover:border-merah-400">
                 <span>🌾</span>
                 <span>Survei Panen</span>
             </a>
 
-            <button type="button"
-                    onclick="openTambahModal()"
-                    class="inline-flex items-center gap-1.5 rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
-                <span>+</span>
-                <span>Catat Potensi Panen</span>
-            </button>
+            @unless ($isKomparasi)
+                <button type="button"
+                        onclick="openTambahModal()"
+                        class="inline-flex items-center gap-1.5 rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
+                    <span>+</span>
+                    <span>Catat Potensi Panen</span>
+                </button>
+            @endunless
         </div>
     </div>
+
+    @if ($isKomparasi)
+        <div class="mb-5 rounded-sm border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Data {{ $wilayah?->nama }} ditampilkan untuk perbandingan dan hanya dapat dilihat. Perubahan data hanya dapat dilakukan pada desa sendiri.
+        </div>
+    @endif
 
     {{-- Ringkasan KPI Potensi Produksi --}}
     <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -142,89 +161,103 @@
         </div>
     </div>
 
-    {{-- Tabel Catatan Potensi Produksi Panen --}}
-    <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50 shadow-2xs">
-        <div class="border-b border-paper-200 px-5 py-4">
-            <h2 class="font-display text-base font-semibold text-ink-900">Kalender Potensi Produksi &amp; Panen Komoditas</h2>
-            <p class="text-xs text-ink-600">Data panen dicatat berdasarkan bulan terjadinya panen riil desa (padi tidak panen 12 kali setahun).</p>
+    @php
+        $itemsByKategori = collect($items->items())
+            ->groupBy(fn ($item) => $item->komoditas?->kategori ?: 'lainnya')
+            ->sortKeys();
+    @endphp
+
+    <section class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50 shadow-2xs">
+        <div class="border-b border-paper-200 px-4 py-3">
+            <h2 class="font-display text-base font-semibold text-ink-900">Potensi Panen per Kategori</h2>
+            <p class="text-xs text-ink-600">Pilih kategori lalu buka komoditas untuk melihat catatan panen per bulan.</p>
         </div>
 
-        <table class="w-full text-left text-sm">
-            <thead>
-                <tr class="border-b border-paper-300 bg-paper-200/70 font-mono text-[11px] uppercase tracking-wide text-ink-600/80">
-                    <th class="px-5 py-3 font-medium">Komoditas</th>
-                    <th class="px-5 py-3 font-medium">Kategori</th>
-                    <th class="px-5 py-3 font-medium">Bulan Panen</th>
-                    <th class="px-5 py-3 text-right font-medium">Volume Produksi</th>
-                    <th class="px-5 py-3 font-medium">Satuan</th>
-                    <th class="px-5 py-3 font-medium">Sumber Data</th>
-                    <th class="px-5 py-3 text-right font-medium">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($items as $item)
-                    <tr class="border-b border-paper-200 last:border-0 hover:bg-paper-100/70">
-                        <td class="px-5 py-3.5">
-                            <span class="font-semibold text-ink-950">{{ $item->komoditas?->nama ?? '—' }}</span>
-                        </td>
-                        <td class="px-5 py-3.5 font-mono text-xs text-ink-600">
-                            {{ $item->komoditas?->kategori ? ucwords(str_replace('_', ' ', $item->komoditas->kategori)) : '—' }}
-                        </td>
-                        <td class="px-5 py-3.5">
-                            <span class="rounded bg-paper-200 px-2 py-0.5 font-mono text-xs font-medium text-ink-800">
-                                {{ $namaBulanList[$item->bulan] ?? "Bulan {$item->bulan}" }} {{ $item->tahun }}
-                            </span>
-                        </td>
-                        <td class="px-5 py-3.5 text-right font-mono text-sm font-semibold text-sawah-600">
-                            {{ number_format((float)$item->jumlah_produksi, 2, ',', '.') }}
-                        </td>
-                        <td class="px-5 py-3.5 font-mono text-xs text-ink-600">
-                            {{ $item->satuan }}
-                        </td>
-                        <td class="px-5 py-3.5 text-xs text-ink-600">
-                            @if ($item->sesiSurvei)
-                                <a href="{{ route('survei.sesi.show', $item->id_sesi_survei) }}" class="inline-flex items-center gap-1 text-merah-600 hover:underline">
-                                    <span>Survei Sesi #{{ $item->id_sesi_survei }}</span>
-                                    <span>&rarr;</span>
-                                </a>
-                            @else
-                                <span class="text-ink-600/70">Input Mandiri untuk Kalkulasi</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-3.5 text-right">
-                            <div class="inline-flex items-center gap-1.5">
-                                <button type="button"
-                                        onclick="openEditModal({{ $item->id }}, '{{ addslashes($item->komoditas?->nama ?? '') }}', '{{ $item->komoditas?->kategori ?? 'pertanian' }}', {{ $item->bulan }}, {{ (float)$item->jumlah_produksi }}, '{{ $item->satuan }}')"
-                                        class="rounded-sm border border-paper-300 px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-merah-400 hover:text-merah-600">
-                                    Ubah
-                                </button>
-                                <form action="{{ route('perencanaan.potensi-produksi.destroy', $item->id) }}" method="POST"
-                                      onsubmit="return confirm('Hapus catatan potensi produksi panen ini?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="rounded-sm border border-paper-300 px-2 py-1 text-xs text-merah-600 hover:bg-merah-50">
-                                        ✕
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="px-5 py-10 text-center text-xs text-ink-600/70">
-                            <p class="font-medium text-ink-800">Belum ada catatan potensi panen untuk filter ini.</p>
-                            <p class="mt-1">Gunakan tombol "+ Catat Potensi Panen" di atas atau sinkronkan hasil survei.</p>
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+        <div class="divide-y divide-paper-200">
+            @forelse ($itemsByKategori as $kategoriKomoditas => $komoditasKategori)
+                <details>
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-paper-100">
+                        <span class="font-semibold capitalize text-ink-900">{{ str_replace('_', ' ', $kategoriKomoditas) }}</span>
+                        <span class="text-xs text-ink-600">{{ $komoditasKategori->groupBy('id_komoditas')->count() }} komoditas · {{ $komoditasKategori->count() }} catatan <span aria-hidden="true">⌄</span></span>
+                    </summary>
+
+                    <div class="space-y-2 border-t border-paper-200 bg-paper-100/40 p-3">
+                        @foreach ($komoditasKategori->groupBy('id_komoditas') as $catatanKomoditas)
+                            @php
+                                $komoditas = $catatanKomoditas->first()->komoditas;
+                                $totalProduksiKomoditas = $catatanKomoditas->sum('jumlah_produksi');
+                                $satuanKomoditas = $catatanKomoditas->first()->satuan;
+                            @endphp
+                            <details class="rounded-sm border border-paper-200 bg-paper-50">
+                                <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                    <span class="font-medium text-ink-900">{{ $komoditas?->nama ?? 'Komoditas' }}</span>
+                                    <span class="text-xs text-ink-600">{{ $catatanKomoditas->count() }} catatan · Total {{ number_format((float) $totalProduksiKomoditas, 2, ',', '.') }} {{ $satuanKomoditas }} <span aria-hidden="true">⌄</span></span>
+                                </summary>
+
+                                <div class="overflow-x-auto border-t border-paper-200">
+                                    <table class="w-full text-left text-xs">
+                                        <thead class="bg-paper-100 text-[10px] uppercase tracking-wide text-ink-600">
+                                            <tr>
+                                                <th class="px-3 py-2">Bulan Panen</th>
+                                                <th class="px-3 py-2 text-right">Volume</th>
+                                                <th class="px-3 py-2">Sumber Data</th>
+                                                <th class="px-3 py-2 text-right">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-paper-200">
+                                            @foreach ($catatanKomoditas as $item)
+                                                <tr>
+                                                    <td class="px-3 py-2">{{ $namaBulanList[$item->bulan] ?? "Bulan {$item->bulan}" }} {{ $item->tahun }}</td>
+                                                    <td class="px-3 py-2 text-right font-mono font-semibold text-sawah-700">{{ number_format((float) $item->jumlah_produksi, 2, ',', '.') }} {{ $item->satuan }}</td>
+                                                    <td class="px-3 py-2">
+                                                        @if ($item->sesiSurvei)
+                                                            <a href="{{ route('survei.sesi.show', $item->id_sesi_survei) }}" class="text-merah-600 hover:underline">Survei Sesi #{{ $item->id_sesi_survei }}</a>
+                                                        @else
+                                                            <span class="text-ink-600">Input mandiri</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-3 py-2 text-right">
+                                                        @if ($isKomparasi)
+                                                            <span class="text-ink-600">Lihat saja</span>
+                                                        @else
+                                                            <div class="inline-flex items-center gap-1">
+                                                                <button type="button"
+                                                                        onclick="openEditModal({{ $item->id }}, '{{ addslashes($item->komoditas?->nama ?? '') }}', '{{ $item->komoditas?->kategori ?? 'pertanian' }}', {{ $item->bulan }}, {{ (float) $item->jumlah_produksi }}, '{{ $item->satuan }}')"
+                                                                        class="rounded-sm border border-paper-300 px-2 py-1 font-medium text-ink-700 hover:border-merah-400 hover:text-merah-600">
+                                                                    Ubah
+                                                                </button>
+                                                                <form action="{{ route('perencanaan.potensi-produksi.destroy', $item->id) }}" method="POST"
+                                                                      onsubmit="return confirm('Hapus catatan potensi produksi panen ini?')">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="submit" class="rounded-sm border border-paper-300 px-2 py-1 text-merah-600 hover:bg-merah-50" aria-label="Hapus catatan">✕</button>
+                                                                </form>
+                                                            </div>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </details>
+                        @endforeach
+                    </div>
+                </details>
+            @empty
+                <div class="px-5 py-8 text-center text-sm text-ink-600">
+                    <p class="font-medium text-ink-800">Belum ada catatan potensi panen untuk filter ini.</p>
+                    <p class="mt-1">Gunakan tombol “Catat Potensi Panen” atau sinkronkan hasil survei.</p>
+                </div>
+            @endforelse
+        </div>
+    </section>
 
     <div class="mt-4">
         {{ $items->links() }}
     </div>
 
+    @unless ($isKomparasi)
     {{-- Modal Tambah Potensi Panen --}}
     <div id="modal-tambah" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-ink-950/70 p-4 backdrop-blur-xs">
         <div class="w-full max-w-md rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-2xl">
@@ -372,6 +405,7 @@
             </form>
         </div>
     </div>
+    @endunless
 
     <script>
         function openTambahModal() {

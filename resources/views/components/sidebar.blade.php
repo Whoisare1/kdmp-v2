@@ -50,13 +50,12 @@
             'match' => 'perencanaan.*',
             'roles' => ['manajer'],
             'items' => [
-                ['label' => 'Dashboard Kalkulasi dan Perencanaan', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard'],
-                ['label' => 'Data & Parameter', 'route' => 'perencanaan.demografi.index', 'match' => 'perencanaan.demografi.*,perencanaan.potensi-produksi.*,perencanaan.standar-kebutuhan.*'],
-                ['label' => 'Kalkulasi Kebutuhan', 'route' => 'perencanaan.kebutuhan-komoditas.index', 'match' => 'perencanaan.kebutuhan-komoditas.*'],
-                ['label' => 'Surplus Defisit', 'route' => 'perencanaan.neraca-komoditas.index', 'match' => 'perencanaan.neraca-komoditas.*'],
-                ['label' => 'Laporan Kalkulasi', 'route' => 'perencanaan.laporan.index', 'match' => 'perencanaan.laporan.*'],
-                ['label' => 'Permintaan Pengadaan', 'route' => 'perencanaan.permintaan-pengadaan.index', 'match' => 'perencanaan.permintaan-pengadaan.*'],
-                ['label' => 'Perbandingan Harga', 'route' => 'perencanaan.perbandingan-harga.index', 'match' => 'perencanaan.perbandingan-harga.*'],
+                ['label' => 'Dashboard Kalkulasi', 'route' => 'perencanaan.dashboard', 'match' => 'perencanaan.dashboard'],
+                ['label' => 'Data Dasar Desa', 'route' => 'perencanaan.demografi.index', 'match' => 'perencanaan.demografi.*,perencanaan.potensi-produksi.*'],
+                ['label' => 'Standar AKG', 'route' => 'perencanaan.standar-kebutuhan.index', 'match' => 'perencanaan.standar-kebutuhan.*'],
+                ['label' => 'Kalkulasi Kebutuhan Desa', 'route' => 'perencanaan.kebutuhan-komoditas.index', 'match' => 'perencanaan.kebutuhan-komoditas.*,perencanaan.neraca-komoditas.*'],
+                ['label' => 'Laporan Surplus Defisit', 'route' => 'perencanaan.laporan.index', 'match' => 'perencanaan.laporan.*'],
+                ['label' => 'Rekomendasi Pengadaan', 'route' => 'perencanaan.permintaan-pengadaan.index', 'match' => 'perencanaan.permintaan-pengadaan.*'],
             ]
         ],
         [
@@ -67,6 +66,7 @@
             'items' => [
                 ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
                 ['label' => 'Pencocokan Surplus-Defisit', 'route' => 'gudang.pencocokan-surplus-defisit.index', 'match' => 'gudang.pencocokan-surplus-defisit.*'],
+                ['label' => 'Persetujuan Rekomendasi', 'route' => 'gudang.rekomendasi-pengadaan.index', 'match' => 'gudang.rekomendasi-pengadaan.*', 'roles' => ['admin_gudang'], 'required_role' => 'admin_gudang'],
                 ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
                 ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*'],
                 ['label' => 'Penerimaan', 'route' => 'gudang.penerimaan.index', 'match' => 'gudang.penerimaan.*'],
@@ -294,13 +294,13 @@
                     {{-- Accordion Body --}}
                     <div 
                         x-show="expanded" 
-                        x-transition
                         x-cloak
                         class="mt-1"
                     >
                         <ul class="space-y-1 py-1 pl-11 pr-2 relative before:absolute before:left-[1.375rem] before:top-2 before:bottom-2 before:w-px before:bg-ink-800">
                             @foreach($group['items'] as $item)
                                 @continue(! empty($item['super_admin_only']) && auth()->user()?->id_entitas !== null)
+                                @continue(! empty($item['required_role']) && ! ($user?->hasPeran($item['required_role']) ?? false))
                                 @php
                                     // Filter sub-item berdasarkan peran
                                     if (!$isSuperAdmin && !$isManajer && !empty($item['roles'])) {

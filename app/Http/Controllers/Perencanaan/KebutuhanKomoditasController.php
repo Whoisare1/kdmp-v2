@@ -8,11 +8,14 @@ use App\Models\Master\Komoditas;
 use App\Models\Perencanaan\DemografiDesa;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\KebutuhanKomoditas;
+use App\Models\Perencanaan\KomoditasKalkulasiDesa;
 use App\Models\Perencanaan\KetersediaanKomoditas;
+use App\Models\Tenant\Wilayah;
 use App\Services\Perencanaan\KalkulasiKebutuhanService;
 use App\Support\Perencanaan\PeriodeKalkulasi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Throwable;
 
@@ -61,6 +64,20 @@ class KebutuhanKomoditasController extends ModuleCrudController
 
         // Data pendukung untuk filter dan kalkulasi
         $daftarKomoditas = Komoditas::where('is_active', true)->orderBy('nama')->get();
+        $wilayah = Wilayah::find($idWilayah);
+        $masterKomoditas = KomoditasKalkulasiDesa::with('komoditas')
+            ->where('id_wilayah', $idWilayah)
+            ->whereHas('komoditas', fn ($query) => $query->where('is_active', true))
+            ->get();
+        $komoditasMasterTampil = $masterKomoditas->filter(function (KomoditasKalkulasiDesa $master) use ($idKomoditas, $request): bool {
+            if ($idKomoditas !== null && (int) $master->id_komoditas !== $idKomoditas) {
+                return false;
+            }
+
+            $search = trim((string) $request->query('q', ''));
+
+            return $search === '' || str_contains(mb_strtolower((string) $master->komoditas?->nama), mb_strtolower($search));
+        })->values();
         $totalPendudukTahunIni = DemografiDesa::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)
             ->sum('jumlah_penduduk');
@@ -84,7 +101,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
             ->when($bulan, fn ($q) => $q->where('bulan', $bulan))
             ->when($idKomoditas, fn ($q) => $q->where('id_komoditas', $idKomoditas))
             ->where(function ($q) {
-                $q->whereNull('id_standar')->orWhere('per_kapita_harian', '<=', 0);
+                $q->whereNull('id_standar')->orWhere('per_kapita_harian', '<', 0);
             })
             ->count();
 
@@ -96,12 +113,52 @@ class KebutuhanKomoditasController extends ModuleCrudController
             'bulan' => $bulan,
             'idKomoditas' => $idKomoditas,
             'daftarKomoditas' => $daftarKomoditas,
+            'masterKomoditas' => $masterKomoditas,
+            'komoditasMasterTampil' => $komoditasMasterTampil,
+            'wilayah' => $wilayah,
             'adaDataDemografi' => $adaDataDemografi,
             'totalPenduduk' => $totalPendudukTahunIni,
             'ringkasanKebutuhan' => $ringkasanKebutuhan,
             'totalKomoditasTerhitung' => $totalKomoditasTerhitung,
             'totalBarisTanpaStandar' => $totalBarisTanpaStandar,
         ]);
+    }
+
+    public function simpanMaster(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'master_komoditas_ids' => ['nullable', 'array'],
+            'master_komoditas_ids.*' => ['integer', 'distinct', 'exists:komoditas,id'],
+        ]);
+        $idWilayah = $this->wilayahAktifId();
+        $idKomoditas = array_map('intval', $validated['master_komoditas_ids'] ?? []);
+
+        if ($idKomoditas !== []) {
+            $jumlahKomoditasAktif = Komoditas::where('is_active', true)
+                ->whereIn('id', $idKomoditas)
+                ->count();
+
+            if ($jumlahKomoditasAktif !== count($idKomoditas)) {
+                return back()->withErrors([
+                    'master_komoditas_ids' => 'Master hanya dapat berisi komoditas yang masih aktif.',
+                ])->withInput();
+            }
+        }
+
+        DB::transaction(function () use ($idWilayah, $idKomoditas): void {
+            KomoditasKalkulasiDesa::where('id_wilayah', $idWilayah)->delete();
+
+            foreach ($idKomoditas as $id) {
+                KomoditasKalkulasiDesa::create([
+                    'id_wilayah' => $idWilayah,
+                    'id_komoditas' => $id,
+                    'created_at' => now(),
+                ]);
+            }
+        });
+
+        return redirect()->route('perencanaan.kebutuhan-komoditas.index')
+            ->with('status', count($idKomoditas) . ' komoditas berhasil disimpan pada master kalkulasi desa.');
     }
 
     /**
@@ -114,7 +171,11 @@ class KebutuhanKomoditasController extends ModuleCrudController
             'periode' => ['nullable', 'in:ganjil,genap'],
             'bulan' => ['nullable', 'integer', 'min:1', 'max:12'],
             'id_komoditas' => ['nullable', 'exists:komoditas,id'],
-            'redirect_to' => ['nullable', 'string', 'in:dashboard,kebutuhan,neraca'],
+            'kategori' => ['nullable', 'string', 'max:100'],
+            'pilih_komoditas' => ['nullable', 'in:1'],
+            'komoditas_ids' => ['required_if:pilih_komoditas,1', 'array', 'min:1'],
+            'komoditas_ids.*' => ['integer', 'distinct', 'exists:komoditas,id'],
+            'redirect_to' => ['nullable', 'string', 'in:kebutuhan,neraca'],
         ]);
         $legacyBulan = ($validated['periode'] ?? null) === null && isset($validated['bulan'])
             ? (int) $validated['bulan']
@@ -128,29 +189,65 @@ class KebutuhanKomoditasController extends ModuleCrudController
 
         try {
             $idWilayah = $this->wilayahAktifId();
+            $idKomoditasMaster = KomoditasKalkulasiDesa::where('id_wilayah', $idWilayah)
+                ->whereHas('komoditas', fn ($query) => $query->where('is_active', true))
+                ->pluck('id_komoditas')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if ($idKomoditasMaster === []) {
+                return back()->with('error', 'Master komoditas desa belum diatur. Pilih komoditas terlebih dahulu di halaman Kalkulasi Kebutuhan.');
+            }
+
+            if (! empty($validated['kategori'])) {
+                $idKomoditasDipilih = KomoditasKalkulasiDesa::where('id_wilayah', $idWilayah)
+                    ->whereHas('komoditas', fn ($query) => $query
+                        ->where('is_active', true)
+                        ->where(function ($query) use ($validated): void {
+                            if ($validated['kategori'] === 'lainnya') {
+                                $query->whereNull('kategori')->orWhere('kategori', '');
+                            } else {
+                                $query->where('kategori', $validated['kategori']);
+                            }
+                        }))
+                    ->pluck('id_komoditas')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                if ($idKomoditasDipilih === []) {
+                    return back()->withErrors([
+                        'kategori' => 'Kategori tersebut belum memiliki komoditas aktif di master desa.',
+                    ])->withInput();
+                }
+            } else {
+                $idKomoditasDipilih = ($validated['pilih_komoditas'] ?? null) === '1'
+                    ? array_map('intval', $validated['komoditas_ids'])
+                    : (isset($validated['id_komoditas']) ? [(int) $validated['id_komoditas']] : $idKomoditasMaster);
+            }
+            $komoditasDiLuarMaster = array_diff($idKomoditasDipilih, $idKomoditasMaster);
+            if ($komoditasDiLuarMaster !== []) {
+                return back()->withErrors([
+                    'komoditas_ids' => 'Komoditas kalkulasi harus dipilih dari master desa sendiri.',
+                ])->withInput();
+            }
+
             $hasil = $service->hitungKebutuhan(
                 $idWilayah,
                 (int) $validated['tahun'],
                 $legacyBulan ?? $validated['periode'],
-                !empty($validated['id_komoditas']) ? (int) $validated['id_komoditas'] : null
+                $idKomoditasDipilih
             );
 
             $labelPeriode = PeriodeKalkulasi::detail($validated['periode'])['label'];
             $pesan = "Kalkulasi kebutuhan berhasil dijalankan untuk {$labelPeriode} {$validated['tahun']}. Terhitung {$hasil['total_baris_kebutuhan']} baris kebutuhan dan diperbarui {$hasil['total_hasil_kalkulasi']} neraca komoditas.";
 
-            $redirectTo = $validated['redirect_to'] ?? 'kebutuhan';
-
-            if ($redirectTo === 'dashboard') {
-                return redirect()->route('perencanaan.dashboard', [
-                    'tahun' => $validated['tahun'],
-                    'periode' => $validated['periode'],
-                ])->with('status', $pesan);
-            }
+            $redirectTo = $validated['redirect_to'] ?? 'neraca';
 
             if ($redirectTo === 'neraca') {
                 return redirect()->route('perencanaan.neraca-komoditas.index', [
                     'tahun' => $validated['tahun'],
                     'periode' => $validated['periode'],
+                    'kategori' => $validated['kategori'] ?? null,
                     'id_komoditas' => $validated['id_komoditas'] ?? null,
                 ])->with('status', $pesan);
             }
@@ -194,7 +291,7 @@ class KebutuhanKomoditasController extends ModuleCrudController
             ->first();
 
         $totalKelompok = $rincianKelompok->count();
-        $kelompokValidStandar = $rincianKelompok->filter(fn ($rk) => $rk->id_standar !== null && (float) $rk->per_kapita_harian > 0)->count();
+        $kelompokValidStandar = $rincianKelompok->filter(fn ($rk) => $rk->id_standar !== null && (float) $rk->per_kapita_harian >= 0)->count();
         $standarLengkap = ($totalKelompok > 0 && $kelompokValidStandar >= $totalKelompok);
 
         return view('perencanaan.kebutuhan-komoditas.show', [

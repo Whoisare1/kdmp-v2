@@ -1,40 +1,29 @@
 @props(['active' => 'dashboard', 'subActive' => null])
 
 @php
-    $isParameterActive = in_array($active, ['parameter', 'demografi', 'potensi', 'standar'], true)
-        || request()->routeIs('perencanaan.demografi.*')
-        || request()->routeIs('perencanaan.potensi-produksi.*')
-        || request()->routeIs('perencanaan.standar-kebutuhan.*');
+    $isParameterActive = ! request()->routeIs('perencanaan.standar-kebutuhan.*')
+        && (in_array($active, ['parameter', 'demografi', 'potensi'], true)
+            || request()->routeIs('perencanaan.demografi.*')
+            || request()->routeIs('perencanaan.potensi-produksi.*'));
 
     $activeSub = $subActive ?? (
         request()->routeIs('perencanaan.demografi.*') || $active === 'demografi' ? 'demografi' : (
-            request()->routeIs('perencanaan.potensi-produksi.*') || $active === 'potensi' ? 'potensi' : (
-                request()->routeIs('perencanaan.standar-kebutuhan.*') || $active === 'standar' ? 'standar' : 'demografi'
-            )
+            request()->routeIs('perencanaan.potensi-produksi.*') || $active === 'potensi' ? 'potensi' : 'demografi'
         )
     );
 
-    $paramPills = [
+    $dataDasarMenu = [
         [
             'id' => 'demografi',
-            'label' => 'Demografi Penduduk Desa',
+            'label' => 'Rekap Penduduk',
             'route' => 'perencanaan.demografi.index',
             'icon' => '👥',
-            'info' => 'Survei Sesi 1',
         ],
         [
             'id' => 'potensi',
-            'label' => 'Potensi Produksi Panen',
+            'label' => 'Komoditi & Kategori Panen',
             'route' => 'perencanaan.potensi-produksi.index',
             'icon' => '🌾',
-            'info' => 'Survei Sesi 2',
-        ],
-        [
-            'id' => 'standar',
-            'label' => 'Standar Kebutuhan Gizi',
-            'route' => 'perencanaan.standar-kebutuhan.index',
-            'icon' => '⚖️',
-            'info' => 'AKG / Standar',
         ],
     ];
 @endphp
@@ -57,22 +46,22 @@
         </div>
     </div>
 
-    {{-- Sub Navigation untuk Data & Parameter --}}
+    {{-- Sub Navigation untuk dua data dasar kalkulasi --}}
     @if ($isParameterActive)
         <div class="flex flex-wrap items-center gap-2 border-t border-paper-200/80 bg-paper-100/60 px-3 py-2">
-            <span class="font-mono text-[10px] uppercase tracking-wider text-ink-600/70 mr-1">Parameter:</span>
-            @foreach ($paramPills as $pill)
+            <span class="font-mono text-[10px] uppercase tracking-wider text-ink-600/70 mr-1">Data Dasar:</span>
+            @foreach ($dataDasarMenu as $pill)
                 @php $isPillActive = $activeSub === $pill['id']; @endphp
-                <a href="{{ route($pill['route']) }}"
+                <a href="{{ route($pill['route'], array_filter([
+                        'id_wilayah' => request()->query('id_wilayah'),
+                        'tahun' => request()->query('tahun'),
+                    ])) }}"
                    class="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-medium transition
                           {{ $isPillActive
                               ? 'bg-ink-900 text-paper-50 shadow-xs'
                               : 'bg-paper-200/70 text-ink-700 hover:bg-paper-200 hover:text-ink-950' }}">
                     <span>{{ $pill['icon'] }}</span>
                     <span>{{ $pill['label'] }}</span>
-                    <span class="rounded px-1 py-0.2 font-mono text-[9px] {{ $isPillActive ? 'bg-ink-800 text-paper-200' : 'bg-paper-300/60 text-ink-600' }}">
-                        {{ $pill['info'] }}
-                    </span>
                 </a>
             @endforeach
         </div>

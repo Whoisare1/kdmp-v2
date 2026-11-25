@@ -55,6 +55,7 @@ use App\Http\Controllers\Perencanaan\NeracaKomoditasController;
 use App\Http\Controllers\Perencanaan\PerbandinganHargaController;
 use App\Http\Controllers\Perencanaan\PermintaanPengadaanController;
 use App\Http\Controllers\Perencanaan\PotensiProduksiController;
+use App\Http\Controllers\Perencanaan\RekomendasiPengadaanDesaController;
 use App\Http\Controllers\Perencanaan\StandarKebutuhanController;
 use Illuminate\Support\Facades\Route;
 
@@ -119,6 +120,8 @@ Route::middleware('auth')->group(function () {
         Route::post('potensi-produksi/komoditas', [PotensiProduksiController::class, 'storeKomoditas'])
             ->name('potensi-produksi.komoditas.store');
         Route::resource('standar-kebutuhan', StandarKebutuhanController::class);
+        Route::post('kebutuhan-komoditas/master', [KebutuhanKomoditasController::class, 'simpanMaster'])
+            ->name('kebutuhan-komoditas.master');
         Route::post('kebutuhan-komoditas/kalkulasi', [KebutuhanKomoditasController::class, 'kalkulasi'])
             ->name('kebutuhan-komoditas.kalkulasi');
         Route::resource('kebutuhan-komoditas', KebutuhanKomoditasController::class)
@@ -131,6 +134,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('perbandingan-harga', PerbandinganHargaController::class);
         Route::get('permintaan-pengadaan/from-hasil/{hasil}', [PermintaanPengadaanController::class, 'fromHasil'])
             ->name('permintaan-pengadaan.from-hasil');
+        Route::post('rekomendasi-pengadaan', [RekomendasiPengadaanDesaController::class, 'store'])
+            ->name('rekomendasi-pengadaan.store');
         Route::post('permintaan-pengadaan/{id}/setujui', [PermintaanPengadaanController::class, 'setujui'])
             ->name('permintaan-pengadaan.setujui');
         Route::post('permintaan-pengadaan/{id}/tolak', [PermintaanPengadaanController::class, 'tolak'])
@@ -143,6 +148,12 @@ Route::middleware('auth')->group(function () {
     // ===== M4 â€” Gudang =====
     Route::prefix('gudang')->name('gudang.')->middleware('peran:admin_gudang')->group(function () {
         Route::get('/', [GudangDashboardController::class, 'index'])->name('index');
+        Route::get('rekomendasi-pengadaan', [RekomendasiPengadaanDesaController::class, 'inbox'])
+            ->name('rekomendasi-pengadaan.index');
+        Route::post('rekomendasi-pengadaan/{id}/setujui', [RekomendasiPengadaanDesaController::class, 'setujui'])
+            ->name('rekomendasi-pengadaan.setujui');
+        Route::post('rekomendasi-pengadaan/{id}/tolak', [RekomendasiPengadaanDesaController::class, 'tolak'])
+            ->name('rekomendasi-pengadaan.tolak');
         Route::get('pencocokan-surplus-defisit', [PencocokanSurplusDefisitController::class, 'index'])
             ->name('pencocokan-surplus-defisit.index');
         Route::post('permintaan-antar-entitas', [PermintaanAntarEntitasController::class, 'store'])

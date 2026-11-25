@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Perencanaan;
 
 use App\Http\Controllers\Concerns\ModuleCrudController;
+use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Models\Master\Barang;
 use App\Models\Master\Gudang;
 use App\Models\Master\UnitUsaha;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\PermintaanPengadaan;
+use App\Models\Perencanaan\RekomendasiPengadaanDesa;
 use App\Rules\TenantOwnershipRule;
 use App\Services\Perencanaan\PerbandinganHargaService;
 use App\Support\Perencanaan\PeriodeKalkulasi;
@@ -18,6 +20,8 @@ use Illuminate\View\View;
 
 class PermintaanPengadaanController extends ModuleCrudController
 {
+    use ResolvesWilayahAktif;
+
     protected string $model = PermintaanPengadaan::class;
     protected string $view = 'perencanaan.permintaan-pengadaan';
     protected string $title = 'Permintaan Pengadaan (PR)';
@@ -35,43 +39,59 @@ class PermintaanPengadaanController extends ModuleCrudController
 
     public function index(Request $request): View
     {
-        $user = auth()->user();
-        $idWilayah = $user?->entitas?->id_wilayah;
-        $hargaService = app(PerbandinganHargaService::class);
-        $items = PermintaanPengadaan::query()
-            ->with(['pihak', 'unitUsaha', 'gudang', 'detail.barang'])
-            ->latest('id_permintaan')
-            ->paginate(15)
-            ->withQueryString();
+        $idWilayah = $this->wilayahAktifId();
+
         $calonPerencanaan = HasilKalkulasi::query()
             ->with(['komoditas', 'wilayah'])
             ->where('status_surplus_defisit', 'defisit')
-            ->when($idWilayah, fn ($query) => $query->where('id_wilayah', $idWilayah))
+            ->where('id_wilayah', $idWilayah)
+            ->whereRaw(
+                'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
+            )
             ->latest('id_hasil')
-            ->get()
-            ->map(function (HasilKalkulasi $hasil) use ($hargaService, $user): array {
-                $periode = PeriodeKalkulasi::fromMonth((int) $hasil->bulan);
-                $comparison = $hargaService->bandingkan(
-                    (int) $user->id_entitas,
-                    (int) $hasil->id_komoditas,
-                    (int) $hasil->tahun,
-                    $periode,
-                );
+            ->get();
+        $desaSurplusPerKomoditasPeriode = collect();
 
-                return [
-                    'hasil' => $hasil,
-                    'sektor' => in_array($hasil->komoditas?->kategori, ['pertanian', 'perkebunan', 'peternakan'], true)
-                        ? $hasil->komoditas->kategori
-                        : 'lainnya',
-                    'periode' => $periode,
-                    'calonSupplier' => $hargaService->calonSupplier(
-                        (int) $hasil->id_komoditas,
-                        (int) $hasil->tahun,
-                        $periode,
-                    ),
-                    'hargaTerendah' => $comparison['lowest'],
-                ];
-            });
+        if ($calonPerencanaan->isNotEmpty()) {
+            $desaSurplusPerKomoditasPeriode = HasilKalkulasi::query()
+                ->with('wilayah')
+                ->where('status_surplus_defisit', 'surplus')
+                ->where('id_wilayah', '!=', $idWilayah)
+                ->whereIn('id_komoditas', $calonPerencanaan->pluck('id_komoditas')->unique())
+                ->whereIn('tahun', $calonPerencanaan->pluck('tahun')->unique())
+                ->whereIn('bulan', $calonPerencanaan->pluck('bulan')->unique())
+                ->orderByDesc('selisih')
+                ->whereRaw(
+                    'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
+                )
+                ->get()
+                ->groupBy(fn (HasilKalkulasi $hasil): string => implode('|', [
+                    $hasil->id_komoditas,
+                    $hasil->tahun,
+                    $hasil->bulan,
+                ]));
+        }
+
+        $calonPerencanaan = $calonPerencanaan->map(function (HasilKalkulasi $hasil) use ($desaSurplusPerKomoditasPeriode): array {
+            $periode = PeriodeKalkulasi::fromMonth((int) $hasil->bulan);
+            $key = implode('|', [$hasil->id_komoditas, $hasil->tahun, $hasil->bulan]);
+
+            return [
+                'hasil' => $hasil,
+                'sektor' => strtolower(trim((string) ($hasil->komoditas?->kategori ?: 'lainnya'))),
+                'periode' => $periode,
+                'calonSupplier' => $desaSurplusPerKomoditasPeriode->get($key, collect()),
+            ];
+        });
+        $rekomendasiTerkini = collect();
+        if ($calonPerencanaan->isNotEmpty()) {
+            $rekomendasiTerkini = RekomendasiPengadaanDesa::query()
+                ->whereIn('id_hasil_defisit', $calonPerencanaan->pluck('hasil')->map->id_hasil)
+                ->latest('id_rekomendasi')
+                ->get()
+                ->unique('id_hasil_defisit')
+                ->keyBy('id_hasil_defisit');
+        }
         $calonPerencanaanSektor = $calonPerencanaan
             ->groupBy('sektor')
             ->sortKeys()
@@ -87,17 +107,22 @@ class PermintaanPengadaanController extends ModuleCrudController
             });
 
         return view('perencanaan.permintaan-pengadaan.index', [
-            'title' => $this->title,
-            'items' => $items,
+            'title' => 'Rekomendasi Pengadaan Desa',
             'calonPerencanaanSektor' => $calonPerencanaanSektor,
+            'rekomendasiTerkini' => $rekomendasiTerkini,
         ]);
     }
 
     public function show(int|string $id): View
     {
+        $user = auth()->user();
         $item = PermintaanPengadaan::query()
             ->with(['pihak', 'unitUsaha', 'gudang', 'detail.barang', 'detail'])
             ->findOrFail($id);
+
+        if ($user && $user->id_entitas !== null && (int) $item->id_entitas !== (int) $user->id_entitas) {
+            abort(403, 'Akses ditolak: Permintaan pengadaan milik koperasi lain.');
+        }
 
         return view('perencanaan.permintaan-pengadaan.show', [
             'title' => 'Detail '.$this->title,
@@ -196,12 +221,13 @@ class PermintaanPengadaanController extends ModuleCrudController
                 ->with('satuanDasar')
                 ->where('id_komoditas', $hasil->id_komoditas)
                 ->where('is_active', true)
-                ->where(function ($q) use ($entitasId) {
+                ->when(\Illuminate\Support\Facades\Schema::hasColumn('master_barang', 'id_entitas'), function ($query) use ($entitasId) {
                     if ($entitasId) {
-                        $q->where('id_entitas', $entitasId)->orWhereNull('id_entitas');
+                        $query->where(function ($q) use ($entitasId) {
+                            $q->where('id_entitas', $entitasId)->orWhereNull('id_entitas');
+                        })->orderByRaw("CASE WHEN id_entitas = ? THEN 0 ELSE 1 END", [$entitasId]);
                     }
                 })
-                ->orderByRaw("CASE WHEN id_entitas = ? THEN 0 ELSE 1 END", [$entitasId ?? 0])
                 ->orderByDesc('id_barang')
                 ->first()
             : null;
@@ -338,13 +364,8 @@ class PermintaanPengadaanController extends ModuleCrudController
             abort(403, 'Silakan login terlebih dahulu.');
         }
 
-        // Jika bukan Super Admin, validasi apakah hasil kalkulasi milik wilayahnya
-        if ($user->id_entitas !== null) {
-            $idWilayahUser = $user->entitas?->id_wilayah;
-
-            if ((int) $hasil->id_wilayah !== (int) $idWilayahUser) {
-                abort(403, 'Hasil kalkulasi tidak milik koperasi aktif Anda.');
-            }
+        if ((int) $hasil->id_wilayah !== $this->wilayahAktifId()) {
+            abort(403, 'Hasil kalkulasi tidak milik desa aktif Anda.');
         }
 
         if ($hasil->status_surplus_defisit !== 'defisit') {

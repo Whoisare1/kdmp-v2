@@ -22,8 +22,24 @@ class DashboardM2Controller extends Controller
 
     public function index(Request $request): View
     {
-        $idWilayah = $this->wilayahAktifId();
+        $idWilayahAsal = $this->wilayahAktifId();
+        $daftarWilayah = Wilayah::where('tingkat', 'desa')->orderBy('nama')->get();
+        if (! $daftarWilayah->contains('id', $idWilayahAsal)) {
+            $wilayahAktif = Wilayah::find($idWilayahAsal);
+            if ($wilayahAktif) {
+                $daftarWilayah->prepend($wilayahAktif);
+            }
+        }
+
+        $idWilayah = $idWilayahAsal;
+        if ($request->filled('id_wilayah')) {
+            $idWilayahDiminta = (int) $request->query('id_wilayah');
+            abort_unless($daftarWilayah->contains('id', $idWilayahDiminta), 404);
+            $idWilayah = $idWilayahDiminta;
+        }
+
         $wilayah = Wilayah::find($idWilayah);
+        $isKomparasi = ($idWilayah !== $idWilayahAsal);
 
         $tahun = (int) $request->query('tahun', 2026);
         $bulanQuery = $request->query('bulan');
@@ -46,9 +62,7 @@ class DashboardM2Controller extends Controller
 
         $daftarHasil = (clone $queryHasil)->orderBy('id_komoditas')->get();
         $distribusiNeraca = $daftarHasil
-            ->groupBy(fn (HasilKalkulasi $hasil): string => in_array($hasil->komoditas?->kategori, ['pertanian', 'perkebunan', 'peternakan'], true)
-                ? (string) $hasil->komoditas->kategori
-                : 'lainnya')
+            ->groupBy(fn (HasilKalkulasi $hasil): string => (string) ($hasil->komoditas?->kategori ?: 'lainnya'))
             ->sortKeys()
             ->map(function ($hasilSektor) {
                 return $hasilSektor
@@ -133,6 +147,18 @@ class DashboardM2Controller extends Controller
             ->distinct()
             ->pluck('kategori');
 
+        // Pengelompokan Defisit & Surplus per Kategori/Sektor untuk Desa yang dipilih
+        $daftarDefisitSektor = $daftarHasil->where('status_surplus_defisit', 'defisit')
+            ->groupBy(fn ($h) => ucwords(str_replace('_', ' ', $h->komoditas?->kategori ?? 'Lainnya')));
+
+        $daftarSurplusSektor = $daftarHasil->where('status_surplus_defisit', 'surplus')
+            ->groupBy(fn ($h) => ucwords(str_replace('_', ' ', $h->komoditas?->kategori ?? 'Lainnya')));
+
+        $satuanMap = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
+            ->where('tahun', $tahun)
+            ->pluck('satuan', 'id_komoditas')
+            ->toArray();
+
         // Persentase Distribusi untuk Visualisasi Donut / Bar
         $persenSurplus = $totalKomoditasTerhitung > 0 ? round(($totalSurplus / $totalKomoditasTerhitung) * 100, 1) : 0;
         $persenDefisit = $totalKomoditasTerhitung > 0 ? round(($totalDefisit / $totalKomoditasTerhitung) * 100, 1) : 0;
@@ -140,10 +166,17 @@ class DashboardM2Controller extends Controller
 
         return view('perencanaan.dashboard.index', [
             'wilayah' => $wilayah,
+            'daftarWilayah' => $daftarWilayah,
+            'idWilayahAsal' => $idWilayahAsal,
+            'idWilayah' => $idWilayah,
+            'isKomparasi' => $isKomparasi,
             'tahun' => $tahun,
             'bulan' => $bulan,
             'periode' => $periode,
             'kategori' => $kategori,
+            'daftarDefisitSektor' => $daftarDefisitSektor,
+            'daftarSurplusSektor' => $daftarSurplusSektor,
+            'satuanMap' => $satuanMap,
             'daftarHasil' => $daftarHasil,
             'distribusiNeraca' => $distribusiNeraca,
             'totalKomoditasTerhitung' => $totalKomoditasTerhitung,

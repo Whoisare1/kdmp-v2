@@ -1,4 +1,4 @@
-    <x-layouts.app title="Demografi Penduduk Desa" eyebrow="Kalkulasi — Data & Parameter">
+    <x-layouts.app title="Data Dasar Desa" eyebrow="Kalkulasi — Data Dasar">
     {{-- Navigasi kalkulasi --}}
     <x-perencanaan.nav-m2 active="parameter" subActive="demografi" />
 
@@ -25,10 +25,14 @@
     {{-- Context Banner Wilayah & Sumber Survei --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-sm border border-paper-300 bg-paper-50 p-4 shadow-2xs">
         <form method="GET" action="{{ route('perencanaan.demografi.index') }}" class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800">
-                <span class="font-mono text-[10px] uppercase text-ink-600/70">Desa:</span>
-                <span class="font-semibold text-ink-950">{{ $wilayah?->nama ?? 'Desa Terdaftar' }}</span>
-            </div>
+            <label for="id_wilayah" class="font-mono text-xs text-ink-600/80">Desa:</label>
+            <select name="id_wilayah" id="id_wilayah" class="rounded-sm border border-paper-300 bg-paper-100 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                @foreach ($daftarWilayah as $pilihanWilayah)
+                    <option value="{{ $pilihanWilayah->id }}" {{ $idWilayah == $pilihanWilayah->id ? 'selected' : '' }}>
+                        {{ $pilihanWilayah->nama }}{{ $pilihanWilayah->id == $idWilayahAsal ? ' (Desa Saya)' : '' }}
+                    </option>
+                @endforeach
+            </select>
 
             <div class="flex items-center gap-2">
                 <label for="tahun" class="font-mono text-xs text-ink-600/80">Tahun:</label>
@@ -51,14 +55,22 @@
                 <span>Lihat Survei</span>
             </a>
 
-            <button type="button"
-                    onclick="document.getElementById('modal-edit-semua').classList.remove('hidden')"
-                    class="inline-flex items-center gap-1.5 rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
-                <span>✏️</span>
-                <span>Perbarui Data Populasi</span>
-            </button>
+            @unless ($isKomparasi)
+                <button type="button"
+                        onclick="document.getElementById('modal-edit-semua').classList.remove('hidden')"
+                        class="inline-flex items-center gap-1.5 rounded-sm bg-merah-500 px-4 py-2 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600">
+                    <span>✏️</span>
+                    <span>Perbarui Data Populasi</span>
+                </button>
+            @endunless
         </div>
     </div>
+
+    @if ($isKomparasi)
+        <div class="mb-5 rounded-sm border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Data {{ $wilayah?->nama }} ditampilkan untuk perbandingan dan hanya dapat dilihat. Perubahan data hanya dapat dilakukan pada desa sendiri.
+        </div>
+    @endif
 
     {{-- Ringkasan Kartu Demografi --}}
     <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -135,8 +147,8 @@
     {{-- Tabel Rincian Populasi Per Kelompok Umur --}}
     <div class="overflow-hidden rounded-sm border border-paper-300 bg-paper-50 shadow-2xs">
         <div class="border-b border-paper-200 px-5 py-4">
-            <h2 class="font-display text-base font-semibold text-ink-900">Rincian Populasi Desa Berdasarkan Kelompok Umur</h2>
-            <p class="text-xs text-ink-600">Klasifikasi kelompok umur diselaraskan dengan standar Angka Kecukupan Gizi (AKG) Kementerian Kesehatan.</p>
+            <h2 class="font-display text-base font-semibold text-ink-900">Data Rekap Penduduk</h2>
+            <p class="text-xs text-ink-600">Rekap penduduk per kelompok umur dari hasil survei menjadi dasar kalkulasi kebutuhan desa.</p>
         </div>
 
         <table class="w-full text-left text-sm">
@@ -203,7 +215,9 @@
                             @endif
                         </td>
                         <td class="px-5 py-3.5 text-right">
-                            @if ($record)
+                            @if ($isKomparasi)
+                                <span class="text-xs text-ink-600/70">Lihat saja</span>
+                            @elseif ($record)
                                 <button type="button"
                                         onclick="openEditSingle({{ $record->id_demografi }}, '{{ $ku }}', {{ $jumlah }})"
                                         class="rounded-sm border border-paper-300 px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-merah-400 hover:text-merah-600">
@@ -235,6 +249,7 @@
     </div>
 
     {{-- Modal Perbarui Semua Kelompok Umur --}}
+    @unless ($isKomparasi)
     <div id="modal-edit-semua" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-ink-950/70 p-4 backdrop-blur-xs">
         <div class="w-full max-w-lg rounded-sm border border-paper-300 bg-paper-50 p-6 shadow-2xl">
             <div class="flex items-center justify-between border-b border-paper-200 pb-3">
@@ -328,6 +343,7 @@
             </form>
         </div>
     </div>
+    @endunless
 
     <script>
         function openEditSingle(id, kelompokUmur, jumlah) {

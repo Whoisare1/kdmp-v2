@@ -81,6 +81,15 @@
                 <option value="genap" {{ request('periode') === 'genap' ? 'selected' : '' }}>Genap (Juli–Desember)</option>
             </select>
 
+            <select name="kategori" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
+                <option value="">-- Semua Kategori --</option>
+                @foreach ($daftarKategori as $kategoriKomoditas)
+                    <option value="{{ $kategoriKomoditas }}" {{ $kategori === $kategoriKomoditas ? 'selected' : '' }}>
+                        {{ ucwords(str_replace('_', ' ', $kategoriKomoditas)) }}
+                    </option>
+                @endforeach
+            </select>
+
             <select name="id_komoditas" class="rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-xs font-medium text-ink-800 focus:border-merah-400 focus:outline-none">
                 <option value="">-- Semua Komoditas --</option>
                 @foreach ($daftarKomoditas as $k)
@@ -106,7 +115,7 @@
             <button type="submit" class="rounded-sm border border-paper-300 bg-paper-200/80 px-3 py-2 text-xs font-medium text-ink-800 hover:border-merah-400">
                 Filter
             </button>
-            @if ($bulan || $idKomoditas || $statusFilter || request('q'))
+            @if ($bulan || $idKomoditas || $kategori || $statusFilter || request('q'))
                 <a href="{{ route('perencanaan.neraca-komoditas.index', ['tahun' => $tahun]) }}" class="text-xs text-ink-600 hover:text-merah-600 hover:underline">
                     Reset
                 </a>
@@ -235,10 +244,10 @@
                                 </a>
 
                                 @if ($item->status_surplus_defisit === 'defisit')
-                                    <a href="{{ route('perencanaan.permintaan-pengadaan.from-hasil', ['hasil' => $item->id_hasil]) }}"
-                                       class="inline-flex items-center gap-1 rounded-sm bg-merah-500 px-2.5 py-1 text-xs font-semibold text-paper-50 shadow-xs hover:bg-merah-600"
-                                       title="Buat Draft Permintaan Pengadaan untuk menutupi kekurangan komoditas ini">
-                                        <span>Buat Permintaan Pengadaan</span>
+                                    <a href="{{ route('perencanaan.permintaan-pengadaan.index') }}"
+                                       class="inline-flex items-center gap-1 rounded-sm border border-merah-300 px-2.5 py-1 text-xs font-semibold text-merah-700 hover:bg-merah-50"
+                                       title="Lihat rekomendasi pengadaan untuk kebutuhan defisit">
+                                       <span>Lihat Rekomendasi Pengadaan</span>
                                     </a>
                                 @elseif ($item->status_surplus_defisit === 'surplus')
                                     <form method="POST" action="{{ route('perencanaan.neraca-komoditas.ajukan-ke-gudang', ['hasil' => $item->id_hasil]) }}">
@@ -326,14 +335,10 @@
 
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-ink-800">Tampilkan Hasil Pada:</label>
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-2 gap-2">
                         <label class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 p-2 text-xs cursor-pointer hover:border-merah-400">
                             <input type="radio" name="redirect_to" value="neraca" checked class="text-merah-500">
                             <span class="font-medium text-ink-900">Neraca</span>
-                        </label>
-                        <label class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 p-2 text-xs cursor-pointer hover:border-merah-400">
-                            <input type="radio" name="redirect_to" value="dashboard" class="text-merah-500">
-                            <span class="font-medium text-ink-900">Dashboard</span>
                         </label>
                         <label class="flex items-center gap-1.5 rounded-sm border border-paper-300 bg-paper-100 p-2 text-xs cursor-pointer hover:border-merah-400">
                             <input type="radio" name="redirect_to" value="kebutuhan" class="text-merah-500">

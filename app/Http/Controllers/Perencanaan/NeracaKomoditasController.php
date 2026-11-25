@@ -38,6 +38,7 @@ class NeracaKomoditasController extends ModuleCrudController
         $bulan = $periode ? PeriodeKalkulasi::detail($periode)['bulan_awal'] : ($bulanQuery ? (int) $bulanQuery : null);
         $idKomoditas = $request->filled('id_komoditas') ? (int) $request->query('id_komoditas') : null;
         $status = $request->query('status_surplus_defisit');
+        $kategori = $request->query('kategori');
 
         $query = HasilKalkulasi::with(['wilayah', 'komoditas'])
             ->where('id_wilayah', $idWilayah)
@@ -51,6 +52,10 @@ class NeracaKomoditasController extends ModuleCrudController
 
         if ($idKomoditas !== null) {
             $query->where('id_komoditas', $idKomoditas);
+        }
+
+        if ($kategori !== null) {
+            $query->whereHas('komoditas', fn ($komoditasQuery) => $komoditasQuery->where('kategori', $kategori));
         }
 
         if ($status !== null && in_array($status, ['surplus', 'defisit', 'seimbang'], true)) {
@@ -70,6 +75,12 @@ class NeracaKomoditasController extends ModuleCrudController
             ->withQueryString();
 
         $daftarKomoditas = Komoditas::where('is_active', true)->orderBy('nama')->get();
+        $daftarKategori = Komoditas::where('is_active', true)
+            ->whereNotNull('kategori')
+            ->select('kategori')
+            ->distinct()
+            ->orderBy('kategori')
+            ->pluck('kategori');
 
         // Satuan komoditas
         $satuanMap = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
@@ -82,6 +93,9 @@ class NeracaKomoditasController extends ModuleCrudController
         $baseQuery = HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)
             ->when($bulan, fn ($q) => $q->where('bulan', $bulan));
+        if ($kategori !== null) {
+            $baseQuery->whereHas('komoditas', fn ($komoditasQuery) => $komoditasQuery->where('kategori', $kategori));
+        }
 
         $this->onlyLatestVersion($baseQuery);
 
@@ -93,7 +107,7 @@ class NeracaKomoditasController extends ModuleCrudController
         $kelengkapanStandarRaw = KebutuhanKomoditas::where('id_wilayah', $idWilayah)
             ->where('tahun', $tahun)
             ->when($bulan, fn ($q) => $q->where('bulan', $bulan))
-            ->selectRaw('id_komoditas, COUNT(CASE WHEN id_standar IS NOT NULL AND per_kapita_harian > 0 THEN 1 END) as valid_count, COUNT(*) as total_groups')
+            ->selectRaw('id_komoditas, COUNT(CASE WHEN id_standar IS NOT NULL AND per_kapita_harian >= 0 THEN 1 END) as valid_count, COUNT(*) as total_groups')
             ->groupBy('id_komoditas')
             ->get();
 
@@ -117,6 +131,8 @@ class NeracaKomoditasController extends ModuleCrudController
             'tahun' => $tahun,
             'bulan' => $bulan,
             'idKomoditas' => $idKomoditas,
+            'kategori' => $kategori,
+            'daftarKategori' => $daftarKategori,
             'statusFilter' => $status,
             'daftarKomoditas' => $daftarKomoditas,
             'satuanMap' => $satuanMap,
@@ -159,7 +175,7 @@ class NeracaKomoditasController extends ModuleCrudController
         $satuan = $rincianKebutuhan->first()?->satuan ?? ($ketersediaan?->satuan ?? 'KG');
 
         $totalKelompok = $rincianKebutuhan->count();
-        $kelompokValidStandar = $rincianKebutuhan->filter(fn ($rk) => $rk->id_standar !== null && (float) $rk->per_kapita_harian > 0)->count();
+        $kelompokValidStandar = $rincianKebutuhan->filter(fn ($rk) => $rk->id_standar !== null && (float) $rk->per_kapita_harian >= 0)->count();
         $standarLengkap = ($totalKelompok > 0 && $kelompokValidStandar >= $totalKelompok);
 
         return view('perencanaan.neraca-komoditas.show', [

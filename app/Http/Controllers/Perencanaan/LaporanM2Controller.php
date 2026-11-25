@@ -19,8 +19,24 @@ class LaporanM2Controller extends Controller
 
     public function index(Request $request): View
     {
-        $idWilayah = $this->wilayahAktifId();
+        $idWilayahAsal = $this->wilayahAktifId();
+        $daftarWilayah = Wilayah::where('tingkat', 'desa')->orderBy('nama')->get();
+        if (! $daftarWilayah->contains('id', $idWilayahAsal)) {
+            $wilayahAktif = Wilayah::find($idWilayahAsal);
+            if ($wilayahAktif) {
+                $daftarWilayah->prepend($wilayahAktif);
+            }
+        }
+
+        $idWilayah = $idWilayahAsal;
+        if ($request->filled('id_wilayah')) {
+            $idWilayahDiminta = (int) $request->query('id_wilayah');
+            abort_unless($daftarWilayah->contains('id', $idWilayahDiminta), 404);
+            $idWilayah = $idWilayahDiminta;
+        }
+
         $wilayah = Wilayah::find($idWilayah);
+        $isKomparasi = ($idWilayah !== $idWilayahAsal);
 
         $tahun = (int) $request->query('tahun', 2026);
         $bulanQuery = $request->query('bulan');
@@ -80,10 +96,23 @@ class LaporanM2Controller extends Controller
             ->distinct()
             ->pluck('kategori');
 
+        // Pengelompokan Defisit & Surplus per Sektor (Pertanian, Peternakan, Perkebunan, Perikanan, dll)
+        $daftarDefisitPerSektor = $items->where('status_surplus_defisit', 'defisit')
+            ->groupBy(fn ($item) => ucwords(str_replace('_', ' ', $item->komoditas?->kategori ?? 'Lainnya')));
+
+        $daftarSurplusPerSektor = $items->where('status_surplus_defisit', 'surplus')
+            ->groupBy(fn ($item) => ucwords(str_replace('_', ' ', $item->komoditas?->kategori ?? 'Lainnya')));
+
         return view('perencanaan.laporan.index', [
             'items' => $items,
+            'daftarDefisitPerSektor' => $daftarDefisitPerSektor,
+            'daftarSurplusPerSektor' => $daftarSurplusPerSektor,
             'satuanMap' => $satuanMap,
             'wilayah' => $wilayah,
+            'daftarWilayah' => $daftarWilayah,
+            'idWilayahAsal' => $idWilayahAsal,
+            'idWilayah' => $idWilayah,
+            'isKomparasi' => $isKomparasi,
             'tahun' => $tahun,
             'bulan' => $bulan,
             'periode' => $periode,
