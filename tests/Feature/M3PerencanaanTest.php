@@ -397,6 +397,7 @@ class M3PerencanaanTest extends TestCase
             ['nama' => 'Desa Surplus Beda Periode Uji'],
             ['tingkat' => 'desa', 'is_active' => true]
         );
+        $this->buatEntitasDesaAktif($desaSurplus);
         $versiDefisit = (int) HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('id_komoditas', 1)
             ->where('tahun', 2026)
@@ -466,10 +467,13 @@ class M3PerencanaanTest extends TestCase
     {
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
         $idWilayahSendiri = $this->idWilayahAktif($user);
+        DB::table('entitas')->where('id_entitas', $user->id_entitas)
+            ->update(['is_active' => true, 'status' => 'APPROVED']);
         $desaDefisit = Wilayah::firstOrCreate(
             ['nama' => 'Desa Defisit Pasangan Surplus Uji'],
             ['tingkat' => 'desa', 'is_active' => true]
         );
+        $this->buatEntitasDesaAktif($desaDefisit);
         $tahun = 2098;
         $versiSurplus = (int) HasilKalkulasi::where('id_wilayah', $idWilayahSendiri)
             ->where('id_komoditas', 1)
@@ -508,6 +512,12 @@ class M3PerencanaanTest extends TestCase
             'status' => 'disetujui',
         ]);
 
+        $this->assertDatabaseHas('entitas', [
+            'id_entitas' => $user->id_entitas,
+            'id_wilayah' => $idWilayahSendiri,
+            'is_active' => true,
+            'status' => 'APPROVED',
+        ]);
         $this->actingAs($user)
             ->get(route('perencanaan.permintaan-pengadaan.index'))
             ->assertOk()
@@ -518,10 +528,11 @@ class M3PerencanaanTest extends TestCase
             ->assertSee('Rekomendasikan ke Desa Lain');
 
         $jumlahPrSebelumnya = PermintaanPengadaan::count();
-        $this->actingAs($user)->post(route('perencanaan.rekomendasi-pengadaan.store'), [
+        $response = $this->actingAs($user)->post(route('perencanaan.rekomendasi-pengadaan.store'), [
             'id_hasil_defisit' => $defisitDesaLain->id_hasil,
             'id_hasil_surplus' => $surplusSendiri->id_hasil,
-        ])->assertRedirect(route('perencanaan.rekomendasi-pengadaan.index'));
+        ]);
+        $response->assertRedirect(route('perencanaan.rekomendasi-pengadaan.index'));
 
         $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
             'id_hasil_defisit' => $defisitDesaLain->id_hasil,
@@ -705,6 +716,7 @@ class M3PerencanaanTest extends TestCase
             ['nama' => 'Desa Surplus Antrean Uji'],
             ['tingkat' => 'desa', 'is_active' => true]
         );
+        $this->buatEntitasDesaAktif($desaSurplus);
         $tahun = 2097;
         $versiDefisit = (int) HasilKalkulasi::where('id_wilayah', $idWilayah)
             ->where('id_komoditas', 1)
@@ -760,6 +772,20 @@ class M3PerencanaanTest extends TestCase
         $adminGudang->peran()->syncWithoutDetaching([$peran->id_peran]);
 
         return $adminGudang;
+    }
+
+    private function buatEntitasDesaAktif(Wilayah $wilayah): Entitas
+    {
+        return Entitas::updateOrCreate(
+            ['id_wilayah' => $wilayah->id],
+            [
+                'kode_entitas' => 'UJI-'.strtoupper(substr(md5((string) $wilayah->id), 0, 8)),
+                'nama_entitas' => 'Entitas '.$wilayah->nama,
+                'tahun_buku_awal' => 2026,
+                'is_active' => true,
+                'status' => 'APPROVED',
+            ]
+        );
     }
 
     public function test_laporan_desa_sendiri_memiliki_tautan_ke_rekomendasi_pengadaan(): void

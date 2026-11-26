@@ -167,6 +167,13 @@ class RekomendasiPengadaanDesaController extends Controller
     private function pasanganSurplusCocok(HasilKalkulasi $defisit, HasilKalkulasi $surplus): bool
     {
         return (int) $surplus->id_wilayah !== (int) $defisit->id_wilayah
+            && DB::table('entitas')
+                ->join('wilayah', 'wilayah.id', '=', 'entitas.id_wilayah')
+                ->where('entitas.id_wilayah', $surplus->id_wilayah)
+                ->where('wilayah.tingkat', 'desa')
+                ->where('entitas.is_active', true)
+                ->where('entitas.status', 'APPROVED')
+                ->exists()
             && (int) $surplus->id_komoditas === (int) $defisit->id_komoditas
             && (int) $surplus->tahun === (int) $defisit->tahun
             && (int) $surplus->bulan === (int) $defisit->bulan

@@ -17,6 +17,7 @@ use App\Support\Perencanaan\PeriodeKalkulasi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class PermintaanPengadaanController extends ModuleCrudController
@@ -61,6 +62,11 @@ class PermintaanPengadaanController extends ModuleCrudController
                 ->whereIn('id_komoditas', $hasilWilayahSendiri->pluck('id_komoditas')->unique())
                 ->whereIn('tahun', $hasilWilayahSendiri->pluck('tahun')->unique())
                 ->whereIn('bulan', $hasilWilayahSendiri->pluck('bulan')->unique())
+                ->whereHas('wilayah', fn ($query) => $query
+                    ->where('tingkat', 'desa')
+                    ->whereHas('entitas', fn ($entitas) => $entitas
+                        ->where('is_active', true)
+                        ->where('status', 'APPROVED')))
                 ->whereRaw(
                     'hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan)'
                 )
@@ -233,11 +239,7 @@ class PermintaanPengadaanController extends ModuleCrudController
             $this->assertHasilBisaDiproses($hasil);
         }
 
-        $user = auth()->user();
-        $entitasId = $user?->id_entitas 
-            ?? session('entitas_aktif_pilihan') 
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
-            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+        $entitasId = $this->entitasAktifId();
 
         $barang = $hasil
             ? Barang::query()
@@ -245,19 +247,15 @@ class PermintaanPengadaanController extends ModuleCrudController
                 ->where('id_komoditas', $hasil->id_komoditas)
                 ->where('is_active', true)
                 ->when(\Illuminate\Support\Facades\Schema::hasColumn('master_barang', 'id_entitas'), function ($query) use ($entitasId) {
-                    if ($entitasId) {
-                        $query->where(function ($q) use ($entitasId) {
-                            $q->where('id_entitas', $entitasId)->orWhereNull('id_entitas');
-                        })->orderByRaw("CASE WHEN id_entitas = ? THEN 0 ELSE 1 END", [$entitasId]);
-                    }
+                    $query->where(function ($q) use ($entitasId) {
+                        $q->where('id_entitas', $entitasId)->orWhereNull('id_entitas');
+                    })->orderByRaw("CASE WHEN id_entitas = ? THEN 0 ELSE 1 END", [$entitasId]);
                 })
                 ->orderByDesc('id_barang')
                 ->first()
             : null;
 
-        $gudangs = $entitasId
-            ? Gudang::query()->where('id_entitas', $entitasId)->where('is_active', true)->orderBy('nama_gudang')->get()
-            : Gudang::query()->where('is_active', true)->orderBy('nama_gudang')->get();
+        $gudangs = Gudang::query()->where('id_entitas', $entitasId)->where('is_active', true)->orderBy('nama_gudang')->get();
         $satuanBarang = $barang?->satuanDasar?->kode_satuan;
         $hargaComparison = $hasil
             ? $hargaService->bandingkan(
@@ -301,21 +299,21 @@ class PermintaanPengadaanController extends ModuleCrudController
         ]);
         $hasil = HasilKalkulasi::with('komoditas')->findOrFail((int) $validated['id_hasil']);
         $this->assertHasilBisaDiproses($hasil);
-        $user = auth()->user();
-        $entitasId = $user?->id_entitas 
-            ?? session('entitas_aktif_pilihan') 
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
-            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+        $entitasId = $this->entitasAktifId();
 
-        $barang = Barang::query()->whereKey($validated['id_barang'])
+        $barangQuery = Barang::query()->whereKey($validated['id_barang'])
             ->with('satuanDasar')
-            ->where('id_komoditas', $hasil->id_komoditas)->where('is_active', true)->firstOrFail();
+            ->where('id_komoditas', $hasil->id_komoditas)
+            ->where('is_active', true);
+        if (Schema::hasColumn('master_barang', 'id_entitas')) {
+            $barangQuery->where(fn ($query) => $query
+                ->where('id_entitas', $entitasId)
+                ->orWhereNull('id_entitas'));
+        }
+        $barang = $barangQuery->firstOrFail();
         $gudang = Gudang::query()->whereKey($validated['id_gudang'])
-            ->where(function ($q) use ($entitasId) {
-                if ($entitasId) {
-                    $q->where('id_entitas', $entitasId);
-                }
-            })->where('is_active', true)->firstOrFail();
+            ->where('id_entitas', $entitasId)
+            ->where('is_active', true)->firstOrFail();
 
         $unitUsahaId = $hasil->id_unit_usaha_rekomendasi
             ?? $barang->id_unit_usaha

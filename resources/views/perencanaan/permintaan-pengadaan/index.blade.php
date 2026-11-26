@@ -22,8 +22,7 @@
             </div>
             @if ($calonPerencanaanSektor->isEmpty())
                 <div class="rounded-sm border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                    Belum ada hasil kalkulasi surplus atau defisit untuk desa aktif. Untuk menyiapkan data contoh di database lokal, jalankan <code class="rounded bg-amber-100 px-1 py-0.5">php artisan db:seed --class=PerencanaanDemoSeeder</code>, lalu buka kembali halaman ini.
-                    <p class="mt-2">Contoh pasangan data demo tahun 2026: Desa Mekar Jaya memiliki surplus Jagung 2.000 kg, sedangkan Desa Sukamaju defisit Jagung 1.000 kg. Ikan Nila juga tersedia sebagai contoh sektor Perikanan. Dari Desa Sukamaju, arahnya menjadi sebaliknya.</p>
+                    Belum ada hasil kalkulasi surplus atau defisit untuk desa aktif. Lengkapi data desa dan jalankan kalkulasi terlebih dahulu.
                     <a href="{{ route('perencanaan.kebutuhan-komoditas.index') }}" class="ml-1 font-semibold underline">Buka Kalkulasi Kebutuhan Desa</a>
                 </div>
             @else

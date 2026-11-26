@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Pengguna;
+use App\Models\Peran;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -53,6 +54,9 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
             'password' => 'password',
             'is_active' => true,
         ]);
+        $peranGudang = Peran::firstOrCreate(['kode' => 'admin_gudang'], ['nama' => 'Admin Gudang']);
+        $this->penggunaDefisit->peran()->attach($peranGudang->id_peran);
+        $this->penggunaSurplus->peran()->attach($peranGudang->id_peran);
 
         $this->idKomoditas = DB::table('komoditas')->insertGetId([
             'kategori' => 'pangan',

@@ -12,33 +12,35 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 trait ResolvesWilayahAktif
 {
-    private function wilayahAktifId(): int
+    protected function entitasAktifId(): int
     {
         $user = auth()->user();
+        $entitasId = $user?->id_entitas
+            ?? session('entitas_aktif_pilihan')
+            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
 
-        // 1. Cek id_entitas user desa jika terikat langsung
-        $entitasId = $user?->id_entitas;
-
-        // 2. Jika Super Admin (id_entitas null), baca dari pilihan session, binding, atau default entitas
         if (! $entitasId) {
-            $entitasId = session('entitas_aktif_pilihan')
-                ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
-                ?? DB::table('entitas')->whereNotNull('id_wilayah')->where('status', 'APPROVED')->value('id_entitas')
-                ?? DB::table('entitas')->whereNotNull('id_wilayah')->value('id_entitas');
+            throw new HttpException(403, 'Entitas aktif belum dipilih untuk akun ini.');
         }
 
-        $idWilayah = null;
-        if ($entitasId) {
-            $idWilayah = DB::table('entitas')->where('id_entitas', $entitasId)->value('id_wilayah');
+        $entitasId = (int) $entitasId;
+        if (! DB::table('entitas')->where('id_entitas', $entitasId)->exists()) {
+            throw new HttpException(404, 'Entitas aktif tidak ditemukan.');
         }
 
-        // 3. Fallback ke wilayah pertama di database jika entitas belum punya wilayah
+        return $entitasId;
+    }
+
+    protected function wilayahAktifId(): int
+    {
+        $idWilayah = DB::table('entitas')
+            ->join('wilayah', 'wilayah.id', '=', 'entitas.id_wilayah')
+            ->where('entitas.id_entitas', $this->entitasAktifId())
+            ->where('wilayah.tingkat', 'desa')
+            ->value('wilayah.id');
+
         if (! $idWilayah) {
-            $idWilayah = DB::table('wilayah')->value('id');
-        }
-
-        if (! $idWilayah) {
-            throw new HttpException(404, 'Belum ada data wilayah desa yang terdaftar di sistem.');
+            throw new HttpException(404, 'Entitas aktif belum terhubung dengan wilayah desa.');
         }
 
         return (int) $idWilayah;

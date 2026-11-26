@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use App\Support\Perencanaan\PeriodeKalkulasi;
 
@@ -201,36 +202,24 @@ class NeracaKomoditasController extends ModuleCrudController
             ->with('komoditas')
             ->firstOrFail();
 
-        $user = auth()->user();
-        $entitasId = $user?->id_entitas
-            ?? session('entitas_aktif_pilihan')
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
-            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+        $entitasId = $this->entitasAktifId();
 
-        $barang = Barang::query()
+        $barangQuery = Barang::query()
             ->where('id_komoditas', $hasil->id_komoditas)
-            ->where('is_active', true)
-            ->where(function ($q) use ($entitasId) {
-                if ($entitasId) {
-                    $q->where('id_entitas', $entitasId);
-                }
-            })
-            ->first()
-            ?? Barang::query()
-                ->where('id_komoditas', $hasil->id_komoditas)
-                ->where('is_active', true)
-                ->first();
+            ->where('is_active', true);
+        if (Schema::hasColumn('master_barang', 'id_entitas')) {
+            $barangQuery->where(fn ($query) => $query
+                ->where('id_entitas', $entitasId)
+                ->orWhereNull('id_entitas'));
+        }
+        $barang = $barangQuery->first();
 
         if (! $barang) {
             return back()->with('error', 'Komoditas surplus belum memiliki master barang aktif untuk diajukan ke gudang.');
         }
 
         $gudang = Gudang::query()
-            ->where(function ($q) use ($entitasId) {
-                if ($entitasId) {
-                    $q->where('id_entitas', $entitasId);
-                }
-            })
+            ->where('id_entitas', $entitasId)
             ->where('is_active', true)
             ->orderBy('nama_gudang')
             ->first();

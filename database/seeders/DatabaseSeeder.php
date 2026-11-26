@@ -14,12 +14,7 @@ class DatabaseSeeder extends Seeder
             PeranSeeder::class,
             DataAwalSeeder::class,
             M2PerencanaanSeeder::class,
-            M3PerencanaanSeeder::class,
             KonsinyasiDemoSeeder::class,
         ]);
-
-        if (! app()->environment('testing')) {
-            $this->call(PerencanaanDemoSeeder::class);
-        }
     }
 }
