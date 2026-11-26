@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Perencanaan;
 
+use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Models\Master\Komoditas;
 use App\Models\Perencanaan\PerbandinganHarga;
@@ -12,6 +13,8 @@ use App\Support\Perencanaan\PeriodeKalkulasi;
 
 class PerbandinganHargaController extends ModuleCrudController
 {
+    use ResolvesWilayahAktif;
+
     protected string $model = PerbandinganHarga::class;
     protected string $view = 'perencanaan.perbandingan-harga';
     protected string $title = 'Perbandingan Harga';
@@ -26,11 +29,7 @@ class PerbandinganHargaController extends ModuleCrudController
             'periode' => ['nullable', 'in:ganjil,genap'],
             'bulan' => ['nullable', 'integer', 'min:1', 'max:12'],
         ]);
-        $user = auth()->user();
-        $entitasId = $user?->id_entitas 
-            ?? session('entitas_aktif_pilihan') 
-            ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null)
-            ?? \App\Models\Tenant\Entitas::value('id_entitas');
+        $entitasId = $this->entitasAktifId();
 
         $service = app(PerbandinganHargaService::class);
         $selected = (int) ($validated['id_komoditas'] ?? 0);

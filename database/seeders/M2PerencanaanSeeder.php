@@ -4,10 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Master\Komoditas;
 use App\Models\Master\Satuan;
-use App\Models\Perencanaan\DemografiDesa;
-use App\Models\Perencanaan\KetersediaanKomoditas;
 use App\Models\Perencanaan\StandarKebutuhanKomoditas;
-use App\Models\Tenant\Wilayah;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -131,59 +128,5 @@ class M2PerencanaanSeeder extends Seeder
             }
         }
 
-        // 4. Data Demografi Penduduk (M1 Survey Basis) untuk Wilayah Desa Mekar Jaya & Sukamaju
-        $wilayahDesa = Wilayah::where('tingkat', 'desa')->get();
-        $distribusiPenduduk = [
-            'balita' => 120,
-            'anak' => 250,
-            'remaja' => 380,
-            'dewasa' => 850,
-            'lansia' => 200,
-        ];
-
-        foreach ($wilayahDesa as $wilayah) {
-            foreach ($distribusiPenduduk as $umur => $jumlah) {
-                DB::table('demografi_desa')->updateOrInsert(
-                    [
-                        'id_wilayah' => $wilayah->id,
-                        'tahun' => 2026,
-                        'kelompok_umur' => $umur,
-                    ],
-                    [
-                        'jumlah_penduduk' => $jumlah,
-                        'id_sesi_survei' => null,
-                        'created_at' => now(),
-                    ]
-                );
-            }
-
-            // 5. Data Ketersediaan / Potensi Produksi Lokal (Contoh Bulan 3 Tahun 2026)
-            // Beras surplus (panen lokal), Gula Pasir 0 (defisit), Minyak sedikit (defisit)
-            $potensiProduksiBulan3 = [
-                'Beras' => 18000.0000,        // Kebutuhan ~14.700 -> Surplus
-                'Gula Pasir' => 0.0000,        // Kebutuhan ~1.500 -> Defisit
-                'Minyak Goreng' => 300.0000,   // Kebutuhan ~1.300 -> Defisit
-                'Telur Ayam' => 3200.0000,     // Kebutuhan ~2.700 -> Surplus
-            ];
-
-            foreach ($potensiProduksiBulan3 as $namaKomoditas => $qtyProduksi) {
-                if (isset($komoditasIds[$namaKomoditas])) {
-                    DB::table('ketersediaan_komoditas')->updateOrInsert(
-                        [
-                            'id_wilayah' => $wilayah->id,
-                            'id_komoditas' => $komoditasIds[$namaKomoditas],
-                            'tahun' => 2026,
-                            'bulan' => 3,
-                        ],
-                        [
-                            'jumlah_produksi' => $qtyProduksi,
-                            'satuan' => $standarGizi[$namaKomoditas]['satuan'],
-                            'id_sesi_survei' => null,
-                            'created_at' => now(),
-                        ]
-                    );
-                }
-            }
-        }
     }
 }

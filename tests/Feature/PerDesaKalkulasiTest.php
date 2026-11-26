@@ -49,6 +49,12 @@ class PerDesaKalkulasiTest extends TestCase
     public function test_halaman_kalkulasi_menyembunyikan_komoditas_di_dalam_akordeon_kategori(): void
     {
         $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $idWilayah = DB::table('entitas')->where('id_entitas', $user->id_entitas)->value('id_wilayah');
+        $komoditas = Komoditas::where('is_active', true)->firstOrFail();
+        KomoditasKalkulasiDesa::firstOrCreate(
+            ['id_wilayah' => $idWilayah, 'id_komoditas' => $komoditas->id],
+            ['created_at' => now()]
+        );
 
         $response = $this->actingAs($user)->get(route('perencanaan.kebutuhan-komoditas.index'));
 
@@ -90,6 +96,7 @@ class PerDesaKalkulasiTest extends TestCase
         $idWilayah = DB::table('entitas')->where('id_entitas', $user->id_entitas)->value('id_wilayah');
         $master = Komoditas::where('is_active', true)->firstOrFail();
         $diLuarMaster = Komoditas::where('is_active', true)
+            ->where('id', '!=', $master->id)
             ->whereNotIn('id', KomoditasKalkulasiDesa::where('id_wilayah', $idWilayah)->select('id_komoditas'))
             ->first()
             ?? Komoditas::create([
@@ -105,6 +112,12 @@ class PerDesaKalkulasiTest extends TestCase
             ],
             ['created_at' => now()]
         );
+        $komoditasMaster = KomoditasKalkulasiDesa::where('id_wilayah', $idWilayah)
+            ->pluck('id_komoditas')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $this->assertContains($master->id, $komoditasMaster);
+        $this->assertNotContains($diLuarMaster->id, $komoditasMaster);
         $jumlahHasilSebelum = DB::table('hasil_kalkulasi')
             ->where('id_wilayah', $idWilayah)
             ->where('id_komoditas', $diLuarMaster->id)
@@ -144,13 +157,19 @@ class PerDesaKalkulasiTest extends TestCase
                 'created_at' => now(),
             ]);
         }
+        $idKomoditasIkanMaster = KomoditasKalkulasiDesa::query()
+            ->where('id_wilayah', $idWilayah)
+            ->whereHas('komoditas', fn ($query) => $query->where('kategori', 'perikanan'))
+            ->pluck('id_komoditas')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
         $service = \Mockery::mock(KalkulasiKebutuhanService::class);
         $service->shouldReceive('hitungKebutuhan')
             ->once()
-            ->withArgs(function (int $wilayahId, int $tahun, string $periode, array $idKomoditas) use ($idWilayah, $ikanA, $ikanB): bool {
+            ->withArgs(function (int $wilayahId, int $tahun, string $periode, array $idKomoditas) use ($idWilayah, $idKomoditasIkanMaster): bool {
                 sort($idKomoditas);
-                $idIkan = [$ikanA->id, $ikanB->id];
+                $idIkan = $idKomoditasIkanMaster;
                 sort($idIkan);
 
                 return $wilayahId === $idWilayah && $tahun === 2026 && $periode === 'ganjil' && $idKomoditas === $idIkan;
@@ -190,5 +209,15 @@ class PerDesaKalkulasiTest extends TestCase
         $response->assertSee('Mode Komparasi');
         $response->assertSee('Mode lihat saja');
         $response->assertDontSee('id="modal-kalkulasi"');
+    }
+
+    public function test_perencanaan_tidak_fallback_ke_wilayah_pertama_jika_entitas_aktif_tidak_valid(): void
+    {
+        $user = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        $user->id_entitas = PHP_INT_MAX;
+
+        $this->actingAs($user)
+            ->get(route('perencanaan.dashboard'))
+            ->assertNotFound();
     }
 }
