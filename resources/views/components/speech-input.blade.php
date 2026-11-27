@@ -5,7 +5,9 @@
     'type' => 'text', 
     'placeholder' => '', 
     'min' => null,
+    'max' => null,
     'step' => null,
+    'rows' => 3,
     'large' => false,
     'autoformat' => '', // e.g., 'RT', 'RW'
     'value' => null,
@@ -15,47 +17,81 @@
 
 <div x-data="speechInput('{{ $autoformat }}')" class="relative">
     @if($label)
-    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1.5">
+    <label class="block text-xs font-medium text-paper-700 mb-1">
         {{ $label }} @if($required)<span class="text-red-500">*</span>@endif
     </label>
     @endif
     
     <div class="relative flex items-center">
-        <input 
-            type="{{ $type }}" 
-            name="{{ $name }}" 
-            value="{{ $value ?? old($name) }}"
-            x-ref="inputField"
-            @if($xmodel) x-model="{{ $xmodel }}" @endif
-            @if($list) list="{{ $list }}" @endif
-            @if($required) required @endif
-            @if($min !== null) min="{{ $min }}" @endif
-            @if($step !== null) step="{{ $step }}" @endif
-            placeholder="{{ $placeholder }}" 
-            {{ $attributes->merge(['class' => 'w-full rounded-xl border-slate-300 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500 shadow-sm transition-shadow ' . ($large ? 'text-lg font-bold text-slate-900 shadow-inner py-3' : '')]) }}
-        >
-        
-        <!-- Microphone Button (Left Side) -->
-        <div class="absolute inset-y-0 left-0 flex items-center pl-2 z-10">
-            <button 
-                type="button" 
-                @click="toggleSpeech()"
-                :class="{'text-red-600 animate-pulse bg-red-100 ring-2 ring-red-400': isListening, 'text-slate-400 hover:text-blue-500 hover:bg-blue-50': !isListening}"
-                class="p-2 rounded-full transition-all focus:outline-none flex items-center justify-center cursor-pointer"
-                title="Gunakan suara untuk mengetik"
+        @if($type === 'textarea')
+            <textarea 
+                name="{{ $name }}" 
+                x-ref="inputField"
+                @if($xmodel) x-model="{{ $xmodel }}" @endif
+                @if($required) required @endif
+                rows="{{ $rows }}"
+                placeholder="{{ $placeholder }}" 
+                {{ $attributes->merge(['class' => 'w-full rounded-lg border border-paper-300 bg-white pr-10 pl-3 py-2 text-sm text-ink-900 focus:border-padi-500 focus:outline-none focus:ring-1 focus:ring-padi-500 shadow-sm transition']) }}
+            >{{ $value ?? old($name) }}</textarea>
+            
+            <!-- Microphone Button for Textarea -->
+            <div class="absolute top-2 right-2 flex items-center z-10">
+                <button 
+                    type="button" 
+                    @click="toggleSpeech()"
+                    :class="{'text-red-600 animate-pulse bg-red-100 ring-2 ring-red-400': isListening, 'text-paper-400 hover:text-padi-600 hover:bg-padi-50': !isListening}"
+                    class="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center cursor-pointer border border-transparent hover:border-paper-200 touch-manipulation"
+                    title="Gunakan suara untuk mendiktekan (Bahasa Indonesia)"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                    </svg>
+                </button>
+            </div>
+        @else
+            <input 
+                type="{{ $type }}" 
+                name="{{ $name }}" 
+                value="{{ $value ?? old($name) }}"
+                x-ref="inputField"
+                @if($xmodel) x-model="{{ $xmodel }}" @endif
+                @if($list) list="{{ $list }}" @endif
+                @if($required) required @endif
+                @if($min !== null) min="{{ $min }}" @endif
+                @if($max !== null) max="{{ $max }}" @endif
+                @if($step !== null) step="{{ $step }}" @endif
+                placeholder="{{ $placeholder }}" 
+                {{ $attributes->merge(['class' => 'w-full rounded-lg border border-paper-300 bg-white pr-10 pl-3 py-2 text-sm text-ink-900 focus:border-padi-500 focus:outline-none focus:ring-1 focus:ring-padi-500 shadow-sm transition ' . ($large ? 'text-lg font-bold text-ink-950 py-2.5' : '')]) }}
             >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
-                </svg>
-            </button>
-        </div>
+            
+            <!-- Microphone Button for Input -->
+            <div class="absolute inset-y-0 right-0 flex items-center pr-2 z-10">
+                <button 
+                    type="button" 
+                    @click="toggleSpeech()"
+                    :class="{'text-red-600 animate-pulse bg-red-100 ring-2 ring-red-400': isListening, 'text-paper-400 hover:text-padi-600 hover:bg-padi-50': !isListening}"
+                    class="p-2 rounded-lg transition-all focus:outline-none flex items-center justify-center cursor-pointer border border-transparent hover:border-paper-200 touch-manipulation"
+                    title="Gunakan suara untuk mengetik (Bahasa Indonesia)"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                    </svg>
+                </button>
+            </div>
+        @endif
     </div>
     
     <!-- Status indicator -->
     <div x-show="isListening" x-cloak class="absolute -bottom-5 right-0 text-[10px] font-semibold text-red-600 flex items-center gap-1 bg-white px-2 py-0.5 rounded-full shadow-sm border border-red-200 z-20">
         <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-        Mendengarkan...
+        Mendengarkan (id-ID)...
     </div>
+
+    @if($name)
+        @error($name)
+            <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
+        @enderror
+    @endif
 </div>
 
 @push('scripts')
@@ -239,10 +275,10 @@
                 const el = this.$refs.inputField;
                 if (el) {
                     this.originalPlaceholder = el.placeholder || '';
-                    const isPhone = el.type === 'tel' || el.name === 'no_hp';
+                    const isPhone = el.type === 'tel' || el.name === 'no_hp' || el.name === 'nomor_hp';
                     el.placeholder = isPhone 
-                        ? '🎙️ Sebut nomor HP (bisa berjeda)...' 
-                        : '🎙️ Mendengarkan suara Anda...';
+                        ? 'Sebut nomor HP (bisa berjeda)...' 
+                        : 'Mendengarkan suara Anda...';
                 }
             },
 
@@ -263,11 +299,16 @@
                 const el = this.$refs.inputField;
                 if (!el) return false;
 
-                const isPhone = el.type === 'tel' || el.name === 'no_hp';
+                const isPhone = el.type === 'tel' || el.name === 'no_hp' || el.name === 'nomor_hp';
                 if (isPhone) {
                     const digits = (el.value || '').replace(/[^0-9]/g, '');
                     // Terus dengarkan sampai nomor HP mencapai minimal 10 digit atau di-stop manual
                     return digits.length < 10;
+                }
+
+                // Untuk input angka, pertahankan listening selama session aktif agar jeda sebelum "ribu" tidak mematikan mic
+                if (el.type === 'number') {
+                    return true;
                 }
 
                 return false;
@@ -277,7 +318,7 @@
                 const el = this.$refs.inputField;
                 if (!el) return;
 
-                const isPhone = el.type === 'tel' || el.name === 'no_hp';
+                const isPhone = el.type === 'tel' || el.name === 'no_hp' || el.name === 'nomor_hp';
                 if (isPhone) {
                     const newDigits = this.parseSpokenDigits(interim);
                     if (newDigits) {
@@ -287,10 +328,10 @@
                         } else if (newDigits.length > preview.length) {
                             preview = newDigits;
                         }
-                        el.placeholder = '🎙️ "' + preview + '"... (bicara lagi)';
+                        el.placeholder = '"' + preview + '"... (bicara lagi)';
                     }
                 } else {
-                    el.placeholder = '🎙️ "' + interim + '"...';
+                    el.placeholder = '"' + interim + '"...';
                 }
             },
 
@@ -299,7 +340,7 @@
                 if (!inputElement || !finalAlternatives || finalAlternatives.length === 0) return true;
 
                 const autoFormatUpper = (this.autoFormat || '').toUpperCase();
-                const isRtRwField = autoFormatUpper === 'RT' || autoFormatUpper === 'RW' || inputElement.name === 'nama_rt' || inputElement.name === 'rw';
+                const isRtRwField = autoFormatUpper === 'RT' || autoFormatUpper === 'RW' || inputElement.name === 'nama_rt' || inputElement.name === 'rt' || inputElement.name === 'rw';
 
                 // ==============================================================
                 // 1. KHUSUS NOMOR RT & NOMOR RW: Format Wajib Angka 2 Digit (01, 02, ...)
@@ -323,9 +364,57 @@
                 }
 
                 // ==============================================================
-                // 2. INPUT TELEPON / HP (misal: no_hp) -> AKUMULASI SAMPAI LENGKAP!
+                // KHUSUS KODE (Kode Kategori, Kode Master, Kode Item)
                 // ==============================================================
-                if (inputElement.type === 'tel' || inputElement.name === 'no_hp') {
+                if (inputElement.name === 'kode' || autoFormatUpper === 'KODE') {
+                    let cleanCode = finalAlternatives[0].trim().toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9\-_]/g, '');
+                    inputElement.value = cleanCode;
+                    this.notifyModelAndEvents(inputElement);
+                    return true;
+                }
+
+                // ==============================================================
+                // KHUSUS SIKLUS PANEN (Durasi Bulan: misal "3 - 4 bulan", "2 - 3 bulan")
+                // ==============================================================
+                if (inputElement.name === 'periode_panen' || inputElement.name === 'tambah_periode_panen' || autoFormatUpper === 'BULAN') {
+                    let text = finalAlternatives[0].toLowerCase().trim();
+
+                    // Peta kata angka bahasa Indonesia ("satu" -> 1, "dua" -> 2, dll)
+                    const wordNums = {
+                        'setengah': '0.5', 'koma lima': '.5', 'koma': '.',
+                        'satu': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5, 'enam': 6,
+                        'tujuh': 7, 'delapan': 8, 'sembilan': 9, 'sepuluh': 10, 'sebelas': 11, 'dua belas': 12
+                    };
+                    for (const [wName, wNum] of Object.entries(wordNums)) {
+                        text = text.replace(new RegExp('\\b' + wName + '\\b', 'gi'), String(wNum));
+                    }
+
+                    // Bersihkan pemisah rentang ("sampai", "sampe", "hingga", "ke", "sd", "s/d")
+                    text = text.replace(/\s*(?:sampai|sampe|hingga|s\/d|sd|-)\s*/gi, ' - ');
+                    // Bersihkan kata "bulan" agar tidak dobel
+                    text = text.replace(/\bbulan\b/gi, ' ').replace(/\s+/g, ' ').trim();
+
+                    // Deteksi rentang angka, e.g. "3 - 4" atau "2.5 - 3"
+                    const rangeMatch = text.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
+                    if (rangeMatch) {
+                        inputElement.value = rangeMatch[1] + ' - ' + rangeMatch[2] + ' bulan';
+                    } else {
+                        const singleMatch = text.match(/\d+(?:\.\d+)?/);
+                        if (singleMatch) {
+                            inputElement.value = singleMatch[0] + ' bulan';
+                        } else {
+                            inputElement.value = text.trim() ? (text.trim() + ' bulan') : '';
+                        }
+                    }
+
+                    this.notifyModelAndEvents(inputElement);
+                    return true;
+                }
+
+                // ==============================================================
+                // 2. INPUT TELEPON / HP (misal: no_hp / nomor_hp) -> AKUMULASI SAMPAI LENGKAP!
+                // ==============================================================
+                if (inputElement.type === 'tel' || inputElement.name === 'no_hp' || inputElement.name === 'nomor_hp') {
                     let digits = '';
                     for (const cand of finalAlternatives) {
                         digits = this.parseSpokenDigits(cand);
@@ -343,7 +432,7 @@
 
                         inputElement.value = this.accumulated;
                         this.notifyModelAndEvents(inputElement);
-                        inputElement.placeholder = '🎙️ ' + this.accumulated + '... (sebutkan sisa nomor)';
+                        inputElement.placeholder = this.accumulated + '... (sebutkan sisa nomor)';
                     }
 
                     // Jika nomor sudah mencapai panjang standar HP (>= 10 digit, misal 08123456789)
@@ -355,29 +444,33 @@
                 }
 
                 // ==============================================================
-                // 3. INPUT NUMBER (misal: Total KK, Total Jiwa)
+                // 3. INPUT NUMBER (misal: Harga Satuan, Total Nilai, Volume Panen, Total KK, dll)
                 // ==============================================================
                 if (inputElement.type === 'number') {
-                    let numResult = null;
-                    for (const cand of finalAlternatives) {
-                        const parsed = this.parseIndonesianSpokenNumber(cand);
-                        if (parsed !== null) {
-                            numResult = parsed;
-                            break;
+                    let candidates = [...finalAlternatives];
+                    if (this.accumulated) {
+                        for (const alt of finalAlternatives) {
+                            candidates.push(this.accumulated + ' ' + alt);
                         }
                     }
+
+                    const numResult = this.pickBestNumber(candidates, inputElement.name || '');
 
                     if (numResult !== null) {
                         inputElement.value = String(numResult);
+                        this.notifyModelAndEvents(inputElement);
+                        this.accumulated = finalAlternatives[0];
                     } else {
-                        const clean = this.parseCleanNumber(this.wordsToNumbers(finalAlternatives[0]));
+                        const clean = this.parseCleanNumber(this.wordsToNumbers(finalAlternatives[0], inputElement.name || ''));
                         if (clean !== '') {
                             inputElement.value = clean;
+                            this.notifyModelAndEvents(inputElement);
                         }
                     }
 
-                    this.notifyModelAndEvents(inputElement);
-                    return true;
+                    // Kembalikan false agar mic tidak terputus prematur (silence timer 2.5s aktif)
+                    // Jika pengguna berjeda saat menyebut "dua puluh lima ... ribu", kata "ribu" tetap tertangkap sempurna!
+                    return false;
                 }
 
                 // ==============================================================
@@ -410,11 +503,18 @@
                 }
 
                 // ==============================================================
-                // 5. INPUT TEKS BIASA (misal: Nama Ketua RT, Dusun)
+                // 5. INPUT TEKS BIASA (misal: Nama, Alamat, atau Deskripsi/Keterangan)
                 // ==============================================================
-                chosenText = this.correctLabialWords(chosenText);
-                chosenText = chosenText.replace(/\./g, "").trim();
-                chosenText = chosenText.replace(/\b[a-z]/g, c => c.toUpperCase());
+                chosenText = this.correctLabialWords(chosenText).trim();
+
+                if (inputElement.tagName === 'TEXTAREA' || inputElement.name === 'deskripsi' || inputElement.name === 'keterangan') {
+                    // Untuk deskripsi dan keterangan: pertahankan tanda baca dan gunakan Sentence Case
+                    chosenText = chosenText.charAt(0).toUpperCase() + chosenText.slice(1);
+                } else {
+                    // Untuk nama orang, nama komoditas, alamat: Title Case
+                    chosenText = chosenText.replace(/\./g, "").trim();
+                    chosenText = chosenText.replace(/\b[a-z]/g, c => c.toUpperCase());
+                }
 
                 inputElement.value = chosenText;
                 this.notifyModelAndEvents(inputElement);
@@ -469,20 +569,81 @@
                 return null;
             },
 
-            // Parser Angka Lisan Bahasa Indonesia Majemuk & Tunggal
-            parseIndonesianSpokenNumber(str) {
-                if (!str) return null;
-                let s = String(str).toLowerCase().trim();
+            // Pemilih Kandidat Terbaik untuk Angka (Menghindari kata 'ribu' terpotong)
+            pickBestNumber(candidates, fieldName = '') {
+                if (!candidates || candidates.length === 0) return null;
+                let bestVal = null;
+                let bestScore = -1;
 
-                // Bersihkan tanda baca
-                s = s.replace(/[.,\-]/g, ' ').replace(/\s+/g, ' ').trim();
+                for (const rawCand of candidates) {
+                    if (!rawCand) continue;
+                    const cand = String(rawCand).trim();
+                    const val = this.parseIndonesianSpokenNumber(cand, fieldName);
+                    if (val === null) continue;
 
-                // Jika angka murni
-                if (/^\d+$/.test(s)) {
-                    return parseInt(s, 10);
+                    let score = 10;
+                    // Deteksi indikator kelengkapan ucapan (ribu, juta, ratus, rebu, rb, titik ribuan)
+                    if (/(\b(?:ribu|juta|ratus|rebu|ibu|libu|dibu|rb|rbu|jt|k|perak)\b|\.\d{3}|\b\d{4,}\b)/i.test(cand)) {
+                        score += 10000;
+                    }
+                    // Bobot kelengkapan teks
+                    score += cand.length;
+                    // Magnitude nilai (angka ribuan/jutaan lebih lengkap daripada puluhan terpotong)
+                    if (val >= 1000) {
+                        score += 5000;
+                    }
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestVal = val;
+                    }
                 }
 
-                // Konversi satuan dasar langsung
+                return bestVal;
+            },
+
+            // Parser Angka Lisan Bahasa Indonesia Majemuk & Tunggal (Cerdas & Toleran Fonetik)
+            parseIndonesianSpokenNumber(str, fieldName = '') {
+                if (!str) return null;
+                let s = String(str).toLowerCase().trim();
+                s = s.replace(/^(rp|idr)\.?\s*/i, '').replace(/\s*rupiah$/i, '').trim();
+
+                // 1. Format angka dengan titik ribuan standar Indonesia (e.g. 25.000 atau 70.000.000)
+                if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+                    return parseFloat(s.replace(/\./g, ''));
+                }
+                // Format desimal dengan koma (e.g. 25,5 atau 0,5)
+                if (/^\d+,\d+$/.test(s)) {
+                    return parseFloat(s.replace(',', '.'));
+                }
+                // Jika angka murni (e.g. 25000 atau 25)
+                if (/^\d+(\.\d+)?$/.test(s)) {
+                    let val = parseFloat(s);
+                    // Konteks harga komoditas lapangan: jika terucap '25' atau '35' di field harga satuan,
+                    // di pasar pertanian tidak ada cabai/bawang Rp 25 per kg; otomatis diartikan 25.000
+                    if ((fieldName.includes('harga') || fieldName.includes('nilai')) && val >= 10 && val <= 400 && Number.isInteger(val)) {
+                        val = val * 1000;
+                    }
+                    return val;
+                }
+
+                // 2. Koreksi fonetik salah dengar Google Speech API (misal 'ribu' terdengar 'ibu', 'libu', 'dibu', 'rebu', 'rb', 'k')
+                s = s.replace(/\b(\d+|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|belas|puluh|ratus)\s*(?:ibu|libu|dibu|rebu|rb|rbu|mibu|k|perak)\b/gi, '$1 ribu');
+                s = s.replace(/(\d+)\s*(?:rb|k|ribu)/gi, '$1 ribu');
+                s = s.replace(/(\d+)\s*(?:jt|juta|jute)/gi, '$1 juta');
+                s = s.replace(/(\d+)\s*(?:atus|ratus)/gi, '$1 ratus');
+
+                // 3. Tangani singkatan bahasa pasar: 'dua lima ribu' -> '25 ribu', 'tiga lima ribu' -> '35 ribu', dll
+                const slangPairs = [
+                    ['dua lima', '25'], ['tiga lima', '35'], ['empat lima', '45'],
+                    ['lima lima', '55'], ['enam lima', '65'], ['tujuh lima', '75'],
+                    ['delapan lima', '85'], ['sembilan lima', '95'],
+                    ['satu lima', '15']
+                ];
+                for (const [p, num] of slangPairs) {
+                    s = s.replace(new RegExp('\\b' + p + '\\s+ribu\\b', 'gi'), num + ' ribu');
+                }
+
                 const unitWords = {
                     'nol': 0, 'kosong': 0,
                     'satu': 1, 'se': 1,
@@ -498,37 +659,99 @@
                     'sebelas': 11
                 };
 
-                if (unitWords[s] !== undefined) {
-                    return unitWords[s];
+                // Tangani ucapan dua digit: 'dua lima' -> '25', 'tiga lima' -> '35'
+                s = s.replace(/\b(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan)\s+(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan)\b/gi, (m, d1, d2) => {
+                    return String(unitWords[d1] * 10 + unitWords[d2]);
+                });
+
+                // Tangani setengah / koma lima
+                s = s.replace(/\bsetengah\b/gi, '0.5');
+                s = s.replace(/\bkoma\s*lima\b/gi, '.5');
+
+                // Jika setelah normalisasi menjadi angka murni
+                if (/^\d+(\.\d+)?$/.test(s)) {
+                    let val = parseFloat(s);
+                    if ((fieldName.includes('harga') || fieldName.includes('nilai')) && val >= 10 && val <= 400 && Number.isInteger(val)) {
+                        val = val * 1000;
+                    }
+                    return val;
                 }
 
-                // Cek awalan "nol satu" / "kosong satu" -> 1
-                const zeroPrefixMatch = s.match(/^(?:nol|kosong)\s+(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|\d+)$/i);
-                if (zeroPrefixMatch) {
-                    const nextWord = zeroPrefixMatch[1];
-                    if (!isNaN(nextWord)) return parseInt(nextWord, 10);
-                    if (unitWords[nextWord] !== undefined) return unitWords[nextWord];
+                const parseUpTo999 = (sub) => {
+                    sub = sub.trim();
+                    if (!isNaN(sub) && sub !== '') return parseFloat(sub);
+                    let total = 0;
+
+                    if (sub.startsWith('seratus')) {
+                        total += 100;
+                        sub = sub.substring(7).trim();
+                    } else {
+                        const ratusMatch = sub.match(/^(.*?)\s*ratus\s*(.*)$/i);
+                        if (ratusMatch) {
+                            const rPart = ratusMatch[1].trim();
+                            const rCount = (!isNaN(rPart) && rPart !== '') ? parseFloat(rPart) : (unitWords[rPart] || 1);
+                            total += rCount * 100;
+                            sub = ratusMatch[2].trim();
+                        }
+                    }
+
+                    const numMap = [
+                        ['sembilan puluh', 90], ['delapan puluh', 80], ['tujuh puluh', 70],
+                        ['enam puluh', 60], ['lima puluh', 50], ['empat puluh', 40],
+                        ['tiga puluh', 30], ['dua puluh', 20], ['sepuluh', 10],
+                        ['sembilan belas', 19], ['delapan belas', 18], ['tujuh belas', 17],
+                        ['enam belas', 16], ['lima belas', 15], ['empat belas', 14],
+                        ['tiga belas', 13], ['dua belas', 12], ['sebelas', 11],
+                        ['sembilan', 9], ['delapan', 8], ['tujuh', 7], ['enam', 6],
+                        ['lima', 5], ['empat', 4], ['tiga', 3], ['dua', 2], ['satu', 1],
+                        ['nol', 0], ['kosong', 0]
+                    ];
+
+                    for (const [w, val] of numMap) {
+                        if (sub === w || sub.startsWith(w + ' ') || sub.endsWith(' ' + w) || sub.includes(' ' + w + ' ')) {
+                            total += val;
+                            sub = sub.replace(new RegExp('\\b' + w + '\\b', 'i'), '').trim();
+                        }
+                    }
+
+                    if (!isNaN(sub) && sub !== '') {
+                        total += parseFloat(sub);
+                    }
+                    return total;
+                };
+
+                let grandTotal = 0;
+                let remaining = s;
+
+                // Juta
+                const jutaMatch = remaining.match(/^(.*?)\s*juta\s*(.*)$/i);
+                if (jutaMatch) {
+                    const jPart = jutaMatch[1].trim();
+                    grandTotal += (parseUpTo999(jPart) || 1) * 1000000;
+                    remaining = (jutaMatch[2] || '').trim();
                 }
 
-                // Tangani belasan: "dua belas" s/d "sembilan belas"
-                const belasMatch = s.match(/^(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan)\s+belas$/i);
-                if (belasMatch) {
-                    return (unitWords[belasMatch[1]] || 0) + 10;
+                // Ribu
+                const ribuMatch = remaining.match(/^(.*?)\s*ribu\s*(.*)$/i);
+                if (ribuMatch) {
+                    const rPart = ribuMatch[1].trim();
+                    if (rPart === 'se' || rPart === '') {
+                        grandTotal += 1000;
+                    } else {
+                        grandTotal += (parseUpTo999(rPart) || 1) * 1000;
+                    }
+                    remaining = (ribuMatch[2] || '').trim();
                 }
 
-                // Tangani puluhan: "dua puluh", "dua puluh satu", dll
-                const puluhMatch = s.match(/^(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan)\s+puluh(?:\s+(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan))?$/i);
-                if (puluhMatch) {
-                    const puluhan = (unitWords[puluhMatch[1]] || 0) * 10;
-                    const satuan = puluhMatch[2] ? (unitWords[puluhMatch[2]] || 0) : 0;
-                    return puluhan + satuan;
+                if (remaining !== '') {
+                    grandTotal += parseUpTo999(remaining);
                 }
 
-                // Ratusan & Ribuan umum
-                const converted = this.wordsToNumbers(s);
-                const parsedVal = parseFloat(converted);
-                if (!isNaN(parsedVal)) {
-                    return parsedVal;
+                if (grandTotal > 0) {
+                    if ((fieldName.includes('harga') || fieldName.includes('nilai')) && grandTotal >= 10 && grandTotal <= 400 && Number.isInteger(grandTotal)) {
+                        grandTotal = grandTotal * 1000;
+                    }
+                    return grandTotal;
                 }
 
                 return null;
@@ -702,97 +925,13 @@
             },
 
             // Parsing Angka Lisan Bahasa Indonesia Majemuk (Juta, Ribu, Ratus, Belas, Puluh, Setengah)
-            wordsToNumbers(text) {
+            wordsToNumbers(text, fieldName = '') {
                 if (!text) return '';
-                let str = String(text).toLowerCase().trim();
-                str = str.replace(/^(rp|idr)\.?\s*/i, '').replace(/\s*rupiah$/i, '').trim();
-                str = str.replace(/[.,\s]+$/, '').trim();
-
-                str = str.replace(/(\d+)\s*(rb|ribu)/gi, '$1 ribu');
-                str = str.replace(/(\d+)\s*k\b/gi, '$1 ribu');
-                str = str.replace(/(\d+)\s*(jt|juta)/gi, '$1 juta');
-
-                if (/^\d{1,3}(\.\d{3})+$/.test(str)) {
-                    return str.replace(/\./g, '');
+                const parsed = this.parseIndonesianSpokenNumber(text, fieldName);
+                if (parsed !== null && !isNaN(parsed)) {
+                    return String(parsed);
                 }
-                if (!isNaN(str) && str !== '') {
-                    return str;
-                }
-
-                str = str.replace(/([a-z\d]+)\s+setengah/gi, (match, p1) => {
-                    const units = {'satu':1,'dua':2,'tiga':3,'empat':4,'lima':5,'enam':6,'tujuh':7,'delapan':8,'sembilan':9,'sepuluh':10};
-                    const val = !isNaN(p1) ? parseFloat(p1) : (units[p1.toLowerCase()] || 0);
-                    return val > 0 ? String(val + 0.5) : '0.5';
-                });
-                str = str.replace(/\bsetengah\b/gi, '0.5');
-
-                const parseUpTo999 = (s) => {
-                    s = s.trim();
-                    if (!isNaN(s) && s !== '') return parseFloat(s);
-                    let total = 0;
-
-                    if (s.startsWith('seratus')) {
-                        total += 100;
-                        s = s.substring(7).trim();
-                    } else {
-                        const ratusMatch = s.match(/^(.*?)\s*ratus\s*(.*)$/i);
-                        if (ratusMatch) {
-                            const rCount = this.wordsToNumbers(ratusMatch[1]);
-                            total += (parseFloat(rCount) || 1) * 100;
-                            s = ratusMatch[2].trim();
-                        }
-                    }
-
-                    const numMap = [
-                        ['sembilan puluh', 90], ['delapan puluh', 80], ['tujuh puluh', 70],
-                        ['enam puluh', 60], ['lima puluh', 50], ['empat puluh', 40],
-                        ['tiga puluh', 30], ['dua puluh', 20], ['sepuluh', 10],
-                        ['sembilan belas', 19], ['delapan belas', 18], ['tujuh belas', 17],
-                        ['enam belas', 16], ['lima belas', 15], ['empat belas', 14],
-                        ['tiga belas', 13], ['dua belas', 12], ['sebelas', 11],
-                        ['sembilan', 9], ['delapan', 8], ['tujuh', 7], ['enam', 6],
-                        ['lima', 5], ['empat', 4], ['tiga', 3], ['dua', 2], ['satu', 1],
-                        ['nol', 0], ['kosong', 0]
-                    ];
-
-                    for (const [w, val] of numMap) {
-                        if (s === w || s.startsWith(w + ' ') || s.endsWith(' ' + w)) {
-                            total += val;
-                            s = s.replace(new RegExp(`\\b${w}\\b`, 'i'), '').trim();
-                        }
-                    }
-
-                    if (!isNaN(s) && s !== '') {
-                        total += parseFloat(s);
-                    }
-                    return total;
-                };
-
-                let grandTotal = 0;
-                let remaining = str;
-
-                const jutaMatch = remaining.match(/^(.*?)\s*juta\s*(.*)$/i);
-                if (jutaMatch) {
-                    grandTotal += parseUpTo999(jutaMatch[1]) * 1000000;
-                    remaining = (jutaMatch[2] || '').trim();
-                }
-
-                const ribuMatch = remaining.match(/^(.*?)\s*ribu\s*(.*)$/i);
-                if (ribuMatch) {
-                    const rPart = ribuMatch[1].trim();
-                    if (rPart === 'se' || rPart === '') {
-                        grandTotal += 1000;
-                    } else {
-                        grandTotal += parseUpTo999(rPart) * 1000;
-                    }
-                    remaining = (ribuMatch[2] || '').trim();
-                }
-
-                if (remaining !== '') {
-                    grandTotal += parseUpTo999(remaining);
-                }
-
-                return grandTotal > 0 ? String(grandTotal) : str;
+                return String(text).trim();
             }
         }));
     }

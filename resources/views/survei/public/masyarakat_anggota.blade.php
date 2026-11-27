@@ -66,9 +66,9 @@
 
 <div class="container">
     <div class="stepper">
-        <div class="step-item" style="color: var(--success);">✓ Data Diri</div>
+        <div class="step-item" style="color: var(--success);">1. Data Diri</div>
         <div class="step-arrow">→</div>
-        <div class="step-item active" id="stepIndicator2">👨‍👩‍👧‍👦 Anggota Keluarga</div>
+        <div class="step-item active" id="stepIndicator2">2. Anggota Keluarga</div>
     </div>
 
     <div class="step-container">

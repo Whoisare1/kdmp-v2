@@ -20,8 +20,8 @@
                 $st1 = $sesi->status_sesi1 ?? 'belum_diisi';
                 $st1Label = match($st1) {
                     'sedang_diisi'  => 'Sedang Diisi',
-                    'selesai'       => 'Selesai ✓',
-                    'terverifikasi' => 'Terverifikasi ✓',
+                    'selesai'       => 'Selesai',
+                    'terverifikasi' => 'Terverifikasi',
                     default         => 'Belum Diisi',
                 };
             @endphp
@@ -184,7 +184,7 @@
         <div class="bg-white rounded-xl border border-paper-200 shadow-sm p-4">
             @if($sesi->status_sesi1 === 'selesai' || $sesi->status_sesi1 === 'terverifikasi')
                 <div class="text-center py-2">
-                    <p class="text-sm font-semibold text-green-700">✓ Sesi 1 sudah diselesaikan</p>
+                    <p class="text-sm font-semibold text-green-700">Sesi 1 sudah diselesaikan</p>
                     <p class="text-xs text-ink-400 mt-1">Data dapat dilihat oleh admin untuk verifikasi.</p>
                 </div>
             @else

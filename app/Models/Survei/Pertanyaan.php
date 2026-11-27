@@ -9,7 +9,8 @@ class Pertanyaan extends Model
     protected $table = 'pertanyaan';
 
     protected $fillable = [
-        'id_modul', 'kode_pertanyaan', 'teks_pertanyaan', 'tipe_jawaban', 'satuan',
+        'id_modul', 'jenis_pendataan', 'id_kategori_komoditas', 'id_master_komoditas',
+        'kode_pertanyaan', 'teks_pertanyaan', 'tipe_jawaban', 'satuan',
         'wajib_diisi', 'aturan_validasi_json', 'urutan', 'is_active',
     ];
 
@@ -25,5 +26,15 @@ class Pertanyaan extends Model
     public function modul()
     {
         return $this->belongsTo(ModulSurvei::class, 'id_modul');
+    }
+
+    public function kategoriKomoditas()
+    {
+        return $this->belongsTo(\App\Models\Master\KategoriKomoditas::class, 'id_kategori_komoditas');
+    }
+
+    public function masterKomoditas()
+    {
+        return $this->belongsTo(\App\Models\Master\MasterKomoditas::class, 'id_master_komoditas');
     }
 }

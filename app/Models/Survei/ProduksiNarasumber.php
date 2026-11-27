@@ -44,7 +44,6 @@ class ProduksiNarasumber extends Model
 
     const KATEGORI_KOMODITAS_LIST = [
         'Pertanian',
-        'Perkebunan',
         'Perikanan',
         'Peternakan',
     ];

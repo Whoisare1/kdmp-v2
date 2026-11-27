@@ -16,8 +16,8 @@ class Sesi4PemenuhanController extends Controller
     private function checkHakAksesWilayah(SesiSurvei $sesi): void
     {
         $user = auth()->user();
-        if ($user && $user->id_koperasi) {
-            $userWilayahId = $user->koperasi?->id_wilayah;
+        if ($user && $user->id_entitas) {
+            $userWilayahId = $user->entitas?->id_wilayah;
             if ($userWilayahId && (int) $sesi->id_wilayah !== (int) $userWilayahId) {
                 abort(403, 'Anda tidak memiliki hak akses untuk mengelola sesi survei desa ini.');
             }
@@ -44,7 +44,6 @@ class Sesi4PemenuhanController extends Controller
                     WHEN kategori = 'Pertanian' THEN 1
                     WHEN kategori = 'Peternakan' THEN 2
                     WHEN kategori = 'Perikanan' THEN 3
-                    WHEN kategori = 'Perkebunan' THEN 99
                     ELSE 50
                 END
             ")

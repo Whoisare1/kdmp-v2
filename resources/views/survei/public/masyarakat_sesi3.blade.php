@@ -33,9 +33,9 @@
 
 <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
     <div class="stepper mt-4">
-        <div class="step-item done">✓ Lokasi</div>
-        <div class="step-item done">✓ Anggota Keluarga</div>
-        <div class="step-item active">🛒 Konsumsi & Pemenuhan (Selesai)</div>
+        <div class="step-item done">1. Data Diri</div>
+        <div class="step-item done">2. Anggota Keluarga</div>
+        <div class="step-item active">3. Konsumsi &amp; Pemenuhan (Selesai)</div>
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 mb-6 relative overflow-hidden">

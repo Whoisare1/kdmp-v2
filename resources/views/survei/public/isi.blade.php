@@ -58,8 +58,8 @@
                 $st1 = $sesi->status_sesi1 ?? 'belum_diisi';
                 $st1Label = match($st1) {
                     'sedang_diisi'  => 'Sedang Diisi',
-                    'selesai'       => 'Selesai ✓',
-                    'terverifikasi' => 'Terverifikasi ✓',
+                    'selesai'       => 'Selesai',
+                    'terverifikasi' => 'Terverifikasi',
                     default         => 'Belum Diisi',
                 };
                 $st1BtnText = match($st1) {
@@ -100,8 +100,8 @@
                 $st2 = $sesi->status_sesi2 ?? 'belum_diisi';
                 $st2Label = match($st2) {
                     'sedang_diisi'  => 'Sedang Diisi',
-                    'selesai'       => 'Selesai ✓',
-                    'terverifikasi' => 'Terverifikasi ✓',
+                    'selesai'       => 'Selesai',
+                    'terverifikasi' => 'Terverifikasi',
                     default         => 'Belum Diisi',
                 };
                 $st2BtnText = match($st2) {
@@ -142,8 +142,8 @@
                 $st3 = $sesi->status_sesi3 ?? 'belum_diisi';
                 $st3Label = match($st3) {
                     'sedang_diisi'  => 'Sedang Diisi',
-                    'selesai'       => 'Selesai ✓',
-                    'terverifikasi' => 'Terverifikasi ✓',
+                    'selesai'       => 'Selesai',
+                    'terverifikasi' => 'Terverifikasi',
                     default         => 'Belum Diisi',
                 };
                 $st3BtnText = match($st3) {
@@ -184,8 +184,8 @@
                 $st4 = $sesi->status_sesi4 ?? 'belum_diisi';
                 $st4Label = match($st4) {
                     'sedang_diisi'  => 'Sedang Diisi',
-                    'selesai'       => 'Selesai ✓',
-                    'terverifikasi' => 'Terverifikasi ✓',
+                    'selesai'       => 'Selesai',
+                    'terverifikasi' => 'Terverifikasi',
                     default         => 'Belum Diisi',
                 };
                 $st4BtnText = match($st4) {

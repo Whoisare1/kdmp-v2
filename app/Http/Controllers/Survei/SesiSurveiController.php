@@ -10,6 +10,7 @@ use App\Models\Survei\Jawaban;
 use App\Models\Survei\RekamanSuara;
 use App\Models\Tenant\Wilayah;
 use App\Models\Pengguna;
+use App\Services\Survei\SurveySyncService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
@@ -31,11 +32,11 @@ class SesiSurveiController extends ModuleCrudController
     private function getUserWilayahId(): ?int
     {
         $user = auth()->user();
-        if (!$user || !$user->id_koperasi) {
+        if (!$user || !$user->id_entitas) {
             return null;
         }
 
-        return $user->koperasi?->id_wilayah;
+        return $user->entitas?->id_wilayah;
     }
 
     private function checkHakAksesSesi(SesiSurvei $sesi): void
@@ -48,24 +49,31 @@ class SesiSurveiController extends ModuleCrudController
 
     public function index(Request $request): View
     {
-        $query = SesiSurvei::with(['wilayah', 'petugas', 'narasumber']);
+        $query = SesiSurvei::with(['wilayah', 'petugas', 'jawaban', 'narasumber']);
 
         if ($userWilayahId = $this->getUserWilayahId()) {
             $query->where('id_wilayah', $userWilayahId);
         }
 
         if ($search = $request->query('q')) {
-            $query->whereHas('wilayah', function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('catatan', 'like', "%{$search}%")
+                    ->orWhereHas('wilayah', fn ($qw) => $qw->where('nama', 'like', "%{$search}%"))
+                    ->orWhereHas('petugas', fn ($qp) => $qp->where('nama', 'like', "%{$search}%"));
             });
         }
 
-        $items = $query->latest('id')->paginate(15)->withQueryString();
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+
+        $items = $query->latest('id')->paginate($this->perPage)->withQueryString();
 
         return view('survei.sesi.index', [
-            'items'     => $items,
-            'title'     => 'Daftar Sesi Survei',
+            'items' => $items,
+            'title' => $this->title,
             'routeBase' => $this->routeBase,
+            'columns' => ['id', 'id_wilayah', 'tahun', 'tanggal_survei', 'status'],
         ]);
     }
 
@@ -103,7 +111,6 @@ class SesiSurveiController extends ModuleCrudController
             'tanggal_survei' => 'required|date',
             'tahun'          => 'nullable|integer|min:2000|max:2100',
             'bulan'          => 'nullable|integer|min:1|max:12',
-            'salin_data'     => 'nullable|boolean',
         ]);
 
         $userWilayahId = $this->getUserWilayahId();
@@ -125,26 +132,8 @@ class SesiSurveiController extends ModuleCrudController
 
         $sesi = SesiSurvei::create($validated);
 
-        // Salin data narasumber & demografi dari periode sebelumnya secara otomatis jika opsi diaktifkan
-        $salin = $request->has('salin_data') ? $request->boolean('salin_data') : true;
-        $pesanSalin = '';
-        if ($salin) {
-            $disalin = $sesi->salinDataDariPeriodeSebelumnya();
-            if ($disalin) {
-                $pesanSalin = ' Data narasumber & demografi dari periode sebelumnya otomatis disalin sebagai acuan.';
-            }
-        }
-
         return redirect()->route('survei.sesi.show', $sesi->id)
-            ->with('success', 'Sesi survei berhasil dibuat.' . $pesanSalin);
-    }
-
-    /**
-     * Helper untuk menyalin data narasumber & demografi dari sesi survei sebelumnya di desa yang sama.
-     */
-    public function salinDataNarasumberSesiSebelumnya(SesiSurvei $targetSesi): bool
-    {
-        return $targetSesi->salinDataDariPeriodeSebelumnya();
+            ->with('success', 'Sesi survei berhasil dibuat.');
     }
 
     public function show(int|string $id): View

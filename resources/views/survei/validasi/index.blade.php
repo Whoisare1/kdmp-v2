@@ -6,7 +6,7 @@
             <p class="text-sm text-ink-500">Perbandingan Data Baseline Kependudukan RT vs Survei Real Masyarakat.</p>
             @if(isset($wilayahAdmin) && $wilayahAdmin)
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mt-1">
-                    📍 Wilayah: {{ $wilayahAdmin->nama }}
+                    Wilayah: {{ $wilayahAdmin->nama }}
                 </span>
             @endif
         </div>
@@ -100,7 +100,7 @@
     @if(isset($unmatchedMasyarakat) && $unmatchedMasyarakat->count() > 0)
         <div class="mt-6 rounded-sm border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
             <div class="flex items-start gap-3">
-                <span class="text-amber-600 text-base">ℹ️</span>
+                <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
                 <div>
                     <h4 class="text-sm font-semibold text-amber-900">Perhatian: Ada Data Masyarakat yang RT-nya Belum Mengisi Baseline</h4>
                     <p class="text-xs text-amber-700 mt-0.5">

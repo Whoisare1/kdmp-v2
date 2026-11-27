@@ -7,6 +7,9 @@
             'items' => [
                 ['label' => 'Entitas', 'route' => 'master.entitas.index', 'match' => 'master.entitas.*', 'super_admin_only' => true],
                 ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
+                ['label' => 'Kategori Komoditas', 'route' => 'master.kategori-komoditas.index', 'match' => 'master.kategori-komoditas.*'],
+                ['label' => 'Master Komoditas', 'route' => 'master.master-komoditas.index', 'match' => 'master.master-komoditas.*'],
+                ['label' => 'Item Komoditas', 'route' => 'master.item-komoditas.index', 'match' => 'master.item-komoditas.*'],
                 ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.*'],
                 ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
                 ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
@@ -14,16 +17,12 @@
             ]
         ],
         [
-            'title' => 'Survei & Pemetaan',
-            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>',
-            'match' => 'survei.*',
+            'title' => 'Pendataan Desa',
+            'icon' => '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>',
+            'match' => 'pendataan.*',
             'items' => [
-                ['label' => 'Dashboard Survei', 'route' => 'survei.dashboard.index', 'match' => 'survei.dashboard.*'],
-                ['label' => 'Sesi Survei', 'route' => 'survei.sesi.index', 'match' => 'survei.sesi.*'],
-                ['label' => 'Data RT', 'route' => 'survei.rt.index', 'match' => 'survei.rt.*'],
-                ['label' => 'Produsen Desa', 'route' => 'survei.produsen.index', 'match' => 'survei.produsen.*'],
-                ['label' => 'Validasi Survei', 'route' => 'survei.validasi.index', 'match' => 'survei.validasi.*'],
-                ['label' => 'Bank Pertanyaan', 'route' => 'survei.pertanyaan.index', 'match' => 'survei.pertanyaan.*'],
+                ['label' => 'Pendataan Penduduk', 'route' => 'pendataan.penduduk.index', 'match' => 'pendataan.penduduk.*'],
+                ['label' => 'Profil Petani', 'route' => 'pendataan.petani.index', 'match' => 'pendataan.petani.*'],
             ]
         ],
         [
@@ -191,7 +190,7 @@
                                 @endphp
                                 <li>
                                     <a 
-                                        href="{{ route($item['route']) }}" 
+                                        href="{{ Route::has($item['route']) ? route($item['route']) : '#' }}" 
                                         class="block rounded-lg px-3 py-2 text-xs transition-colors
                                         {{ $isItemActive ? 'bg-padi-500/10 text-padi-400 font-medium relative before:absolute before:-left-[0.8125rem] before:top-1/2 before:-translate-y-1/2 before:w-[5px] before:h-[5px] before:rounded-full before:bg-padi-400' : 'text-paper-400 hover:bg-ink-800 hover:text-white' }}"
                                     >

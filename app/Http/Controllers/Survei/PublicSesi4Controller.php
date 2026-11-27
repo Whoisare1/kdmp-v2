@@ -34,7 +34,6 @@ class PublicSesi4Controller extends Controller
                     WHEN kategori = 'Pertanian' THEN 1
                     WHEN kategori = 'Peternakan' THEN 2
                     WHEN kategori = 'Perikanan' THEN 3
-                    WHEN kategori = 'Perkebunan' THEN 99
                     ELSE 50
                 END
             ")

@@ -71,6 +71,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // ===== Modul Master Komoditas, Pendataan Desa, dan Laporan =====
+    require __DIR__ . '/routes_pendataan_laporan.php';
+
     // ===== SUPER ADMIN =====
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Admin\SuperAdminController::class, 'dashboard'])->name('dashboard');

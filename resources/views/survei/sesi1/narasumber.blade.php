@@ -1,4 +1,4 @@
-﻿<x-layouts.app :title="$title" eyebrow="Survei — Sesi 1">
+<x-layouts.app :title="$title" eyebrow="Survei — Sesi 1">
 
     {{-- ═══════════════════════════════════════════════════════════════════
          HEADER
@@ -240,7 +240,7 @@
 
                     {{-- Peringatan jika ada nilai negatif --}}
                     <div id="alert-negatif" class="hidden mx-5 mb-4 rounded-sm border border-merah-200 bg-merah-50 px-3 py-2 text-xs text-merah-800">
-                        ⚠ Nilai tidak boleh negatif. Periksa kembali data yang dimasukkan.
+                        Nilai tidak boleh negatif. Periksa kembali data yang dimasukkan.
                     </div>
                 </div>
 

@@ -33,26 +33,6 @@ return new class extends Migration
             $t->timestamps();
         });
 
-        // Bulan 13 = periode penyesuaian, dipakai untuk tutup buku Jan-Mar tahun N+1
-        Schema::create('periode_akuntansi', function (Blueprint $t) {
-            $t->id('id_periode');
-            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
-            $t->year('tahun');
-            $t->unsignedTinyInteger('bulan');
-            $t->enum('status', ['OPEN', 'CLOSED', 'LOCKED'])->default('OPEN');
-            $t->dateTime('tgl_tutup')->nullable();
-            $t->unsignedBigInteger('ditutup_oleh')->nullable();
-            $t->unique(['id_entitas', 'tahun', 'bulan']);
-        });
-
-        Schema::create('konfigurasi', function (Blueprint $t) {
-            $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
-            $t->string('kunci', 50);
-            $t->string('nilai');
-            $t->string('keterangan')->nullable();
-            $t->primary(['id_entitas', 'kunci']);
-        });
-
         Schema::create('pengguna', function (Blueprint $t) {
             $t->id();
             $t->foreignId('id_entitas')->nullable()->constrained('entitas', 'id_entitas')
@@ -77,30 +57,13 @@ return new class extends Migration
             $t->foreignId('id_peran')->constrained('peran', 'id_peran');
             $t->primary(['id_pengguna', 'id_peran']);
         });
-
-        Schema::create('audit_log', function (Blueprint $t) {
-            $t->id('id_log');
-            $t->unsignedBigInteger('id_entitas')->nullable();
-            $t->unsignedBigInteger('id_pengguna')->nullable();
-            $t->string('tabel', 50);
-            $t->unsignedBigInteger('record_id');
-            $t->enum('aksi', ['INSERT', 'UPDATE', 'DELETE', 'POST', 'REVERSE', 'APPROVE']);
-            $t->json('data_lama')->nullable();
-            $t->json('data_baru')->nullable();
-            $t->string('ip_address', 45)->nullable();
-            $t->timestamp('created_at')->nullable();
-            $t->index(['tabel', 'record_id', 'created_at']);
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('pengguna_peran');
         Schema::dropIfExists('peran');
         Schema::dropIfExists('pengguna');
-        Schema::dropIfExists('konfigurasi');
-        Schema::dropIfExists('periode_akuntansi');
         Schema::dropIfExists('entitas');
         Schema::dropIfExists('wilayah');
     }

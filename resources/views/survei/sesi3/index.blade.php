@@ -570,7 +570,7 @@
             document.getElementById('modal-standar-title').innerText    = 'Edit Standar Konsumsi';
             document.getElementById('modal-standar-subtitle').innerText = kom.nama + ' (' + kom.kategori + ')';
             document.getElementById('row-pilih-komoditas').classList.add('hidden');
-            document.getElementById('label-komoditas-terpilih').innerText = '✓ ' + kom.nama;
+            document.getElementById('label-komoditas-terpilih').innerText = kom.nama;
             document.getElementById('label-komoditas-terpilih').classList.remove('hidden');
             document.getElementById('form-standar').action = storeUrl;
             document.getElementById('form-method').value  = 'POST';
@@ -689,7 +689,7 @@
             komoditasTerpilih = { id, nama, kategori };
             document.getElementById('form-id-komoditas').value      = id;
             document.getElementById('search-komoditas').value       = nama;
-            document.getElementById('label-komoditas-terpilih').innerText = '✓ ' + nama + ' (' + kategori + ')';
+            document.getElementById('label-komoditas-terpilih').innerText = nama + ' (' + kategori + ')';
             document.getElementById('label-komoditas-terpilih').classList.remove('hidden');
             hideDropdown();
         }

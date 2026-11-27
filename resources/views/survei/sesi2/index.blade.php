@@ -1,4 +1,4 @@
-﻿<x-layouts.app :title="$title" eyebrow="Manajemen Survei">
+<x-layouts.app :title="$title" eyebrow="Manajemen Survei">
     @php
         $st2 = $sesi->status_sesi2 ?? 'belum_diisi';
         $st2Cls = match($st2) {
@@ -392,14 +392,14 @@
             <form action="{{ route('survei.sesi2.draft', $sesi->id) }}" method="POST">
                 @csrf
                 <button type="submit" class="rounded-sm border border-paper-300 bg-white px-4 py-2 text-xs font-semibold text-ink-700 hover:bg-paper-100">
-                    💾 Simpan Draft Sesi 2
+                    Simpan Draft Sesi 2
                 </button>
             </form>
 
             <form action="{{ route('survei.sesi2.selesaikan', $sesi->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin data Sesi 2 — Potensi Produksi Desa sudah lengkap dan benar?')">
                 @csrf
                 <button type="submit" class="rounded-sm bg-merah-500 px-5 py-2 text-xs font-semibold text-white hover:bg-merah-600 shadow-sm transition-colors">
-                    ✓ Selesaikan Sesi 2
+                    Selesaikan Sesi 2
                 </button>
             </form>
         </div>
