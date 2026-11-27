@@ -32,6 +32,22 @@
         </a>
     @endif
 
+    @php
+        $jumlahRekomendasiMasuk = \App\Models\Perencanaan\RekomendasiPengadaanDesa::where('status', 'diajukan')->count();
+    @endphp
+    @if ($jumlahRekomendasiMasuk > 0)
+        <a href="{{ route('gudang.rekomendasi-pengadaan.index', ['status' => 'diajukan']) }}"
+           class="mb-5 flex items-center justify-between gap-4 rounded-sm border border-sawah-300 bg-sawah-50 p-4 transition hover:bg-sawah-100">
+            <div>
+                <p class="font-mono text-[11px] uppercase tracking-wide text-sawah-700">Rekomendasi Pengadaan Masuk</p>
+                <p class="mt-1 text-sm font-medium text-sawah-800">
+                    {{ $jumlahRekomendasiMasuk }} rekomendasi desa menunggu persetujuan Anda.
+                </p>
+            </div>
+            <span class="text-sm font-medium text-sawah-700">Tinjau &rarr;</span>
+        </a>
+    @endif
+
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <a href="{{ route('gudang.penerimaan.index') }}" class="rounded-sm border border-paper-300 bg-paper-50 p-5 transition hover:border-merah-400 hover:bg-merah-50">
             <p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Barang Masuk</p>
@@ -69,6 +85,23 @@
             <p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Kerusakan</p>
             <h3 class="mt-3 font-display text-xl font-semibold text-ink-900">Barang Rusak</h3>
             <p class="mt-2 text-sm text-ink-700">Catat barang rusak, tidak layak, atau perlu tindakan.</p>
+        </a>
+
+        <a href="{{ route('gudang.rekomendasi-pengadaan.index') }}" class="rounded-sm border border-paper-300 bg-paper-50 p-5 transition hover:border-sawah-400 hover:bg-sawah-50">
+            <p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Antar Desa</p>
+            <h3 class="mt-3 font-display text-xl font-semibold text-ink-900">Rekomendasi Pengadaan</h3>
+            <p class="mt-2 text-sm text-ink-700">Setujui atau tolak permintaan surplus dari desa yang membutuhkan.</p>
+            @if (($jumlahRekomendasiMasuk ?? 0) > 0)
+                <span class="mt-3 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                    {{ $jumlahRekomendasiMasuk }} menunggu
+                </span>
+            @endif
+        </a>
+
+        <a href="{{ route('gudang.pencocokan-surplus-defisit.index') }}" class="rounded-sm border border-paper-300 bg-paper-50 p-5 transition hover:border-sawah-400 hover:bg-sawah-50">
+            <p class="font-mono text-[11px] uppercase tracking-wide text-ink-600/60">Perencanaan</p>
+            <h3 class="mt-3 font-display text-xl font-semibold text-ink-900">Pencocokan Surplus-Defisit</h3>
+            <p class="mt-2 text-sm text-ink-700">Cocokkan kebutuhan antar desa berdasarkan kalkulasi surplus dan defisit.</p>
         </a>
     </div>
 </x-layouts.app>

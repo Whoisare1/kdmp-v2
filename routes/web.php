@@ -84,6 +84,9 @@ require __DIR__ . '/survei.php';
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/notifikasi', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::patch('/notifikasi/{id}/dibaca', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
 
     // ===== SUPER ADMIN =====
     Route::middleware('super_admin')->prefix('admin')->name('admin.')->group(function () {
@@ -138,6 +141,8 @@ Route::middleware('auth')->group(function () {
             ->name('permintaan-pengadaan.from-hasil');
         Route::post('rekomendasi-pengadaan', [RekomendasiPengadaanDesaController::class, 'store'])
             ->name('rekomendasi-pengadaan.store');
+        Route::post('rekomendasi-pengadaan/{id}/setujui', [RekomendasiPengadaanDesaController::class, 'setujui'])
+            ->name('rekomendasi-pengadaan.setujui');
         Route::post('permintaan-pengadaan/{id}/setujui', [PermintaanPengadaanController::class, 'setujui'])
             ->name('permintaan-pengadaan.setujui');
         Route::post('permintaan-pengadaan/{id}/tolak', [PermintaanPengadaanController::class, 'tolak'])

@@ -6,6 +6,9 @@ use App\Http\Controllers\Concerns\ResolvesWilayahAktif;
 use App\Http\Controllers\Controller;
 use App\Models\Perencanaan\HasilKalkulasi;
 use App\Models\Perencanaan\RekomendasiPengadaanDesa;
+use App\Models\Pengguna;
+use App\Notifications\AppNotification;
+use App\Services\Perencanaan\DraftPembelianDariRekomendasiService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,60 +22,105 @@ class RekomendasiPengadaanDesaController extends Controller
     {
         abort_unless(auth()->user()?->hasPeran('manajer'), 403, 'Pengajuan rekomendasi hanya dapat dilakukan Admin Desa.');
 
-        $validated = $request->validate([
+        $multiSend = is_array($request->input('id_hasil_surplus'));
+        $rules = [
             'id_hasil_defisit' => ['required', 'integer', 'exists:hasil_kalkulasi,id_hasil'],
-            'id_hasil_surplus' => ['required', 'integer', 'exists:hasil_kalkulasi,id_hasil'],
-        ]);
+            'id_hasil_surplus' => $multiSend
+                ? ['required', 'array', 'min:1', 'max:3']
+                : ['required', 'integer', 'exists:hasil_kalkulasi,id_hasil'],
+        ];
+        if ($multiSend) {
+            $rules['id_hasil_surplus.*'] = ['required', 'integer', 'distinct', 'exists:hasil_kalkulasi,id_hasil'];
+        }
+        $validated = $request->validate($rules);
         $idWilayah = $this->wilayahAktifId();
         $pengajuId = (int) auth()->id();
+        $pasangan = $multiSend
+            ? collect($validated['id_hasil_surplus'])
+                ->map(fn ($id): array => ['defisit' => (int) $validated['id_hasil_defisit'], 'surplus' => (int) $id])
+                ->all()
+            : [['defisit' => (int) $validated['id_hasil_defisit'], 'surplus' => (int) $validated['id_hasil_surplus']]];
 
-        $defisit = DB::transaction(function () use ($validated, $idWilayah, $pengajuId): HasilKalkulasi {
-            $hasilDefisit = HasilKalkulasi::query()
-                ->with('komoditas')
-                ->whereKey($validated['id_hasil_defisit'])
+        $defisit = DB::transaction(function () use ($pasangan, $multiSend, $idWilayah, $pengajuId): HasilKalkulasi {
+            $idHasilPasangan = collect($pasangan)
+                ->flatMap(fn (array $pair): array => [$pair['defisit'], $pair['surplus']])
+                ->unique()
+                ->sort()
+                ->values();
+            $hasilTerkunci = HasilKalkulasi::query()
+                ->with(['komoditas', 'wilayah'])
+                ->whereIn('id_hasil', $idHasilPasangan)
+                ->orderBy('id_hasil')
                 ->lockForUpdate()
-                ->firstOrFail();
-            $hasilSurplus = HasilKalkulasi::query()
-                ->whereKey($validated['id_hasil_surplus'])
-                ->lockForUpdate()
-                ->firstOrFail();
+                ->get()
+                ->keyBy('id_hasil');
+            $hasilDefisitPertama = null;
+            foreach ($pasangan as $pair) {
+                $hasilDefisit = $hasilTerkunci->get($pair['defisit']);
+                $hasilSurplus = $hasilTerkunci->get($pair['surplus']);
+                abort_unless($hasilDefisit && $hasilSurplus, 404, 'Hasil kalkulasi tidak ditemukan.');
+                abort_unless(
+                    $this->hasilTerbaruDenganStatus($hasilDefisit, 'defisit'),
+                    422,
+                    'Hasil defisit bukan kalkulasi terbaru. Muat ulang rekomendasi.'
+                );
+                abort_unless(
+                    $multiSend
+                        ? (int) $hasilDefisit->id_wilayah === $idWilayah
+                        : (int) $hasilDefisit->id_wilayah === $idWilayah || (int) $hasilSurplus->id_wilayah === $idWilayah,
+                    403,
+                    'Rekomendasi harus melibatkan hasil kalkulasi dari desa aktif Anda.'
+                );
+                abort_unless(
+                    $this->pasanganSurplusCocok($hasilDefisit, $hasilSurplus),
+                    422,
+                    'Salah satu desa bukan pasangan surplus terbaru pada periode yang sama. Muat ulang rekomendasi.'
+                );
 
-            abort_unless(
-                (int) $hasilDefisit->id_wilayah === $idWilayah || (int) $hasilSurplus->id_wilayah === $idWilayah,
-                403,
-                'Rekomendasi harus melibatkan komoditas dari desa Anda.'
-            );
-            abort_unless(
-                $this->hasilTerbaruDenganStatus($hasilDefisit, 'defisit')
-                    && $this->pasanganSurplusCocok($hasilDefisit, $hasilSurplus),
-                422,
-                'Pasangan komoditas bukan hasil defisit-surplus terbaru pada periode yang sama. Muat ulang rekomendasi.'
-            );
+                $sudahAda = RekomendasiPengadaanDesa::query()
+                    ->where('id_hasil_defisit', $hasilDefisit->id_hasil)
+                    ->where('id_hasil_surplus', $hasilSurplus->id_hasil)
+                    ->whereIn('status', ['diajukan', 'disetujui'])
+                    ->exists();
+                abort_if($sudahAda, 409, 'Salah satu pasangan desa dan komoditas ini sudah direkomendasikan atau disetujui.');
 
-            $sudahAda = RekomendasiPengadaanDesa::query()
-                ->where('id_hasil_defisit', $hasilDefisit->id_hasil)
-                ->where('id_hasil_surplus', $hasilSurplus->id_hasil)
-                ->whereIn('status', ['diajukan', 'disetujui'])
-                ->exists();
-            abort_if($sudahAda, 409, 'Pasangan desa dan komoditas ini sudah direkomendasikan atau disetujui.');
+                $rekomendasi = RekomendasiPengadaanDesa::create([
+                    'id_hasil_defisit' => $hasilDefisit->id_hasil,
+                    'id_hasil_surplus' => $hasilSurplus->id_hasil,
+                    'id_pengaju' => $pengajuId,
+                    'status' => 'diajukan',
+                ]);
+                $idEntitasSurplus = DB::table('entitas')
+                    ->where('id_wilayah', $hasilSurplus->id_wilayah)
+                    ->where('is_active', true)
+                    ->where('status', 'APPROVED')
+                    ->value('id_entitas');
+                if ($idEntitasSurplus && (int) $idEntitasSurplus !== (int) auth()->user()->id_entitas) {
+                    Pengguna::query()
+                        ->where('id_entitas', $idEntitasSurplus)
+                        ->whereHas('peran', fn ($query) => $query->where('kode', 'manajer'))
+                        ->get()
+                        ->each(fn (Pengguna $manajer) => $manajer->notify(new AppNotification(
+                            title: 'Permintaan rekomendasi masuk',
+                            message: 'Desa '.$hasilDefisit->wilayah?->nama.' meminta komoditas '.$hasilDefisit->komoditas?->nama.'.',
+                            url: route('perencanaan.rekomendasi-pengadaan.index'),
+                            data: ['type' => 'rekomendasi_pengadaan', 'id_rekomendasi' => $rekomendasi->id_rekomendasi],
+                        )));
+                }
+                $hasilDefisitPertama ??= $hasilDefisit;
+            }
 
-            RekomendasiPengadaanDesa::create([
-                'id_hasil_defisit' => $hasilDefisit->id_hasil,
-                'id_hasil_surplus' => $hasilSurplus->id_hasil,
-                'id_pengaju' => $pengajuId,
-                'status' => 'diajukan',
-            ]);
-
-            return $hasilDefisit;
+            return $hasilDefisitPertama;
         });
 
         return redirect()->route('perencanaan.rekomendasi-pengadaan.index')
-            ->with('status', "Rekomendasi untuk {$defisit->komoditas?->nama} berhasil diajukan ke Admin Gudang.");
+            ->with('status', "Rekomendasi {$defisit->komoditas?->nama} berhasil dikirim ke ".count($pasangan).' desa.');
     }
 
-    public function inbox(): View
+    public function inbox(Request $request): View
     {
         $this->authorizeAdminGudang();
+        $filterStatus = $request->query('status'); // null = semua
         $items = RekomendasiPengadaanDesa::query()
             ->with([
                 'hasilDefisit.komoditas',
@@ -81,20 +129,21 @@ class RekomendasiPengadaanDesaController extends Controller
                 'pengaju',
                 'pemutus',
             ])
+            ->when($filterStatus, fn ($q, $s) => $q->where('status', $s))
             ->orderByRaw("CASE WHEN status = 'diajukan' THEN 0 ELSE 1 END")
             ->latest('id_rekomendasi')
             ->paginate(20);
 
         return view('gudang.rekomendasi-pengadaan.index', [
             'items' => $items,
+            'filterStatus' => $filterStatus,
         ]);
     }
 
     public function setujui(int|string $id): RedirectResponse
     {
-        $this->authorizeAdminGudang();
         $item = $this->rekomendasiUntukDitinjau($id);
-        $this->pastikanBukanPengaju($item);
+        $this->pastikanBerhakMenyetujui($item);
         abort_unless($item->status === 'diajukan', 409, 'Rekomendasi ini sudah diproses.');
         abort_unless(
             $this->hasilTerbaruDenganStatus($item->hasilDefisit, 'defisit')
@@ -103,14 +152,69 @@ class RekomendasiPengadaanDesaController extends Controller
             'Hasil kalkulasi telah berubah. Rekomendasi perlu diperiksa ulang.'
         );
 
-        $item->update([
-            'status' => 'disetujui',
-            'diputuskan_oleh' => auth()->id(),
-            'diputuskan_pada' => now(),
-            'catatan_penyetuju' => null,
-        ]);
+        $idPembelian = null;
+        $kodePembelian = null;
 
-        return back()->with('status', 'Rekomendasi disetujui. Tidak ada PR atau transaksi yang dibuat.');
+        DB::transaction(function () use ($item, &$idPembelian, &$kodePembelian): void {
+            HasilKalkulasi::query()
+                ->whereKey($item->id_hasil_defisit)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $terpilih = RekomendasiPengadaanDesa::query()
+                ->whereKey($item->id_rekomendasi)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($terpilih->status === 'diajukan', 409, 'Rekomendasi ini sudah diproses.');
+
+            $terpilih->update([
+                'status' => 'disetujui',
+                'diputuskan_oleh' => auth()->id(),
+                'diputuskan_pada' => now(),
+            ]);
+
+            // Tutup rekomendasi lain untuk defisit yang sama
+            RekomendasiPengadaanDesa::query()
+                ->where('id_hasil_defisit', $terpilih->id_hasil_defisit)
+                ->where('id_rekomendasi', '!=', $terpilih->id_rekomendasi)
+                ->where('status', 'diajukan')
+                ->update([
+                    'status' => 'ditolak',
+                    'diputuskan_oleh' => auth()->id(),
+                    'diputuskan_pada' => now(),
+                    'catatan_penyetuju' => 'Ditutup otomatis karena rekomendasi desa lain telah disetujui lebih dahulu.',
+                ]);
+
+            // Buat draft pembelian otomatis
+            try {
+                $service = app(DraftPembelianDariRekomendasiService::class);
+                $idPembelian = $service->buat($terpilih->fresh(['hasilDefisit.komoditas', 'hasilDefisit.wilayah', 'hasilSurplus.wilayah']));
+                $kodePembelian = \Illuminate\Support\Facades\DB::table('pembelian')
+                    ->where('id_pembelian', $idPembelian)->value('kode_pembelian');
+            } catch (\Throwable $e) {
+                // Draft gagal dibuat tidak membatalkan persetujuan — catat ke log
+                \Illuminate\Support\Facades\Log::warning('Draft pembelian gagal dibuat dari rekomendasi', [
+                    'id_rekomendasi' => $item->id_rekomendasi,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
+        $this->beriNotifikasi($item->id_pengaju, new AppNotification(
+            title: 'Rekomendasi disetujui',
+            message: 'Desa '.$item->hasilSurplus?->wilayah?->nama.' menyetujui permintaan Anda.'
+                .($kodePembelian ? " Draft pembelian {$kodePembelian} telah dibuat." : ' Silakan buat pembelian secara manual.'),
+            url: route('perencanaan.rekomendasi-pengadaan.index'),
+            data: ['type' => 'rekomendasi_pengadaan', 'id_rekomendasi' => $item->id_rekomendasi],
+        ));
+
+        $pesanStatus = 'Rekomendasi disetujui. Alternatif lain ditutup otomatis.';
+        if ($kodePembelian) {
+            $pesanStatus .= " Draft pembelian <strong>{$kodePembelian}</strong> telah dibuat di modul Pembelian.";
+        } else {
+            $pesanStatus .= ' Draft pembelian tidak berhasil dibuat, silakan buat manual di modul Pembelian.';
+        }
+
+        return back()->with('status', $pesanStatus);
     }
 
     public function tolak(Request $request, int|string $id): RedirectResponse
@@ -120,7 +224,7 @@ class RekomendasiPengadaanDesaController extends Controller
             'catatan_penyetuju' => ['nullable', 'string', 'max:1000'],
         ]);
         $item = $this->rekomendasiUntukDitinjau($id);
-        $this->pastikanBukanPengaju($item);
+        abort_if((int) $item->id_pengaju === (int) auth()->id(), 403, 'Pengaju tidak dapat menolak rekomendasinya sendiri.');
         abort_unless($item->status === 'diajukan', 409, 'Rekomendasi ini sudah diproses.');
 
         $item->update([
@@ -141,14 +245,37 @@ class RekomendasiPengadaanDesaController extends Controller
     private function rekomendasiUntukDitinjau(int|string $id): RekomendasiPengadaanDesa
     {
         return RekomendasiPengadaanDesa::query()
-            ->with(['hasilDefisit.komoditas', 'hasilSurplus.wilayah'])
+            ->with(['hasilDefisit.komoditas', 'hasilDefisit.wilayah', 'hasilSurplus.wilayah'])
             ->whereKey($id)
             ->firstOrFail();
     }
 
-    private function pastikanBukanPengaju(RekomendasiPengadaanDesa $item): void
+    private function pastikanBerhakMenyetujui(RekomendasiPengadaanDesa $item): void
     {
-        abort_if((int) $item->id_pengaju === (int) auth()->id(), 403, 'Pengaju tidak dapat menyetujui atau menolak rekomendasinya sendiri.');
+        $user = auth()->user();
+        if ($user?->hasPeran('admin_gudang')) {
+            abort_if((int) $item->id_pengaju === (int) $user->id, 403, 'Pengaju tidak dapat menyetujui rekomendasinya sendiri.');
+
+            return;
+        }
+
+        abort_unless($user?->hasPeran('manajer'), 403, 'Akses hanya untuk desa penerima atau Admin Gudang.');
+        $wilayahPenerima = DB::table('entitas')
+            ->where('id_entitas', $user->id_entitas)
+            ->where('is_active', true)
+            ->where('status', 'APPROVED')
+            ->value('id_wilayah');
+        abort_unless(
+            $wilayahPenerima && (int) $wilayahPenerima === (int) $item->hasilSurplus?->id_wilayah,
+            403,
+            'Hanya Manajer desa surplus penerima yang dapat menyetujui rekomendasi ini.'
+        );
+        abort_if((int) $item->id_pengaju === (int) $user->id, 403, 'Pengaju tidak dapat menyetujui rekomendasinya sendiri.');
+    }
+
+    private function beriNotifikasi(int $idPengguna, AppNotification $notification): void
+    {
+        Pengguna::query()->whereKey($idPengguna)->first()?->notify($notification);
     }
 
     private function hasilTerbaruDenganStatus(HasilKalkulasi $hasil, string $status): bool
