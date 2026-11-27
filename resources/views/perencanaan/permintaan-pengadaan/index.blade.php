@@ -96,8 +96,20 @@
                                                                                 <span class="block text-[11px] text-ink-600">Kebutuhan {{ number_format((float) $calonPasangan->total_kebutuhan, 2, ',', '.') }} · Tersedia {{ number_format((float) $calonPasangan->total_ketersediaan, 2, ',', '.') }} · Periode {{ ucfirst(\App\Support\Perencanaan\PeriodeKalkulasi::fromMonth((int) $calonPasangan->bulan)) }} {{ $calonPasangan->tahun }}</span>
                                                                             @if ($pengajuanPasangan && $pengajuanPasangan->status !== 'ditolak')
                                                                                 <span class="mt-1 inline-block rounded-sm px-2 py-1 font-semibold {{ $pengajuanPasangan->status === 'disetujui' ? 'bg-sawah-100 text-sawah-800' : 'bg-amber-50 text-amber-800' }}">
-                                                                                    {{ $pengajuanPasangan->status === 'disetujui' ? 'Disetujui Admin Gudang' : 'Menunggu Admin Gudang' }}
+                                                                                    {{ $pengajuanPasangan->status === 'disetujui' ? 'Disetujui' : 'Menunggu desa surplus' }}
                                                                                 </span>
+                                                                            @elseif ($pengajuanPasangan?->status === 'ditolak')
+                                                                                <span class="mt-1 inline-block rounded-sm bg-paper-200 px-2 py-1 font-semibold text-ink-700">
+                                                                                    {{ str_starts_with((string) $pengajuanPasangan->catatan_penyetuju, 'Ditutup otomatis') ? 'Ditutup otomatis' : 'Ditolak' }}
+                                                                                </span>
+                                                                            @endif
+                                                                            @if (! $milikSendiriDefisit && $pengajuanPasangan?->status === 'diajukan')
+                                                                                <form method="POST" action="{{ route('perencanaan.rekomendasi-pengadaan.setujui', $pengajuanPasangan->id_rekomendasi) }}" class="mt-2">
+                                                                                    @csrf
+                                                                                    <button type="submit" class="rounded-sm bg-sawah-700 px-3 py-1.5 font-semibold text-white hover:bg-sawah-800">
+                                                                                        Setujui permintaan desa ini
+                                                                                    </button>
+                                                                                </form>
                                                                             @endif
                                                                         </li>
                                                                     @endforeach
@@ -117,18 +129,23 @@
                                                                 <input type="hidden" name="id_hasil_surplus" value="{{ $hasil->id_hasil }}">
                                                             @endif
                                                             <label for="pasangan-{{ $hasil->id_hasil }}" class="grid gap-1 text-[11px] font-medium text-ink-700">
-                                                                Pilih desa dengan status {{ strtolower($statusLabelPasangan) }}
-                                                                <select id="pasangan-{{ $hasil->id_hasil }}" name="{{ $milikSendiriDefisit ? 'id_hasil_surplus' : 'id_hasil_defisit' }}" required class="min-w-60 rounded-sm border border-paper-300 bg-white px-2 py-2 text-xs text-ink-800">
-                                                                    <option value="">Pilih desa</option>
+                                                                    {{ $milikSendiriDefisit ? 'Pilih hingga 3 desa surplus' : 'Pilih desa defisit' }}
+                                                                    <select id="pasangan-{{ $hasil->id_hasil }}" name="{{ $milikSendiriDefisit ? 'id_hasil_surplus[]' : 'id_hasil_defisit' }}" @if ($milikSendiriDefisit) multiple size="3" @endif required class="min-w-60 rounded-sm border border-paper-300 bg-white px-2 py-2 text-xs text-ink-800">
+                                                                        @unless ($milikSendiriDefisit)
+                                                                            <option value="">Pilih desa</option>
+                                                                        @endunless
                                                                     @foreach ($calonBelumDiajukan as $calonPasangan)
                                                                         <option value="{{ $calonPasangan->id_hasil }}">{{ $calonPasangan->wilayah?->nama ?? 'Desa lain' }} — {{ ucfirst($statusLabelPasangan) }} {{ number_format(abs((float) $calonPasangan->selisih), 2, ',', '.') }}</option>
                                                                     @endforeach
                                                                 </select>
                                                             </label>
                                                             <button type="submit" class="rounded-sm bg-merah-600 px-4 py-2 font-semibold text-white shadow-sm hover:bg-merah-700 focus:outline-none focus:ring-2 focus:ring-merah-500 focus:ring-offset-2">
-                                                                Rekomendasikan ke Desa Lain
+                                                                {{ $milikSendiriDefisit ? 'Kirim rekomendasi ke desa terpilih' : 'Rekomendasikan ke Desa Lain' }}
                                                             </button>
                                                         </form>
+                                                        @if ($milikSendiriDefisit)
+                                                            <p class="text-[11px] text-ink-600">Maksimal tiga desa surplus. Penerima yang menyetujui lebih dahulu akan dipilih dan rekomendasi alternatif untuk defisit ini ditutup.</p>
+                                                        @endif
                                                     @else
                                                         <button type="button" disabled class="inline-flex cursor-not-allowed rounded-sm bg-paper-200 px-4 py-2 font-semibold text-ink-600">
                                                             {{ $rencana['calonSupplier']->isNotEmpty() ? 'Semua pasangan sudah direkomendasikan' : 'Belum ada pasangan untuk direkomendasikan' }}

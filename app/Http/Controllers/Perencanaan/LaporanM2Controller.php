@@ -51,7 +51,11 @@ class LaporanM2Controller extends Controller
 
         $query = HasilKalkulasi::with(['komoditas', 'wilayah'])
             ->where('id_wilayah', $idWilayah)
-            ->where('tahun', $tahun);
+            ->where('tahun', $tahun)
+            ->where('status', 'disetujui')
+            ->whereRaw(
+                "hasil_kalkulasi.versi = (SELECT MAX(h2.versi) FROM hasil_kalkulasi h2 WHERE h2.id_wilayah = hasil_kalkulasi.id_wilayah AND h2.id_komoditas = hasil_kalkulasi.id_komoditas AND h2.tahun = hasil_kalkulasi.tahun AND h2.bulan = hasil_kalkulasi.bulan AND h2.status = 'disetujui')"
+            );
 
         if ($bulan !== null) {
             $query->where('bulan', $bulan);

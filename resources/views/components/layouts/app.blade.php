@@ -78,6 +78,13 @@
                                 </select>
                             </form>
                         @endif
+                        <a href="{{ route('notifications.index') }}" class="relative rounded-lg border border-paper-300 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-paper-100" aria-label="Notifikasi">
+                            Notifikasi
+                            @php($jumlahNotifikasiBelumDibaca = $navUser->unreadNotifications()->count())
+                            @if ($jumlahNotifikasiBelumDibaca > 0)
+                                <span class="ml-1 rounded-full bg-merah-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">{{ $jumlahNotifikasiBelumDibaca }}</span>
+                            @endif
+                        </a>
                         <div class="text-right leading-tight hidden sm:block">
                             <p class="text-sm font-semibold text-ink-900">{{ $navUser->nama }}</p>
                             <p class="text-[11px] text-paper-500 uppercase font-medium mt-0.5">

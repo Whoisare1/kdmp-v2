@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Pengguna;
 use App\Models\Peran;
+use App\Services\StokService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -351,6 +352,31 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
         $response->assertSee('Semua gudang');
         $response->assertSee('Minimum entitas: 25');
         $this->assertSame(1, substr_count($response->getContent(), 'Semua gudang'));
+    }
+
+    public function test_stok_yang_menyentuh_batas_minimum_mengirim_notifikasi_ke_manajer_entitas(): void
+    {
+        $peranManajer = Peran::firstOrCreate(['kode' => 'manajer'], ['nama' => 'Manajer']);
+        $this->penggunaDefisit->peran()->syncWithoutDetaching([$peranManajer->id_peran]);
+        DB::table('stok')
+            ->where('id_gudang', $this->idGudangDefisit)
+            ->where('id_barang', $this->idBarang)
+            ->update(['qty_on_hand' => 30]);
+
+        app(StokService::class)->keluar(
+            entitasId: $this->idEntitasDefisit,
+            gudangId: $this->idGudangDefisit,
+            barangId: $this->idBarang,
+            qty: '5',
+            refTipe: 'UJI_STOK_MINIMUM',
+            refId: 900001,
+            createdBy: $this->penggunaDefisit->id,
+        );
+
+        $notifikasi = $this->penggunaDefisit->notifications()->firstOrFail();
+        $this->assertSame('stok_minimum', $notifikasi->data['type']);
+        $this->assertStringContainsString('batas minimum', $notifikasi->data['message']);
+        $this->assertSame(25.0, (float) DB::table('stok')->where('id_gudang', $this->idGudangDefisit)->where('id_barang', $this->idBarang)->value('qty_on_hand'));
     }
 
     public function test_pencocokan_dan_permintaan_mengonversi_stok_ke_satuan_perencanaan(): void

@@ -13,3 +13,6 @@ Schedule::command('idempotency:prune --hours=72')->daily();
 
 // Proses antrean jurnal transaksi gudang secara berkala
 Schedule::command('jurnal:proses-gudang')->everyMinute();
+
+// Cek stok minimum dan kirim notifikasi ke admin_gudang setiap jam
+Schedule::command('gudang:cek-stok-minimum')->hourly();

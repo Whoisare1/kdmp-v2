@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\Gudang\KartuStok;
 use App\Models\Gudang\Stok;
+use App\Models\Master\Barang;
+use App\Models\Pengguna;
+use App\Notifications\AppNotification;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -37,6 +40,7 @@ class StokService
             $createdBy,
             $tanggal,
         ): KartuStok {
+            $qtyTersediaSebelum = self::qtyTersediaEntitasBarang($entitasId, $barangId);
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
                 ->where('id_barang', $barangId)
@@ -72,6 +76,7 @@ class StokService
                     'updated_at' => now(),
                 ],
             );
+            self::notifikasiJikaMencapaiMinimum($entitasId, $barangId, $qtyTersediaSebelum);
 
             return KartuStok::create([
                 'id_entitas' => $entitasId,
@@ -119,6 +124,7 @@ class StokService
             $idBatch,
             $izinkanBatchKedaluwarsa,
         ): KartuStok {
+            $qtyTersediaSebelum = self::qtyTersediaEntitasBarang($entitasId, $barangId);
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
                 ->where('id_barang', $barangId)
@@ -157,6 +163,7 @@ class StokService
                     'nilai_persediaan' => $nilaiBaru,
                     'updated_at' => now(),
                 ]);
+            self::notifikasiJikaMencapaiMinimum($entitasId, $barangId, $qtyTersediaSebelum);
 
             $kartuStok = KartuStok::create([
                 'id_entitas' => $entitasId,
@@ -216,6 +223,7 @@ class StokService
             $opnameId,
             $createdBy,
         ): array {
+            $qtyTersediaSebelum = self::qtyTersediaEntitasBarang($entitasId, $barangId);
             $stok = Stok::query()
                 ->where('id_gudang', $gudangId)
                 ->where('id_barang', $barangId)
@@ -262,6 +270,7 @@ class StokService
                     'updated_at' => now(),
                 ],
             );
+            self::notifikasiJikaMencapaiMinimum($entitasId, $barangId, $qtyTersediaSebelum);
 
             $kartuStok = KartuStok::create([
                 'id_entitas' => $entitasId,
@@ -336,6 +345,7 @@ class StokService
 
         DB::beginTransaction();
         try {
+            $qtyTersediaSebelum = self::qtyTersediaEntitasBarang($entitasId, $idBarang);
             $where = ['id_gudang' => $idGudang, 'id_barang' => $idBarang];
 
             $stok = DB::table('stok')->where($where)->first();
@@ -366,6 +376,7 @@ class StokService
                 'hpp_rata2' => $hppBaru,
                 'nilai_persediaan' => $qtyBaru * $hppBaru,
             ]);
+            self::notifikasiJikaMencapaiMinimum($entitasId, $idBarang, $qtyTersediaSebelum);
 
             $stok = Stok::where($where)->firstOrFail();
 
@@ -432,6 +443,7 @@ class StokService
 
         DB::beginTransaction();
         try {
+            $qtyTersediaSebelum = self::qtyTersediaEntitasBarang($entitasId, $idBarang);
             // 1. Ambil stok
             $where = ['id_gudang' => $idGudang, 'id_barang' => $idBarang];
             $stok = DB::table('stok')->where($where)->lockForUpdate()->firstOrFail();
@@ -464,6 +476,7 @@ class StokService
                 'qty_on_hand' => $qtyBaru,
                 'nilai_persediaan' => $nilaiPersediaanBaru,
             ]);
+            self::notifikasiJikaMencapaiMinimum($entitasId, $idBarang, $qtyTersediaSebelum);
 
             // 4. Create kartu stok
             $kartuStok = KartuStok::create([
@@ -519,6 +532,7 @@ class StokService
             }
 
             $where = ['id_gudang' => $kartu->id_gudang, 'id_barang' => $kartu->id_barang];
+            $qtyTersediaSebelum = self::qtyTersediaEntitasBarang((int) $kartu->id_entitas, (int) $kartu->id_barang);
             $stok = Stok::query()->where($where)->lockForUpdate()->firstOrFail();
 
             // Reverse: stok sekarang - qty_masuk_di_kartu + qty_keluar_di_kartu
@@ -536,6 +550,7 @@ class StokService
                 'nilai_persediaan' => $nilaiPersediaanBaru,
                 'updated_at' => now(),
             ]);
+            self::notifikasiJikaMencapaiMinimum((int) $kartu->id_entitas, (int) $kartu->id_barang, $qtyTersediaSebelum);
 
             $kartu->update(['is_reversed' => true]);
 
@@ -598,6 +613,7 @@ class StokService
             $stokBatch = app(StokBatchService::class);
 
             foreach ($adjustments as $adj) {
+                $qtyTersediaSebelum = self::qtyTersediaEntitasBarang($entitasId, (int) $adj['id_barang']);
                 if ($stokBatch->pelacakanAktif($entitasId, (int) $adj['id_barang'])) {
                     throw new RuntimeException(
                         'Opname melalui jalur lama tidak dapat digunakan untuk barang dengan pelacakan batch aktif. '
@@ -617,6 +633,7 @@ class StokService
                     'nilai_persediaan' => $nilaiPersediaanBaru,
                     'updated_at' => now(),
                 ]);
+                self::notifikasiJikaMencapaiMinimum($entitasId, (int) $adj['id_barang'], $qtyTersediaSebelum);
 
                 $diff = (string) $adj['selisih'];
                 $absDiff = ltrim($diff, '-'); 
@@ -644,6 +661,63 @@ class StokService
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
+        }
+
+        private static function qtyTersediaEntitasBarang(int $entitasId, int $barangId): string
+        {
+            $total = '0';
+            $saldo = DB::table('stok')
+                ->join('gudang', 'gudang.id_gudang', '=', 'stok.id_gudang')
+                ->where('gudang.id_entitas', $entitasId)
+                ->where('stok.id_barang', $barangId)
+                ->get(['stok.qty_on_hand', 'stok.qty_reserved']);
+
+            foreach ($saldo as $stok) {
+                $tersedia = bcsub((string) $stok->qty_on_hand, (string) $stok->qty_reserved, 4);
+                if (bccomp($tersedia, '0', 4) < 0) {
+                    $tersedia = '0';
+                }
+                $total = bcadd($total, $tersedia, 4);
+            }
+
+            return $total;
+        }
+
+        private static function notifikasiJikaMencapaiMinimum(int $entitasId, int $barangId, string $qtySebelum): void
+        {
+            $stokMinimum = DB::table('barang_per_koperasi')
+                ->where('id_entitas', $entitasId)
+                ->where('id_barang', $barangId)
+                ->value('stok_minimum');
+            if ($stokMinimum === null || bccomp((string) $stokMinimum, '0', 4) <= 0) {
+                return;
+            }
+
+            $qtySesudah = self::qtyTersediaEntitasBarang($entitasId, $barangId);
+            if (
+                bccomp($qtySebelum, (string) $stokMinimum, 4) <= 0
+                || bccomp($qtySesudah, (string) $stokMinimum, 4) > 0
+            ) {
+                return;
+            }
+
+            $barang = Barang::query()->with('satuanDasar')->find($barangId);
+            $jumlah = rtrim(rtrim(number_format((float) $qtySesudah, 4, ',', '.'), '0'), ',');
+            $minimum = rtrim(rtrim(number_format((float) $stokMinimum, 4, ',', '.'), '0'), ',');
+            $satuan = $barang?->satuanDasar?->kode_satuan;
+            $teksSatuan = $satuan ? ' '.$satuan : '';
+            $notifikasi = new AppNotification(
+                title: 'Stok mencapai batas minimum',
+                message: ($barang?->nama_barang ?? 'Barang').' tersisa '.$jumlah.$teksSatuan.' (batas minimum '.$minimum.$teksSatuan.').',
+                url: route('master.barang.stok-minimum.index'),
+                data: ['type' => 'stok_minimum', 'id_entitas' => $entitasId, 'id_barang' => $barangId],
+            );
+
+            Pengguna::query()
+                ->where('id_entitas', $entitasId)
+                ->whereHas('peran', fn ($query) => $query->where('kode', 'manajer'))
+                ->get()
+                ->each(fn (Pengguna $manajer) => $manajer->notify($notifikasi));
         }
     }
 }

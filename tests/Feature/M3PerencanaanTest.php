@@ -564,6 +564,63 @@ class M3PerencanaanTest extends TestCase
         $this->assertSame($jumlahPrSebelumnya, PermintaanPengadaan::count());
     }
 
+    public function test_desa_defisit_dapat_mengirim_rekomendasi_ke_tiga_desa_surplus(): void
+    {
+        $pengaju = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        [$defisit, $surplusPertama] = $this->buatPasanganHasilRekomendasi();
+        $surplusKedua = $this->buatSurplusTambahan($defisit, 'Desa Surplus Kedua Uji');
+        $surplusKetiga = $this->buatSurplusTambahan($defisit, 'Desa Surplus Ketiga Uji');
+        $manajerSurplus = [
+            $this->buatManajerDesa((int) DB::table('entitas')->where('id_wilayah', $surplusPertama->id_wilayah)->value('id_entitas')),
+            $this->buatManajerDesa((int) DB::table('entitas')->where('id_wilayah', $surplusKedua->id_wilayah)->value('id_entitas')),
+            $this->buatManajerDesa((int) DB::table('entitas')->where('id_wilayah', $surplusKetiga->id_wilayah)->value('id_entitas')),
+        ];
+
+        $response = $this->actingAs($pengaju)->post(route('perencanaan.rekomendasi-pengadaan.store'), [
+            'id_hasil_defisit' => $defisit->id_hasil,
+            'id_hasil_surplus' => [$surplusPertama->id_hasil, $surplusKedua->id_hasil, $surplusKetiga->id_hasil],
+        ]);
+
+        $response->assertRedirect(route('perencanaan.rekomendasi-pengadaan.index'));
+        $this->assertSame(3, RekomendasiPengadaanDesa::where('id_hasil_defisit', $defisit->id_hasil)->count());
+        foreach ($manajerSurplus as $manajer) {
+            $this->assertSame(1, $manajer->notifications()->count());
+            $this->assertSame('rekomendasi_pengadaan', $manajer->notifications()->first()->data['type']);
+        }
+    }
+
+    public function test_persetujuan_desa_surplus_menutup_alternatif_dan_tidak_membuat_pr(): void
+    {
+        $pengaju = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
+        [$defisit, $surplusTerpilih] = $this->buatPasanganHasilRekomendasi();
+        $surplusAlternatif = $this->buatSurplusTambahan($defisit, 'Desa Surplus Alternatif Uji');
+        $this->actingAs($pengaju)->post(route('perencanaan.rekomendasi-pengadaan.store'), [
+            'id_hasil_defisit' => $defisit->id_hasil,
+            'id_hasil_surplus' => [$surplusTerpilih->id_hasil, $surplusAlternatif->id_hasil],
+        ])->assertRedirect();
+        $rekomendasiTerpilih = RekomendasiPengadaanDesa::where('id_hasil_surplus', $surplusTerpilih->id_hasil)->firstOrFail();
+        $rekomendasiAlternatif = RekomendasiPengadaanDesa::where('id_hasil_surplus', $surplusAlternatif->id_hasil)->firstOrFail();
+        $entitasSurplus = (int) DB::table('entitas')->where('id_wilayah', $surplusTerpilih->id_wilayah)->value('id_entitas');
+        $manajerSurplus = $this->buatManajerDesa($entitasSurplus);
+        $jumlahPrSebelumnya = PermintaanPengadaan::count();
+
+        $this->actingAs($manajerSurplus)
+            ->post(route('perencanaan.rekomendasi-pengadaan.setujui', $rekomendasiTerpilih->id_rekomendasi))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
+            'id_rekomendasi' => $rekomendasiTerpilih->id_rekomendasi,
+            'status' => 'disetujui',
+        ]);
+        $this->assertDatabaseHas('rekomendasi_pengadaan_desa', [
+            'id_rekomendasi' => $rekomendasiAlternatif->id_rekomendasi,
+            'status' => 'ditolak',
+            'catatan_penyetuju' => 'Ditutup otomatis karena rekomendasi desa lain telah disetujui lebih dahulu.',
+        ]);
+        $this->assertSame($jumlahPrSebelumnya, PermintaanPengadaan::count());
+        $this->assertSame(1, $pengaju->notifications()->whereNull('read_at')->count());
+    }
+
     public function test_admin_gudang_dapat_menyetujui_rekomendasi_tanpa_membuat_pr(): void
     {
         $pengaju = Pengguna::where('email', 'manajer@kdmp-a.test')->firstOrFail();
@@ -706,6 +763,52 @@ class M3PerencanaanTest extends TestCase
             'id_rekomendasi' => $rekomendasi->id_rekomendasi,
             'status' => 'diajukan',
         ]);
+    }
+
+    private function buatSurplusTambahan(HasilKalkulasi $defisit, string $namaWilayah): HasilKalkulasi
+    {
+        $wilayah = Wilayah::create([
+            'nama' => $namaWilayah,
+            'tingkat' => 'desa',
+            'is_active' => true,
+        ]);
+        $this->buatEntitasDesaAktif($wilayah);
+        $versi = (int) HasilKalkulasi::query()
+            ->where('id_wilayah', $wilayah->id)
+            ->where('id_komoditas', $defisit->id_komoditas)
+            ->where('tahun', $defisit->tahun)
+            ->where('bulan', $defisit->bulan)
+            ->max('versi') + 1;
+
+        return HasilKalkulasi::create([
+            'id_wilayah' => $wilayah->id,
+            'id_komoditas' => $defisit->id_komoditas,
+            'tahun' => $defisit->tahun,
+            'bulan' => $defisit->bulan,
+            'total_kebutuhan' => 25,
+            'total_ketersediaan' => 100,
+            'selisih' => 75,
+            'status_surplus_defisit' => 'surplus',
+            'versi' => $versi,
+            'id_unit_usaha_rekomendasi' => 1,
+            'status' => 'disetujui',
+        ]);
+    }
+
+    private function buatManajerDesa(int $idEntitas): Pengguna
+    {
+        $suffix = strtolower(substr(md5(uniqid('', true)), 0, 10));
+        $manajer = Pengguna::create([
+            'id_entitas' => $idEntitas,
+            'nama' => 'Manajer Desa Uji',
+            'email' => 'manajer-uji-'.$suffix.'@kdmp.test',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $peran = Peran::firstOrCreate(['kode' => 'manajer'], ['nama' => 'Manajer']);
+        $manajer->peran()->syncWithoutDetaching([$peran->id_peran]);
+
+        return $manajer;
     }
 
     private function buatPasanganHasilRekomendasi(): array
