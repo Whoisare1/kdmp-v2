@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class BarangController extends Controller
@@ -90,6 +91,85 @@ class BarangController extends Controller
             'entitas' => $this->entitasAktif(),
             'idEntitas' => $idEntitas,
         ]);
+    }
+
+    public function hubungkan(): View
+    {
+        $idEntitas = $this->requireEntitasAktifId();
+
+        return view('master.barang.hubungkan', [
+            'title' => 'Hubungkan Barang Mitra',
+            'entitas' => $this->entitasAktif(),
+            'idEntitas' => $idEntitas,
+        ]);
+    }
+
+    public function storeHubungkan(Request $request): RedirectResponse
+    {
+        $idEntitas = $this->requireEntitasAktifId();
+        $request->merge([
+            'kode_barang' => strtoupper(trim((string) $request->input('kode_barang'))),
+        ]);
+        $validated = $request->validate([
+            'kode_barang' => ['required', 'string', 'max:30'],
+        ]);
+
+        $barang = DB::transaction(function () use ($idEntitas, $validated): Barang {
+            $barang = Barang::query()
+                ->where('kode_barang', $validated['kode_barang'])
+                ->lockForUpdate()
+                ->first();
+
+            if (! $barang || ! $barang->is_active || ! $barang->id_komoditas) {
+                throw ValidationException::withMessages([
+                    'kode_barang' => 'Kode barang tidak ditemukan atau barangnya tidak aktif.',
+                ]);
+            }
+
+            $sudahTerhubung = DB::table('barang_per_koperasi')
+                ->where('id_entitas', $idEntitas)
+                ->where('id_barang', $barang->id_barang)
+                ->exists();
+
+            if ($sudahTerhubung) {
+                throw ValidationException::withMessages([
+                    'kode_barang' => 'Barang ini sudah terhubung ke entitas Anda. Ubah pengaturannya dari daftar barang.',
+                ]);
+            }
+
+            $idEntitasMitra = DB::table('master_pihak')
+                ->where('id_entitas', $idEntitas)
+                ->where('jenis_pihak', 'entitas_lain')
+                ->where('is_active', true)
+                ->whereNotNull('id_entitas_mitra')
+                ->pluck('id_entitas_mitra');
+
+            $digunakanMitra = $idEntitasMitra->isNotEmpty()
+                && DB::table('barang_per_koperasi')
+                    ->where('id_barang', $barang->id_barang)
+                    ->whereIn('id_entitas', $idEntitasMitra)
+                    ->exists();
+
+            if (! $digunakanMitra) {
+                throw ValidationException::withMessages([
+                    'kode_barang' => 'Kode barang tidak digunakan oleh mitra aktif entitas Anda. Minta mitra memberikan kode yang benar.',
+                ]);
+            }
+
+            DB::table('barang_per_koperasi')->insert([
+                'id_entitas' => $idEntitas,
+                'id_barang' => $barang->id_barang,
+                'stok_minimum' => 0,
+                'stok_maksimum' => 0,
+                'harga_jual_standar' => 0,
+                'is_dijual' => false,
+            ]);
+
+            return $barang;
+        });
+
+        return redirect()->route('master.barang.index')
+            ->with('success', "Barang \"{$barang->nama_barang}\" berhasil dihubungkan. Data master dan stok mitra tidak diubah; pengaturan entitas Anda dapat disesuaikan dari daftar barang.");
     }
 
     public function store(Request $request): RedirectResponse

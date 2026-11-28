@@ -2,12 +2,39 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('antrean_jurnal_gudang')) {
+            $columnsToAdd = array_values(array_filter(
+                ['kode_error', 'jumlah_percobaan', 'diproses_pada', 'created_by'],
+                fn (string $column): bool => ! Schema::hasColumn('antrean_jurnal_gudang', $column),
+            ));
+
+            if ($columnsToAdd !== []) {
+                Schema::table('antrean_jurnal_gudang', function (Blueprint $t) use ($columnsToAdd): void {
+                    if (in_array('kode_error', $columnsToAdd, true)) {
+                        $t->string('kode_error', 50)->nullable();
+                    }
+                    if (in_array('jumlah_percobaan', $columnsToAdd, true)) {
+                        $t->unsignedSmallInteger('jumlah_percobaan')->default(0);
+                    }
+                    if (in_array('diproses_pada', $columnsToAdd, true)) {
+                        $t->timestamp('diproses_pada')->nullable();
+                    }
+                    if (in_array('created_by', $columnsToAdd, true)) {
+                        $t->unsignedBigInteger('created_by')->nullable();
+                    }
+                });
+            }
+
+            return;
+        }
+
         Schema::create('antrean_jurnal_gudang', function (Blueprint $t) {
             $t->id('id_antrean');
             $t->foreignId('id_entitas')->constrained('entitas', 'id_entitas');
@@ -40,6 +67,13 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (
+            Schema::hasTable('antrean_jurnal_gudang')
+            && DB::table('antrean_jurnal_gudang')->exists()
+        ) {
+            return;
+        }
+
         Schema::dropIfExists('antrean_jurnal_gudang');
     }
 };

@@ -217,9 +217,10 @@ class PenerimaanBarangSumberTest extends TestCase
         ]);
 
         $this->actingAs($this->adminGudang)
-            ->get(route('gudang.penerimaan.create'))
+            ->get(route('gudang.penerimaan.create', ['id_pembelian' => $pembelian->id_pembelian]))
             ->assertOk()
             ->assertSee('PO-UJI-001')
+            ->assertSee('Beras Premium Uji')
             ->assertSee('Sumber Penerimaan');
 
         $response = $this->actingAs($this->adminGudang)->post(route('gudang.penerimaan.store'), [
@@ -355,5 +356,43 @@ class PenerimaanBarangSumberTest extends TestCase
         $this->assertEquals(120000, (float) $details[0]->debet);
         $this->assertEquals('711', $details[1]->kode_anak);
         $this->assertEquals(120000, (float) $details[1]->kredit);
+    }
+
+    public function test_penerimaan_menghitung_selisih_barang_tidak_layak_dan_menambah_stok_layak_saja(): void
+    {
+        $response = $this->actingAs($this->adminGudang)->post(route('gudang.penerimaan.store'), [
+            'sumber_penerimaan' => 'non_pembelian',
+            'kode_penerimaan' => 'PNR-SORTIR-001',
+            'tanggal_terima' => '2026-11-10',
+            'id_gudang' => $this->idGudang,
+            'id_pihak' => $this->idPihak,
+            'items' => [[
+                'id_barang' => $this->barang->id_barang,
+                'id_satuan_input' => $this->satuanKg->id,
+                'qty' => '2000',
+                'qty_layak' => '1995',
+                'alasan_tidak_layak' => '5 kg rusak',
+                'harga_satuan' => '12000',
+                'faktor_konversi' => '1',
+            ]],
+        ]);
+
+        $response->assertRedirect(route('gudang.penerimaan.index'));
+
+        $penerimaan = PenerimaanBarang::where('kode_penerimaan', 'PNR-SORTIR-001')->firstOrFail();
+        $detail = DB::table('penerimaan_barang_detail')
+            ->where('id_penerimaan', $penerimaan->id_penerimaan)
+            ->firstOrFail();
+
+        $this->assertEquals(2000, (float) $detail->qty_dasar);
+        $this->assertEquals(1995, (float) $detail->qty_layak);
+        $this->assertEquals(5, (float) $detail->qty_tidak_layak);
+        $this->assertEquals('5 kg rusak', $detail->alasan_tidak_layak);
+
+        $stok = DB::table('stok')
+            ->where('id_gudang', $this->idGudang)
+            ->where('id_barang', $this->barang->id_barang)
+            ->firstOrFail();
+        $this->assertEquals(1995, (float) $stok->qty_on_hand);
     }
 }

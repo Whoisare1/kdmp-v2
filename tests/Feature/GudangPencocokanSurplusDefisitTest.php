@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Pengguna;
+use App\Models\Pembelian\Pembelian;
+use App\Services\Pembelian\PurchaseRecommendationProvider;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -53,6 +55,8 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
             'password' => 'password',
             'is_active' => true,
         ]);
+        $this->beriPeranGudang($this->penggunaDefisit);
+        $this->beriPeranGudang($this->penggunaSurplus);
 
         $this->idKomoditas = DB::table('komoditas')->insertGetId([
             'kategori' => 'pangan',
@@ -124,12 +128,34 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
             'id_entitas' => $this->idEntitasDefisit,
             'id_barang' => $this->idBarang,
             'stok_minimum' => 25,
+            'stok_maksimum' => 40,
             'is_dijual' => false,
         ]);
         DB::table('barang_per_koperasi')->insert([
             'id_entitas' => $this->idEntitasSurplus,
             'id_barang' => $this->idBarang,
             'is_dijual' => true,
+            'harga_jual_standar' => 2,
+        ]);
+        DB::table('master_pihak')->insert([
+            [
+                'id_entitas' => $this->idEntitasDefisit,
+                'jenis_pihak' => 'entitas_lain',
+                'id_entitas_mitra' => $this->idEntitasSurplus,
+                'nama' => 'Entitas Surplus Dummy',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id_entitas' => $this->idEntitasSurplus,
+                'jenis_pihak' => 'entitas_lain',
+                'id_entitas_mitra' => $this->idEntitasDefisit,
+                'nama' => 'Entitas Defisit Dummy',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
 
         foreach ([
@@ -166,7 +192,7 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
         }
     }
 
-    public function test_halaman_mencocokkan_neraca_dengan_stok_tersedia_kedua_entitas(): void
+    public function test_halaman_gudang_hanya_menampilkan_permintaan_masuk_dan_keluar(): void
     {
         $response = $this->actingAs($this->penggunaDefisit)
             ->get(route('gudang.pencocokan-surplus-defisit.index', [
@@ -175,43 +201,36 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
             ]));
 
         $response->assertOk();
-        $response->assertSee($this->namaKomoditas);
-        $response->assertSee('Kebutuhan yang belum terpenuhi stok gudang');
-        $response->assertSee('80,00');
-        $response->assertSee('90,00');
-        $response->assertSee('Potensi jumlah cocok');
-        $response->assertSee($this->namaWilayahSurplus);
+        $response->assertSee('Permintaan Masuk');
+        $response->assertSee('Permintaan Keluar');
+        $response->assertDontSee('Neraca Kebutuhan');
+        $response->assertDontSee('Hasil M2 surplus');
+        $response->assertDontSee('Hasil M2 defisit');
     }
 
-    public function test_kalkulasi_baru_berstatus_draft_tidak_menggantikan_hasil_disetujui(): void
+    public function test_permintaan_lama_tanpa_catatan_persetujuan_tidak_menampilkan_tombol_lempar(): void
     {
-        DB::table('hasil_kalkulasi')->insert([
-            'id_wilayah' => DB::table('hasil_kalkulasi')
-                ->where('id_hasil', $this->idHasilDefisit)
-                ->value('id_wilayah'),
-            'id_komoditas' => $this->idKomoditas,
-            'tahun' => now()->year,
-            'bulan' => now()->month,
-            'total_kebutuhan' => 5,
-            'total_ketersediaan' => 0,
-            'selisih' => -5,
-            'status_surplus_defisit' => 'defisit',
-            'persentase_kecukupan' => 0,
-            'versi' => 2,
-            'status' => 'draft',
-            'created_at' => now(),
-        ]);
+        $this->actingAs($this->penggunaDefisit)
+            ->post(route('gudang.permintaan-antar-entitas.store'), [
+                'id_hasil_pengaju' => $this->idHasilDefisit,
+                'id_hasil_penerima' => $this->idHasilSurplus,
+            ]);
+
+        $idPermintaan = (int) DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_hasil_pengaju', $this->idHasilDefisit)
+            ->where('id_hasil_penerima', $this->idHasilSurplus)
+            ->value('id_permintaan_gudang');
+        DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_permintaan_gudang', $idPermintaan)
+            ->update(['status' => 'disetujui']);
 
         $response = $this->actingAs($this->penggunaDefisit)
-            ->get(route('gudang.pencocokan-surplus-defisit.index', [
-                'tahun' => now()->year,
-                'bulan' => now()->month,
-            ]));
+            ->get(route('gudang.pencocokan-surplus-defisit.index'));
 
         $response->assertOk();
-        $response->assertSee('80,00');
-        $response->assertSee('Potensi jumlah cocok');
-        $response->assertSee($this->namaWilayahSurplus);
+        $response->assertSee('Persetujuan lama belum tercatat lengkap');
+        $response->assertSee('Persetujuan ulang kedua entitas diperlukan');
+        $response->assertDontSee('Lempar ke Penjualan/Pembelian');
     }
 
     public function test_stok_batch_kedaluwarsa_tidak_dihitung_sebagai_stok_tersedia(): void
@@ -254,48 +273,12 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
         $this->assertSame(50.0, $tersedia);
     }
 
-    public function test_surplus_komoditas_dengan_nama_sama_tetapi_id_berbeda_tidak_dipasangkan(): void
-    {
-        $idKomoditasLain = DB::table('komoditas')->insertGetId([
-            'kategori' => 'pangan',
-            'nama' => $this->namaKomoditas,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $idWilayahSurplus = DB::table('hasil_kalkulasi')
-            ->where('id_hasil', $this->idHasilSurplus)
-            ->value('id_wilayah');
-
-        DB::table('hasil_kalkulasi')->where('id_hasil', $this->idHasilSurplus)
-            ->update(['id_komoditas' => $idKomoditasLain]);
-        DB::table('kebutuhan_komoditas')
-            ->where('id_wilayah', $idWilayahSurplus)
-            ->where('id_komoditas', $this->idKomoditas)
-            ->update(['id_komoditas' => $idKomoditasLain]);
-        DB::table('master_barang')->where('id_barang', $this->idBarang)
-            ->update(['id_komoditas' => $idKomoditasLain]);
-
-        $response = $this->actingAs($this->penggunaDefisit)
-            ->get(route('gudang.pencocokan-surplus-defisit.index', [
-                'tahun' => now()->year,
-                'bulan' => now()->month,
-            ]));
-
-        $response->assertOk();
-        $response->assertSee($this->namaKomoditas);
-        $response->assertDontSee('Potensi jumlah cocok');
-        $response->assertDontSee($this->namaWilayahSurplus);
-    }
-
-    public function test_alur_lengkap_kirim_notifikasi_dan_respons_tidak_mengubah_stok(): void
+    public function test_persetujuan_kedua_entitas_menreservasi_stok_dan_lempar_hanya_mengaktifkan_rekomendasi(): void
     {
         $urlPencocokan = route('gudang.pencocokan-surplus-defisit.index', [
             'tahun' => now()->year,
             'bulan' => now()->month,
         ]);
-        $stokSebelum = DB::table('stok')->select('id_gudang', 'id_barang', 'qty_on_hand', 'qty_reserved')
-            ->orderBy('id_gudang')->get()->toArray();
 
         $kirim = $this->actingAs($this->penggunaDefisit)
             ->from($urlPencocokan)
@@ -315,7 +298,7 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
 
         $halamanPenerima = $this->actingAs($this->penggunaSurplus)->get($urlPencocokan);
         $halamanPenerima->assertOk();
-        $halamanPenerima->assertSee('1 menunggu tindak lanjut');
+        $halamanPenerima->assertSee('1 Perlu Ditanggapi');
         $halamanPenerima->assertSee('Entitas Dummy Defisit');
 
         $idPermintaan = (int) DB::table('permintaan_antar_entitas_gudang')
@@ -331,11 +314,282 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
         $respons->assertRedirect($urlPencocokan);
         $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
             'id_permintaan_gudang' => $idPermintaan,
-            'status' => 'disetujui',
+            'status' => 'terkirim',
         ]);
-        $stokSesudah = DB::table('stok')->select('id_gudang', 'id_barang', 'qty_on_hand', 'qty_reserved')
-            ->orderBy('id_gudang')->get()->toArray();
-        $this->assertEquals($stokSebelum, $stokSesudah);
+        $this->assertNotNull(DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_permintaan_gudang', $idPermintaan)
+            ->value('tgl_persetujuan_penerima'));
+
+        $this->actingAs($this->penggunaDefisit)
+            ->from($urlPencocokan)
+            ->patch(route('gudang.permintaan-antar-entitas.respond', $idPermintaan), [
+                'status' => 'disetujui',
+            ])
+            ->assertRedirect($urlPencocokan);
+
+        $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
+            'id_permintaan_gudang' => $idPermintaan,
+            'status' => 'disetujui',
+            'qty_dialokasikan' => 80,
+        ]);
+        $this->assertDatabaseHas('stok', [
+            'id_gudang' => $this->idGudangSurplus,
+            'id_barang' => $this->idBarang,
+            'qty_on_hand' => 100,
+            'qty_reserved' => 90,
+        ]);
+        $this->assertDatabaseHas('rekomendasi_transaksi', [
+            'id_pengajuan_gudang' => $idPermintaan,
+            'jenis_rekomendasi' => 'penjualan',
+            'status' => 'siap_dilempar',
+            'id_gudang' => $this->idGudangSurplus,
+        ]);
+        $this->assertDatabaseHas('rekomendasi_transaksi', [
+            'id_pengajuan_gudang' => $idPermintaan,
+            'jenis_rekomendasi' => 'pembelian',
+            'status' => 'siap_dilempar',
+            'id_gudang' => $this->idGudangDefisit,
+        ]);
+
+        DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_permintaan_gudang', $idPermintaan)
+            ->update(['status' => 'terkirim']);
+        $halamanSiapDilempar = $this->actingAs($this->penggunaDefisit)->get($urlPencocokan);
+        $halamanSiapDilempar->assertSee('Disetujui kedua entitas');
+        $halamanSiapDilempar->assertSee('Lempar ke Penjualan/Pembelian');
+
+        $lempar = $this->actingAs($this->penggunaDefisit)
+            ->from($urlPencocokan)
+            ->patch(route('gudang.permintaan-antar-entitas.dispatch', $idPermintaan));
+        $lempar->assertRedirect($urlPencocokan)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
+            'id_permintaan_gudang' => $idPermintaan,
+            'status' => 'dilempar',
+        ]);
+        $this->assertSame(2, DB::table('rekomendasi_transaksi')
+            ->where('id_pengajuan_gudang', $idPermintaan)
+            ->where('status', 'menunggu')
+            ->count());
+        $this->assertSame(90.0, (float) DB::table('stok')
+            ->where('id_gudang', $this->idGudangSurplus)
+            ->where('id_barang', $this->idBarang)
+            ->value('qty_reserved'));
+    }
+
+    public function test_pasangan_desa_bisa_diajukan_kembali_setelah_permohonan_lama_ditolak(): void
+    {
+        $dataPengajuan = [
+            'id_hasil_pengaju' => $this->idHasilDefisit,
+            'id_hasil_penerima' => $this->idHasilSurplus,
+        ];
+
+        $this->actingAs($this->penggunaDefisit)
+            ->post(route('gudang.permintaan-antar-entitas.store'), $dataPengajuan)
+            ->assertRedirect();
+        $idPermintaanLama = (int) DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_hasil_pengaju', $this->idHasilDefisit)
+            ->where('id_hasil_penerima', $this->idHasilSurplus)
+            ->value('id_permintaan_gudang');
+
+        $this->actingAs($this->penggunaSurplus)
+            ->patch(route('gudang.permintaan-antar-entitas.respond', $idPermintaanLama), [
+                'status' => 'ditolak',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($this->penggunaDefisit)
+            ->post(route('gudang.permintaan-antar-entitas.store'), $dataPengajuan)
+            ->assertRedirect();
+
+        $this->assertSame(2, DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_hasil_pengaju', $this->idHasilDefisit)
+            ->where('id_hasil_penerima', $this->idHasilSurplus)
+            ->count());
+    }
+
+    public function test_reservasi_fifo_mengalokasikan_sisa_stok_ke_permohonan_berikutnya(): void
+    {
+        $suffix = strtoupper(bin2hex(random_bytes(4)));
+        $idWilayahKedua = $this->buatWilayah('Defisit Kedua '.$suffix);
+        $idEntitasKedua = $this->buatEntitas($idWilayahKedua, 'D2'.$suffix, 'Defisit Kedua');
+        $penggunaKedua = Pengguna::query()->create([
+            'id_entitas' => $idEntitasKedua,
+            'nama' => 'Pengguna Dummy Defisit Kedua',
+            'email' => 'defisit-kedua-'.$suffix.'@example.test',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        $this->beriPeranGudang($penggunaKedua);
+        $this->buatGudang($idEntitasKedua, 'D2G'.$suffix);
+        DB::table('barang_per_koperasi')->insert([
+            'id_entitas' => $idEntitasKedua,
+            'id_barang' => $this->idBarang,
+            'is_dijual' => false,
+        ]);
+        DB::table('master_pihak')->insert([
+            [
+                'id_entitas' => $idEntitasKedua,
+                'jenis_pihak' => 'entitas_lain',
+                'id_entitas_mitra' => $this->idEntitasSurplus,
+                'nama' => 'Entitas Surplus Dummy',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id_entitas' => $this->idEntitasSurplus,
+                'jenis_pihak' => 'entitas_lain',
+                'id_entitas_mitra' => $idEntitasKedua,
+                'nama' => 'Entitas Defisit Kedua Dummy',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        DB::table('kebutuhan_komoditas')->insert([
+            'id_wilayah' => $idWilayahKedua,
+            'id_komoditas' => $this->idKomoditas,
+            'tahun' => now()->year,
+            'bulan' => now()->month,
+            'kelompok_umur' => 'dewasa',
+            'jumlah_penduduk' => 1,
+            'per_kapita_harian' => 0,
+            'faktor_musiman' => 1,
+            'kebutuhan_bulanan' => 50,
+            'satuan' => DB::table('satuan')->where('id', DB::table('master_barang')
+                ->where('id_barang', $this->idBarang)->value('id_satuan_dasar'))->value('kode_satuan'),
+            'created_at' => now(),
+        ]);
+        $idHasilKedua = DB::table('hasil_kalkulasi')->insertGetId([
+            'id_wilayah' => $idWilayahKedua,
+            'id_komoditas' => $this->idKomoditas,
+            'tahun' => now()->year,
+            'bulan' => now()->month,
+            'total_kebutuhan' => 50,
+            'total_ketersediaan' => 0,
+            'selisih' => -50,
+            'status_surplus_defisit' => 'defisit',
+            'persentase_kecukupan' => 0,
+            'versi' => 1,
+            'status' => 'disetujui',
+            'created_at' => now(),
+        ]);
+
+        $idPermintaanPertama = $this->buatPermintaanManual(
+            $this->idEntitasDefisit,
+            $this->idEntitasSurplus,
+            $this->idHasilDefisit,
+            $this->idHasilSurplus,
+            60,
+        );
+        $idPermintaanKedua = $this->buatPermintaanManual(
+            $idEntitasKedua,
+            $this->idEntitasSurplus,
+            $idHasilKedua,
+            $this->idHasilSurplus,
+            50,
+        );
+
+        $this->actingAs($this->penggunaDefisit)->patch(
+            route('gudang.permintaan-antar-entitas.respond', $idPermintaanPertama),
+            ['status' => 'disetujui'],
+        )->assertRedirect();
+        $this->actingAs($this->penggunaSurplus)->patch(
+            route('gudang.permintaan-antar-entitas.respond', $idPermintaanPertama),
+            ['status' => 'disetujui'],
+        )->assertRedirect();
+        $this->actingAs($penggunaKedua)->patch(
+            route('gudang.permintaan-antar-entitas.respond', $idPermintaanKedua),
+            ['status' => 'disetujui'],
+        )->assertRedirect();
+        $this->actingAs($this->penggunaSurplus)->patch(
+            route('gudang.permintaan-antar-entitas.respond', $idPermintaanKedua),
+            ['status' => 'disetujui'],
+        )->assertRedirect();
+
+        $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
+            'id_permintaan_gudang' => $idPermintaanPertama,
+            'qty_dialokasikan' => 60,
+        ]);
+        $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
+            'id_permintaan_gudang' => $idPermintaanKedua,
+            'qty_rekomendasi' => 50,
+            'qty_dialokasikan' => 30,
+        ]);
+        $this->assertSame(100.0, (float) DB::table('stok')
+            ->where('id_gudang', $this->idGudangSurplus)
+            ->where('id_barang', $this->idBarang)
+            ->value('qty_reserved'));
+    }
+
+    public function test_reservasi_kedaluwarsa_dilepas_dan_rekomendasi_ditandai_kedaluwarsa(): void
+    {
+        $idPermintaan = $this->buatPermintaanManual(
+            $this->idEntitasDefisit,
+            $this->idEntitasSurplus,
+            $this->idHasilDefisit,
+            $this->idHasilSurplus,
+            5,
+            'dilempar',
+        );
+        DB::table('stok')->where('id_gudang', $this->idGudangSurplus)
+            ->where('id_barang', $this->idBarang)
+            ->update(['qty_reserved' => 15]);
+
+        $idPihakPembeli = (int) DB::table('master_pihak')
+            ->where('id_entitas', $this->idEntitasDefisit)
+            ->where('id_entitas_mitra', $this->idEntitasSurplus)
+            ->value('id_pihak');
+        $idPihakPenjual = (int) DB::table('master_pihak')
+            ->where('id_entitas', $this->idEntitasSurplus)
+            ->where('id_entitas_mitra', $this->idEntitasDefisit)
+            ->value('id_pihak');
+        $dataRekomendasi = [
+            'id_pengajuan_gudang' => $idPermintaan,
+            'id_entitas_asal' => $this->idEntitasSurplus,
+            'id_entitas_tujuan' => $this->idEntitasDefisit,
+            'id_barang' => $this->idBarang,
+            'nama_barang' => 'Barang Dummy',
+            'id_satuan' => DB::table('master_barang')->where('id_barang', $this->idBarang)->value('id_satuan_dasar'),
+            'qty_disetujui' => 5,
+            'harga_satuan_kesepakatan' => 2,
+            'id_unit_usaha' => DB::table('master_barang')->where('id_barang', $this->idBarang)->value('id_unit_usaha'),
+            'tgl_berlaku_sampai' => now()->subMinute(),
+            'status' => 'menunggu',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('rekomendasi_transaksi')->insert([
+            $dataRekomendasi + [
+                'jenis_rekomendasi' => 'penjualan',
+                'id_pihak_mitra' => $idPihakPenjual,
+                'id_gudang' => $this->idGudangSurplus,
+            ],
+            $dataRekomendasi + [
+                'jenis_rekomendasi' => 'pembelian',
+                'id_pihak_mitra' => $idPihakPembeli,
+                'id_gudang' => $this->idGudangDefisit,
+            ],
+        ]);
+
+        $jumlahDilepas = app(\App\Services\Gudang\RekomendasiSurplusDefisitService::class)
+            ->lepaskanReservasiKedaluwarsa();
+
+        $this->assertSame(1, $jumlahDilepas);
+        $this->assertDatabaseHas('stok', [
+            'id_gudang' => $this->idGudangSurplus,
+            'id_barang' => $this->idBarang,
+            'qty_reserved' => 10,
+        ]);
+        $this->assertSame(2, DB::table('rekomendasi_transaksi')
+            ->where('id_pengajuan_gudang', $idPermintaan)
+            ->where('status', 'kadaluarsa')
+            ->count());
+        $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
+            'id_permintaan_gudang' => $idPermintaan,
+            'status' => 'kadaluarsa',
+        ]);
     }
 
     public function test_peringatan_stok_minimum_merangkum_satu_barang_dari_semua_gudang(): void
@@ -346,6 +600,7 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
         $response->assertOk();
         $response->assertSee('Semua gudang');
         $response->assertSee('Minimum entitas: 25');
+        $response->assertSee('Saran menuju stok maksimum: 20');
         $this->assertSame(1, substr_count($response->getContent(), 'Semua gudang'));
     }
 
@@ -374,11 +629,6 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
             'tahun' => now()->year,
             'bulan' => now()->month,
         ]);
-        $halaman = $this->actingAs($this->penggunaDefisit)->get($urlPencocokan);
-
-        $halaman->assertOk();
-        $halaman->assertSee('3,20 '.$satuanKarung);
-        $halaman->assertSee('3,60 '.$satuanKarung);
 
         $kirim = $this->actingAs($this->penggunaDefisit)
             ->from($urlPencocokan)
@@ -505,6 +755,290 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
         ]);
     }
 
+    public function test_provider_pembelian_memetakan_rekomendasi_menunggu_ke_satuan_kg_dan_membatasi_entitas(): void
+    {
+        $idSatuanKg = $this->buatKonversiKg();
+        $idRekomendasi = $this->buatRekomendasiPembelian();
+        $this->buatRekomendasiPembelian('siap_dilempar');
+        $this->buatRekomendasiPembelian('menunggu', now()->subMinute()->toDateTimeString());
+
+        $provider = app(PurchaseRecommendationProvider::class);
+        $recommendations = $provider->pendingForEntity($this->idEntitasDefisit);
+
+        $this->assertCount(1, $recommendations);
+        $recommendation = $recommendations->first();
+        $this->assertSame((string) $idRekomendasi, $recommendation->id);
+        $this->assertSame($this->idEntitasDefisit, $recommendation->idEntitasTujuan);
+        $this->assertSame($idSatuanKg, $recommendation->idSatuan);
+        $this->assertSame(40.0, $recommendation->quantity);
+        $this->assertSame($this->idGudangDefisit, (int) $recommendation->gudang->id_gudang);
+        $this->assertSame('desa_lain', $recommendation->supplierCandidates->first()->sourceType);
+        $this->assertSame('KG', $recommendation->supplierCandidates->first()->unit);
+        $this->assertSame(40.0, $recommendation->supplierCandidates->first()->availableQuantity);
+        $this->assertSame(4.0, $recommendation->supplierCandidates->first()->standardSellingPrice);
+        $this->assertSame(
+            'Entitas Dummy Surplus',
+            $recommendation->supplierCandidates->first()->originName,
+        );
+        $this->assertTrue($provider->pendingForEntity($this->idEntitasSurplus)->isEmpty());
+    }
+
+    public function test_provider_pembelian_menandai_rekomendasi_idempoten_setelah_po_tersimpan(): void
+    {
+        $this->buatKonversiKg();
+        $idRekomendasi = $this->buatRekomendasiPembelian();
+        $pembelian = new Pembelian();
+        $pembelian->setAttribute('id_pembelian', 987654321);
+        $pembelian->setAttribute('id_entitas', $this->idEntitasDefisit);
+
+        $provider = app(PurchaseRecommendationProvider::class);
+        $provider->markProcessed($this->idEntitasDefisit, (string) $idRekomendasi, $pembelian);
+        $provider->markProcessed($this->idEntitasDefisit, (string) $idRekomendasi, $pembelian);
+
+        $this->assertDatabaseHas('rekomendasi_transaksi', [
+            'id_rekomendasi' => $idRekomendasi,
+            'status' => 'diproses',
+            'id_transaksi_terbentuk' => 987654321,
+        ]);
+    }
+
+    public function test_entitas_dapat_menghubungkan_barang_master_yang_dipakai_mitra_aktif(): void
+    {
+        DB::table('barang_per_koperasi')
+            ->where('id_entitas', $this->idEntitasDefisit)
+            ->where('id_barang', $this->idBarang)
+            ->delete();
+
+        $this->actingAs($this->penggunaDefisit)
+            ->get(route('master.barang.hubungkan.create'))
+            ->assertOk()
+            ->assertSee('Hubungkan Barang Mitra')
+            ->assertSee('tanpa mengubah data master');
+
+        $kodeBarang = (string) DB::table('master_barang')
+            ->where('id_barang', $this->idBarang)
+            ->value('kode_barang');
+        $jumlahMasterSebelum = DB::table('master_barang')
+            ->where('kode_barang', $kodeBarang)
+            ->count();
+
+        $this->actingAs($this->penggunaDefisit)
+            ->post(route('master.barang.hubungkan.store'), ['kode_barang' => $kodeBarang])
+            ->assertRedirect(route('master.barang.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('barang_per_koperasi', [
+            'id_entitas' => $this->idEntitasDefisit,
+            'id_barang' => $this->idBarang,
+            'harga_jual_standar' => 0,
+            'is_dijual' => false,
+        ]);
+        $this->assertDatabaseHas('barang_per_koperasi', [
+            'id_entitas' => $this->idEntitasSurplus,
+            'id_barang' => $this->idBarang,
+            'harga_jual_standar' => 2,
+            'is_dijual' => true,
+        ]);
+        $this->assertSame(
+            $jumlahMasterSebelum,
+            DB::table('master_barang')->where('kode_barang', $kodeBarang)->count(),
+        );
+    }
+
+    public function test_entitas_tidak_dapat_menghubungkan_kode_barang_yang_tidak_ditemukan(): void
+    {
+        $this->actingAs($this->penggunaDefisit)
+            ->from(route('master.barang.hubungkan.create'))
+            ->post(route('master.barang.hubungkan.store'), ['kode_barang' => 'KODE-TIDAK-ADA'])
+            ->assertRedirect(route('master.barang.hubungkan.create'))
+            ->assertSessionHasErrors('kode_barang');
+
+        $this->assertDatabaseMissing('master_barang', ['kode_barang' => 'KODE-TIDAK-ADA']);
+    }
+
+    public function test_entitas_tidak_dapat_menghubungkan_barang_yang_tidak_digunakan_mitra_aktif(): void
+    {
+        $kodeBarang = 'LAIN-'.strtoupper(bin2hex(random_bytes(3)));
+        $idBarangLain = DB::table('master_barang')->insertGetId([
+            'kode_barang' => $kodeBarang,
+            'id_komoditas' => $this->idKomoditas,
+            'id_unit_usaha' => DB::table('master_barang')
+                ->where('id_barang', $this->idBarang)
+                ->value('id_unit_usaha'),
+            'nama_barang' => 'Barang yang tidak digunakan mitra',
+            'id_satuan_dasar' => DB::table('master_barang')
+                ->where('id_barang', $this->idBarang)
+                ->value('id_satuan_dasar'),
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->penggunaDefisit)
+            ->from(route('master.barang.hubungkan.create'))
+            ->post(route('master.barang.hubungkan.store'), ['kode_barang' => $kodeBarang])
+            ->assertRedirect(route('master.barang.hubungkan.create'))
+            ->assertSessionHasErrors('kode_barang');
+
+        $this->assertDatabaseMissing('barang_per_koperasi', [
+            'id_entitas' => $this->idEntitasDefisit,
+            'id_barang' => $idBarangLain,
+        ]);
+    }
+
+    public function test_persetujuan_satu_per_dua_berhasil_setelah_penerima_menghubungkan_kode_barang_penjual(): void
+    {
+        DB::table('barang_per_koperasi')
+            ->where('id_entitas', $this->idEntitasDefisit)
+            ->where('id_barang', $this->idBarang)
+            ->delete();
+        DB::table('barang_per_koperasi')
+            ->where('id_entitas', $this->idEntitasSurplus)
+            ->where('id_barang', $this->idBarang)
+            ->update(['lacak_batch' => true]);
+        DB::table('stok_batch')->insert([
+            'id_gudang' => $this->idGudangSurplus,
+            'id_barang' => $this->idBarang,
+            'kode_batch' => 'BATCH-TELUR-DUMMY',
+            'tanggal_kedaluwarsa' => now()->toDateString(),
+            'qty_on_hand' => 100,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $barangPenjual = DB::table('master_barang')
+            ->where('id_barang', $this->idBarang)
+            ->first();
+        $idBarangTerpisahPembeli = DB::table('master_barang')->insertGetId([
+            'kode_barang' => $barangPenjual->kode_barang.'-DUP',
+            'id_komoditas' => $this->idKomoditas,
+            'id_unit_usaha' => $barangPenjual->id_unit_usaha,
+            'nama_barang' => $barangPenjual->nama_barang,
+            'id_satuan_dasar' => $barangPenjual->id_satuan_dasar,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('barang_per_koperasi')->insert([
+            'id_entitas' => $this->idEntitasDefisit,
+            'id_barang' => $idBarangTerpisahPembeli,
+            'harga_jual_standar' => 22000,
+            'is_dijual' => true,
+        ]);
+
+        $idPermintaan = $this->buatPermintaanManual(
+            $this->idEntitasSurplus,
+            $this->idEntitasDefisit,
+            $this->idHasilSurplus,
+            $this->idHasilDefisit,
+            40,
+        );
+        DB::table('permintaan_antar_entitas_gudang')
+            ->where('id_permintaan_gudang', $idPermintaan)
+            ->update([
+                'jenis_permintaan' => 'tawaran_jual',
+                'id_persetujuan_pengaju' => $this->penggunaSurplus->id,
+                'tgl_persetujuan_pengaju' => now(),
+            ]);
+
+        $urlPencocokan = route('gudang.pencocokan-surplus-defisit.index');
+
+        $this->actingAs($this->penggunaDefisit)
+            ->from($urlPencocokan)
+            ->patch(route('gudang.permintaan-antar-entitas.respond', $idPermintaan), ['status' => 'disetujui'])
+            ->assertRedirect($urlPencocokan)
+            ->assertSessionHasErrors('status');
+
+        $this->actingAs($this->penggunaDefisit)
+            ->post(route('master.barang.hubungkan.store'), ['kode_barang' => $barangPenjual->kode_barang])
+            ->assertRedirect(route('master.barang.index'))
+            ->assertSessionHas('success');
+
+        $this->actingAs($this->penggunaDefisit)
+            ->from($urlPencocokan)
+            ->patch(route('gudang.permintaan-antar-entitas.respond', $idPermintaan), ['status' => 'disetujui'])
+            ->assertRedirect($urlPencocokan)
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('permintaan_antar_entitas_gudang', [
+            'id_permintaan_gudang' => $idPermintaan,
+            'status' => 'disetujui',
+            'qty_dialokasikan' => 40,
+        ]);
+        $this->assertDatabaseHas('stok', [
+            'id_gudang' => $this->idGudangSurplus,
+            'id_barang' => $this->idBarang,
+            'qty_reserved' => 50,
+        ]);
+        $this->assertDatabaseHas('rekomendasi_transaksi', [
+            'id_pengajuan_gudang' => $idPermintaan,
+            'jenis_rekomendasi' => 'penjualan',
+            'id_barang' => $this->idBarang,
+            'qty_disetujui' => 40,
+            'status' => 'siap_dilempar',
+        ]);
+        $this->assertDatabaseHas('rekomendasi_transaksi', [
+            'id_pengajuan_gudang' => $idPermintaan,
+            'jenis_rekomendasi' => 'pembelian',
+            'id_barang' => $this->idBarang,
+            'qty_disetujui' => 40,
+            'status' => 'siap_dilempar',
+        ]);
+    }
+
+    private function buatKonversiKg(): int
+    {
+        $idSatuanKg = DB::table('satuan')->where('kode_satuan', 'KG')->value('id');
+        if (! $idSatuanKg) {
+            $idSatuanKg = DB::table('satuan')->insertGetId([
+                'kode_satuan' => 'KG',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        DB::table('konversi_satuan')->insert([
+            'id_barang' => $this->idBarang,
+            'id_satuan' => $idSatuanKg,
+            'faktor_ke_dasar' => 2,
+            'is_default_beli' => true,
+            'is_default_jual' => false,
+        ]);
+
+        return (int) $idSatuanKg;
+    }
+
+    private function buatRekomendasiPembelian(
+        string $status = 'menunggu',
+        ?string $berlakuSampai = null,
+    ): int {
+        $idPihak = DB::table('master_pihak')
+            ->where('id_entitas', $this->idEntitasDefisit)
+            ->where('id_entitas_mitra', $this->idEntitasSurplus)
+            ->value('id_pihak');
+
+        return DB::table('rekomendasi_transaksi')->insertGetId([
+            'id_pengajuan_gudang' => random_int(100000, 999999),
+            'jenis_rekomendasi' => 'pembelian',
+            'id_entitas_asal' => $this->idEntitasSurplus,
+            'id_entitas_tujuan' => $this->idEntitasDefisit,
+            'id_pihak_mitra' => $idPihak,
+            'id_barang' => $this->idBarang,
+            'nama_barang' => 'Barang Dummy',
+            'id_satuan' => DB::table('master_barang')->where('id_barang', $this->idBarang)->value('id_satuan_dasar'),
+            'qty_disetujui' => 80,
+            'harga_satuan_kesepakatan' => 2,
+            'id_unit_usaha' => DB::table('master_barang')->where('id_barang', $this->idBarang)->value('id_unit_usaha'),
+            'id_gudang' => $this->idGudangDefisit,
+            'id_transaksi_terbentuk' => null,
+            'tgl_berlaku_sampai' => $berlakuSampai ?? now()->addHours(24),
+            'status' => $status,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function buatWilayah(string $nama): int
     {
         return DB::table('wilayah')->insertGetId([
@@ -512,6 +1046,53 @@ class GudangPencocokanSurplusDefisitTest extends TestCase
             'nama' => $nama,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+    }
+
+    private function buatPermintaanManual(
+        int $idEntitasPengaju,
+        int $idEntitasPenerima,
+        int $idHasilPengaju,
+        int $idHasilPenerima,
+        float $qty,
+        string $status = 'terkirim',
+    ): int {
+        return DB::table('permintaan_antar_entitas_gudang')->insertGetId([
+            'id_entitas_pengaju' => $idEntitasPengaju,
+            'id_entitas_penerima' => $idEntitasPenerima,
+            'id_hasil_pengaju' => $idHasilPengaju,
+            'id_hasil_penerima' => $idHasilPenerima,
+            'jenis_permintaan' => 'permintaan_beli',
+            'nama_komoditas' => $this->namaKomoditas,
+            'tahun' => now()->year,
+            'bulan' => now()->month,
+            'qty_rekomendasi' => $qty,
+            'satuan' => DB::table('kebutuhan_komoditas')
+                ->where('id_wilayah', DB::table('hasil_kalkulasi')
+                    ->where('id_hasil', $idHasilPengaju)
+                    ->value('id_wilayah'))
+                ->where('id_komoditas', $this->idKomoditas)
+                ->value('satuan'),
+            'status' => $status,
+            'created_by' => auth()->id(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function beriPeranGudang(Pengguna $pengguna): void
+    {
+        $idPeran = DB::table('peran')->where('kode', 'admin_gudang')->value('id_peran');
+        if ($idPeran === null) {
+            $idPeran = DB::table('peran')->insertGetId([
+                'kode' => 'admin_gudang',
+                'nama' => 'Admin Gudang',
+            ]);
+        }
+
+        DB::table('pengguna_peran')->insertOrIgnore([
+            'id_pengguna' => $pengguna->id,
+            'id_peran' => $idPeran,
         ]);
     }
 

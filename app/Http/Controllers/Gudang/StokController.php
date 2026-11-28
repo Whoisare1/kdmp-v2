@@ -61,6 +61,7 @@ class StokController extends ModuleCrudController
                     COALESCE(ringkasan_stok.hpp_rata2, 0) as hpp_rata2,
                     COALESCE(ringkasan_stok.nilai_persediaan, 0) as nilai_persediaan,
                     pengaturan.stok_minimum,
+                    pengaturan.stok_maksimum,
                     COALESCE(saldo_per_barang.qty_tersedia, 0) as qty_tersedia_koperasi,
                     entitas_stok.nama_entitas as nama_entitas
                 ')
@@ -79,6 +80,7 @@ class StokController extends ModuleCrudController
                 ->select(
                     'stok.*',
                     'barang_per_koperasi.stok_minimum',
+                    'barang_per_koperasi.stok_maksimum',
                     'saldo_per_barang.qty_tersedia as qty_tersedia_koperasi',
                 )
                 ->with(['gudang', 'barang.satuanDasar']);

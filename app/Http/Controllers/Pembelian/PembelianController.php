@@ -10,6 +10,8 @@ use App\Models\Master\KasBank;
 use App\Models\Master\Pihak;
 use App\Rules\TenantOwnershipRule;
 use App\Services\PembelianService;
+use App\Services\Pembelian\PurchaseRecommendation;
+use App\Services\Pembelian\PurchaseRecommendationProvider;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -199,7 +201,7 @@ class PembelianController extends ModuleCrudController
             $kasBanks = KasBank::where('is_active', true)->orderBy('jenis')->orderBy('nama')->get();
         }
 
-        $permintaanPembelianPending = $this->dummyPurchaseRequests($barangs, $gudangs, $pihaks, (int) $idEntitas);
+        $permintaanPembelianPending = $this->purchaseRequestOptions($barangs, $gudangs, $pihaks, (int) $idEntitas);
         $permintaanPembelian = $permintaanPembelianPending
             ->firstWhere('id_permintaan_pembelian', request()->query('permintaan'));
 
@@ -330,7 +332,7 @@ class PembelianController extends ModuleCrudController
                     ->whereIn('jenis_pihak', ['entitas_lain', 'petani', 'warga'])
                     ->orderBy('nama')
                     ->get();
-                $permintaanPembelian = $this->dummyPurchaseRequests(
+                $permintaanPembelian = $this->purchaseRequestOptions(
                     $barangs,
                     $gudangs,
                     $pihaks,
@@ -351,14 +353,29 @@ class PembelianController extends ModuleCrudController
                     || (int) $validated['id_unit_usaha'] !== (int) $permintaanPembelian->barang->id_unit_usaha
                     || count($requestedItems) !== 1
                     || (int) $requestedItems[0]['id_barang'] !== (int) $permintaanPembelian->id_barang
-                    || (int) $requestedItems[0]['id_satuan'] !== (int) $permintaanPembelian->barang->id_satuan_dasar
+                    || (int) $requestedItems[0]['id_satuan'] !== (int) $permintaanPembelian->id_satuan
                     || abs((float) $requestedItems[0]['qty_dasar'] - (float) $permintaanPembelian->qty_diminta) > 0.00005
                 ) {
                     throw new \RuntimeException('Barang, jumlah, unit usaha, dan gudang harus sesuai notifikasi yang dipilih.');
                 }
 
-                if (! $permintaanPembelian->supplier_recommendations->contains('id_pihak', (int) $validated['id_pihak'])) {
+                $supplierRecommendation = $permintaanPembelian->supplier_recommendations
+                    ->firstWhere('id_pihak', (int) $validated['id_pihak']);
+                if (! $supplierRecommendation) {
                     throw new \RuntimeException('Pilih pemasok yang termasuk dalam rekomendasi permintaan.');
+                }
+                if (
+                    $permintaanPembelian->is_external_recommendation
+                    && (
+                        $validated['source'] !== $supplierRecommendation->sumber_rekomendasi
+                        || (
+                            $supplierRecommendation->jumlah_tersedia_rekomendasi !== null
+                            && (float) $requestedItems[0]['qty_dasar']
+                                > (float) $supplierRecommendation->jumlah_tersedia_rekomendasi + 0.00005
+                        )
+                    )
+                ) {
+                    throw new \RuntimeException('Sumber atau jumlah pembelian melebihi rekomendasi pemasok Gudang.');
                 }
             }
 
@@ -383,20 +400,32 @@ class PembelianController extends ModuleCrudController
                 ->values()
                 ->all();
 
-            $pembelian = PembelianService::createQuickPurchase(
-                $idEntitas,
-                (int) $validated['id_pihak'],
-                (int) $validated['id_unit_usaha'],
-                (int) $validated['id_gudang'],
-                $items,
-                $validated['jenis_pembayaran'],
-                $validated['tgl_jatuh_tempo'] ?? null,
-                $idKasBank ? (int) $idKasBank : null,
-                $validated['source'],
-                (float) ($validated['diskon'] ?? 0),
-            );
+            $pembelian = DB::transaction(function () use ($idEntitas, $validated, $items, $idKasBank, $permintaanPembelian) {
+                $pembelian = PembelianService::createQuickPurchase(
+                    $idEntitas,
+                    (int) $validated['id_pihak'],
+                    (int) $validated['id_unit_usaha'],
+                    (int) $validated['id_gudang'],
+                    $items,
+                    $validated['jenis_pembayaran'],
+                    $validated['tgl_jatuh_tempo'] ?? null,
+                    $idKasBank ? (int) $idKasBank : null,
+                    $validated['source'],
+                    (float) ($validated['diskon'] ?? 0),
+                );
 
-            if ($permintaanPembelian) {
+                if ($permintaanPembelian?->is_external_recommendation) {
+                    app(PurchaseRecommendationProvider::class)->markProcessed(
+                        (int) $idEntitas,
+                        (string) $permintaanPembelian->recommendation_id,
+                        $pembelian,
+                    );
+                }
+
+                return $pembelian;
+            });
+
+            if ($permintaanPembelian && ! $permintaanPembelian->is_external_recommendation) {
                 $processed = collect(session('pembelian_dummy_requests_processed', []))
                     ->push($permintaanPembelian->id_permintaan_pembelian)
                     ->unique()
@@ -427,7 +456,7 @@ class PembelianController extends ModuleCrudController
     }
 
     /**
-     * Temporary, read-only examples until the warehouse module provides real requests.
+     * Read-only planning requests retained alongside warehouse recommendations.
      *
      * @param  Collection<int, Barang>  $barangs
      * @param  Collection<int, Gudang>  $gudangs
@@ -475,11 +504,14 @@ class PembelianController extends ModuleCrudController
 
                     $realItems->push((object) [
                         'id_permintaan_pembelian' => "PR-{$pr->id_permintaan}",
+                        'recommendation_id' => null,
+                        'is_external_recommendation' => false,
                         'kode_permintaan' => $pr->kode_permintaan,
                         'sumber_pembelian' => 'warga_lokal',
                         'barang' => $barang,
                         'id_barang' => $barang->id_barang,
                         'id_satuan' => $idSatuanKg ?? $barang->id_satuan_dasar,
+                        'id_unit_usaha' => $barang->id_unit_usaha,
                         'gudang' => $pr->gudang ?? $gudangs->first(),
                         'qty_diminta' => (float) $detail->jumlah_diminta,
                         'supplier_recommendations' => $pihaks->take(5)->values(),
@@ -492,6 +524,73 @@ class PembelianController extends ModuleCrudController
         return $realItems
             ->reject(fn (object $requestItem) => $processed->contains($requestItem->id_permintaan_pembelian))
             ->values();
+    }
+
+    /**
+     * @param  Collection<int, Barang>  $barangs
+     * @param  Collection<int, Gudang>  $gudangs
+     * @param  Collection<int, Pihak>  $pihaks
+     * @return Collection<int, object>
+     */
+    private function purchaseRequestOptions(
+        Collection $barangs,
+        Collection $gudangs,
+        Collection $pihaks,
+        int $idEntitas,
+    ): Collection {
+        $localRequests = $this->dummyPurchaseRequests($barangs, $gudangs, $pihaks, $idEntitas);
+        if ($idEntitas < 1 || ! app()->bound(PurchaseRecommendationProvider::class)) {
+            return $localRequests;
+        }
+
+        $warehouseRequests = app(PurchaseRecommendationProvider::class)
+            ->pendingForEntity($idEntitas)
+            ->map(function ($recommendation) use ($idEntitas): object {
+                if (
+                    ! ($recommendation instanceof PurchaseRecommendation)
+                    || $recommendation->idEntitasTujuan !== $idEntitas
+                ) {
+                    throw new \UnexpectedValueException('Provider Gudang mengembalikan rekomendasi untuk entitas atau tipe data yang tidak sesuai.');
+                }
+
+                $supplierCandidates = $recommendation->supplierCandidates->map(function ($candidate) {
+                    $party = clone $candidate->pihak;
+                    $party->setAttribute('sumber_rekomendasi', $candidate->sourceType);
+                    $party->setAttribute('asal_rekomendasi', $candidate->originName);
+                    $party->setAttribute('jumlah_tersedia_rekomendasi', $candidate->availableQuantity);
+                    $party->setAttribute('satuan_rekomendasi', $candidate->unit);
+                    $party->setAttribute('harga_standar_rekomendasi', $candidate->standardSellingPrice);
+
+                    return $party;
+                })->values();
+                $preferredCandidate = $recommendation->preferredSupplier();
+                $preferredSupplier = $preferredCandidate
+                    ? $supplierCandidates->firstWhere('id_pihak', (int) $preferredCandidate->pihak->id_pihak)
+                    : null;
+
+                if (! $preferredSupplier) {
+                    throw new \RuntimeException("Rekomendasi {$recommendation->requestCode} tidak memiliki pemasok yang tersedia untuk jumlah tersebut.");
+                }
+
+                return (object) [
+                    'id_permintaan_pembelian' => 'REK-' . $recommendation->id,
+                    'recommendation_id' => $recommendation->id,
+                    'is_external_recommendation' => true,
+                    'kode_permintaan' => $recommendation->requestCode,
+                    'sumber_pembelian' => $preferredSupplier->sumber_rekomendasi,
+                    'barang' => $recommendation->barang,
+                    'id_barang' => $recommendation->barang->id_barang,
+                    'id_satuan' => $recommendation->idSatuan,
+                    'id_unit_usaha' => $recommendation->unitUsaha->id_unit_usaha,
+                    'gudang' => $recommendation->gudang,
+                    'qty_diminta' => $recommendation->quantity,
+                    'supplier_recommendations' => $supplierCandidates,
+                    'pihak_rekomendasi' => $preferredSupplier,
+                ];
+            })
+            ->values();
+
+        return $warehouseRequests->merge($localRequests)->values();
     }
 
     /**

@@ -100,6 +100,10 @@ Route::middleware('auth')->group(function () {
             ->name('barang.stok-minimum.index');
         Route::patch('barang/stok-minimum/{idBarang}', [\App\Http\Controllers\Master\StokMinimumBarangController::class, 'update'])
             ->name('barang.stok-minimum.update');
+        Route::get('barang/hubungkan', [BarangController::class, 'hubungkan'])
+            ->name('barang.hubungkan.create');
+        Route::post('barang/hubungkan', [BarangController::class, 'storeHubungkan'])
+            ->name('barang.hubungkan.store');
         Route::resource('barang', BarangController::class);
         Route::resource('pihak', PihakController::class);
         Route::resource('kas-bank', KasBankController::class);
@@ -149,6 +153,8 @@ Route::middleware('auth')->group(function () {
             ->name('permintaan-antar-entitas.store');
         Route::patch('permintaan-antar-entitas/{id}/status', [PermintaanAntarEntitasController::class, 'respond'])
             ->whereNumber('id')->name('permintaan-antar-entitas.respond');
+        Route::patch('permintaan-antar-entitas/{id}/lempar', [PermintaanAntarEntitasController::class, 'dispatch'])
+            ->whereNumber('id')->name('permintaan-antar-entitas.dispatch');
         Route::get('batch', [BatchController::class, 'index'])->name('batch.index');
         Route::patch('batch/{idBatch}/klasifikasikan-stok-awal', [BatchController::class, 'klasifikasikanStokAwal'])
             ->name('batch.klasifikasikan-stok-awal');

@@ -22,7 +22,6 @@
                 ['label' => 'Komoditas', 'route' => 'master.komoditas.index', 'match' => 'master.komoditas.*'],
                 ['label' => 'Satuan Ukur', 'route' => 'master.satuan.index', 'match' => 'master.satuan.*'],
                 ['label' => 'Barang', 'route' => 'master.barang.index', 'match' => 'master.barang.index,master.barang.create,master.barang.edit,master.barang.show'],
-                ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*', 'roles' => ['manajer', 'admin_gudang']],
                 ['label' => 'Pihak/Mitra', 'route' => 'master.pihak.index', 'match' => 'master.pihak.*'],
                 ['label' => 'Gudang', 'route' => 'master.gudang.index', 'match' => 'master.gudang.*'],
                 ['label' => 'Kas & Bank', 'route' => 'master.kas-bank.index', 'match' => 'master.kas-bank.*'],
@@ -66,7 +65,7 @@
             'roles' => ['admin_gudang', 'manajer'],
             'items' => [
                 ['label' => 'Dashboard Gudang', 'route' => 'gudang.index', 'match' => 'gudang.index'],
-                ['label' => 'Pencocokan Surplus-Defisit', 'route' => 'gudang.pencocokan-surplus-defisit.index', 'match' => 'gudang.pencocokan-surplus-defisit.*'],
+                ['label' => 'Permintaan Antar-Desa', 'route' => 'gudang.pencocokan-surplus-defisit.index', 'match' => 'gudang.pencocokan-surplus-defisit.*'],
                 ['label' => 'Posisi Stok', 'route' => 'gudang.stok.index', 'match' => 'gudang.stok.*'],
                 ['label' => 'Stok Minimum & Batch', 'route' => 'master.barang.stok-minimum.index', 'match' => 'master.barang.stok-minimum.*'],
                 ['label' => 'Penerimaan', 'route' => 'gudang.penerimaan.index', 'match' => 'gudang.penerimaan.*'],

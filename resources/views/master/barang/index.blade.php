@@ -47,6 +47,10 @@
                         ⚙️ Atur Stok Minimum & Batch
                     </a>
                 @endif
+                <a href="{{ route('master.barang.hubungkan.create') }}"
+                   class="inline-flex items-center justify-center rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-paper-100 shadow-sm transition">
+                    Hubungkan Barang Mitra
+                </a>
                 <a href="{{ route('master.barang.create') }}"
                    class="inline-flex items-center justify-center rounded-sm bg-merah-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-merah-600 shadow-sm transition">
                     + Tambah Barang

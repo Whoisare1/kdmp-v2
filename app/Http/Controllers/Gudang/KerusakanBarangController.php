@@ -207,36 +207,6 @@ class KerusakanBarangController extends ModuleCrudController
                     izinkanBatchKedaluwarsa: $lacakBatch && $data['jenis_kejadian'] === 'kadaluarsa',
                 );
 
-                // Masukkan ke Antrean Jurnal Gudang
-                $barang = Barang::query()->find($data['id_barang']);
-                if ($barang && $barang->id_unit_usaha) {
-                    AntreanJurnalGudang::create([
-                        'id_entitas' => (int) ($item->id_entitas ?? $entitasId),
-                        'jenis_transaksi' => 'KERUSAKAN',
-                        'ref_tipe' => 'KERUSAKAN',
-                        'ref_id' => (int) $item->id_kerusakan,
-                        'no_dokumen' => 'KRS-' . str_pad((string) $item->id_kerusakan, 5, '0', STR_PAD_LEFT),
-                        'id_unit_usaha' => $barang->id_unit_usaha,
-                        'tanggal' => $data['tanggal'],
-                        'nilai' => $nilaiKerugian,
-                        'payload' => [
-                            'id_gudang' => (int) $data['id_gudang'],
-                            'jenis_kejadian' => $data['jenis_kejadian'],
-                            'items' => [
-                                [
-                                    'id_barang' => (int) $data['id_barang'],
-                                    'qty' => (float) $data['qty'],
-                                    'hpp_satuan' => (float) $hpp,
-                                    'nilai' => (float) $nilaiKerugian,
-                                    'id_kartu' => $kartuStok?->id_kartu,
-                                ],
-                            ],
-                            'keterangan' => $data['keterangan'] ?? null,
-                        ],
-                        'status' => 'MENUNGGU',
-                        'created_by' => auth()->id(),
-                    ]);
-                }
             } catch (RuntimeException $exception) {
                 throw ValidationException::withMessages([
                     $lacakBatch ? 'id_batch' : 'qty' => $exception->getMessage(),

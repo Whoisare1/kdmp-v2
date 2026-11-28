@@ -132,10 +132,17 @@ class PenerimaanBarangController extends ModuleCrudController
             ->where('is_active', true)
             ->orderBy('nama')
             ->get();
+        $barangPoIds = $pembelianTersedia
+            ->flatMap(fn (array $pilihan) => collect($pilihan['items'])->pluck('id_barang'))
+            ->unique()
+            ->values();
         $barangQuery = Barang::query()
             ->with(['satuanDasar', 'konversiSatuan.satuan'])
-            ->forEntitas($entitasId)
             ->where('is_active', true)
+            ->where(function ($query) use ($entitasId, $barangPoIds): void {
+                $query->forEntitas($entitasId)
+                    ->orWhereIn('master_barang.id_barang', $barangPoIds);
+            })
             ->orderBy('nama_barang');
         if ($pembelianTerpilih) {
             $barangQuery->whereIn('id_barang', collect($poItems)->pluck('id_barang'));
@@ -147,31 +154,30 @@ class PenerimaanBarangController extends ModuleCrudController
             ->orderBy('kode_satuan')
             ->get(['id', 'kode_satuan']);
 
-        $pembelianList = Pembelian::query()
-            ->when($entitasId, fn ($q) => $q->where('id_entitas', $entitasId))
-            ->with(['pihak', 'gudang', 'detail'])
-            ->where('status', 'disetujui')
-            ->orderByDesc('id_pembelian')
-            ->get();
-
         return view('gudang.penerimaan.create', [
             'gudang' => $gudang,
             'pihak' => $pihak,
-            'pembelianData' => $pembelianList->map(fn (Pembelian $pb) => [
-                'id' => $pb->id_pembelian,
-                'kode' => $pb->kode_pembelian,
-                'tanggal' => $pb->tanggal_transaksi?->format('Y-m-d'),
-                'idGudang' => $pb->id_gudang,
-                'idPihak' => $pb->id_pihak,
-                'pihakNama' => $pb->pihak?->nama ?? '-',
-                'total' => (float) $pb->total_pembelian,
-                'items' => $pb->detail->map(fn ($detail) => [
-                    'id_barang' => $detail->id_barang,
-                    'id_satuan_input' => $detail->id_satuan_input,
-                    'qty' => (float) $detail->qty_input,
-                    'harga_satuan' => (float) $detail->harga_satuan_input,
-                ])->values(),
-            ])->values(),
+            'pembelianData' => $pembelianTersedia->map(function (array $pilihan): array {
+                $pb = $pilihan['pembelian'];
+
+                return [
+                    'id' => $pb->id_pembelian,
+                    'kode' => $pb->kode_pembelian,
+                    'tanggal' => $pb->tanggal_transaksi?->format('Y-m-d'),
+                    'idGudang' => $pb->id_gudang,
+                    'idPihak' => $pb->id_pihak,
+                    'pihakNama' => $pb->pihak?->nama ?? '-',
+                    'total' => (float) $pb->total_pembelian,
+                    'items' => collect($pilihan['items'])->map(fn (array $item) => [
+                        'id_barang' => $item['id_barang'],
+                        'id_satuan_input' => $item['id_satuan_dasar'],
+                        'qty' => (float) $item['sisa'],
+                        'faktor_konversi' => '1',
+                        'qty_layak' => (float) $item['sisa'],
+                        'harga_satuan' => (float) $item['harga_satuan_dasar'],
+                    ])->values(),
+                ];
+            })->values(),
             'barangData' => $barang->map(fn (Barang $item) => [
                 'id' => $item->id_barang,
                 'kode' => $item->kode_barang,

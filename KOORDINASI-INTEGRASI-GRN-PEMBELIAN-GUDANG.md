@@ -15,6 +15,7 @@
 | **Apakah alur penjualan biasa sudah memanggil `StokService::keluar` & mendukung FEFO?** | **Belum (sedang disambungkan).** Penjualan saat ini masih memakai stub demo. Sesuai kesepakatan, penjualan barang biasa wajib memanggil `StokService::keluar()` di dalam `DB::transaction()` dengan `idBatch = null` agar Gudang otomatis memilih batch terdekat kedaluwarsa (**FEFO**). Jika stok kurang, transaksi di-rollback atomik. |
 | **Apakah Penjualan sudah mendukung `id_stok_konsinyasi` & bagaimana kontrak mutasinya?** | **Belum.** Kolom di database sudah ada. Kontrak yang disepakati: baris konsinyasi **DILARANG memanggil `StokService` biasa**, melainkan memotong `stok_konsinyasi.qty_sisa`, menambah `qty_terjual`, mencatat mutasi ke `kartu_konsinyasi`, dan menjurnal via kode `KJL` (bukan `JTW`). |
 | **Gudang mana yang dipakai POS jika satu entitas memiliki beberapa gudang?** | **SOP Disepakati:** Secara default POS memakai **Gudang Toko/Utama Entitas** (gudang aktif pertama / `is_default`), dengan dukungan opsi dropdown pemilihan gudang di form POS jika koperasi mengoperasikan lebih dari satu gudang fisik. |
+| **Bagaimana integrasi rekomendasi surplus/defisit dari Gudang ke Pembelian & Penjualan?** | Menggunakan **Tabel Bersama (`rekomendasi_transaksi`)** + Domain Event. Rekomendasi muncul bilateral: di **Penjualan desa surplus** (calon pembeli = desa defisit) dan di **Pembelian desa defisit** (calon pemasok = desa surplus). **Roy yang memilih rekomendasi** untuk pre-fill form transaksi, dan transaksi baru tercipta saat Roy menyimpan form. |
 
 ---
 
@@ -461,7 +462,152 @@ Untuk menghindari kesalahan potong stok pada entitas yang memiliki lebih dari sa
 
 ---
 
-## 7. Rencana Perubahan Kode (Action Items)
+## 8. Koordinasi Integrasi Rekomendasi Surplus–Defisit Antara Gudang, Pembelian, & Penjualan
+
+### A. Mekanisme Pengiriman Data Rekomendasi ke Penjualan & Pembelian
+
+#### 1. Status Eksisting di Modul Penjualan & Pembelian:
+* **Modul Pembelian:** Form `PembelianController::create()` sudah memiliki variabel `$permintaanPembelianPending` yang membaca dari tabel `permintaan_pengadaan` (PR yang disetujui) dan fallback ke data contoh jika kosong.
+* **Modul Penjualan:** Halaman `PenjualanController::create()` (`pos.blade.php`) sudah memiliki bagian *"Rekomendasi Penjualan dari Gudang"* (`$warehouseRecommendations`), yang saat ini masih berupa stub data contoh.
+* **Kesimpulan:** Tempat (*UI placeholder*) sudah disiapkan oleh kedua modul, namun tabel dinamis perantara rekomendasi hasil pencocokan antardesa Gudang perlu diresmikan.
+
+#### 2. Cara Gudang Mengirim Data Rekomendasi:
+Sesuai arsitektur *Single Database Multi-Tenant* pada KDMP, metode terbaik adalah menggunakan **Tabel Bersama (Shared Entity / Table)**: `rekomendasi_transaksi` (atau menggunakan tabel `permintaan_barter` / `penawaran_barter` yang diperluas):
+* Masing-masing entitas harus memberi persetujuan. Setelah persetujuan lengkap, Gudang mengalokasikan stok dengan urutan persetujuan lengkap, menaikkan `stok.qty_reserved`, dan menyiapkan rekomendasi berstatus `siap_dilempar`.
+* Tombol **Lempar** di Gudang mengubah rekomendasi menjadi `menunggu`. Hanya setelah itu rekomendasi boleh tampil di modul Penjualan dan Pembelian; tombol ini tidak membuat transaksi atau PO.
+* Halaman Gudang hanya menampilkan permintaan masuk dan keluar serta status persetujuannya. Perhitungan dan pencocokan data surplus-defisit tetap menjadi tanggung jawab modul Perencanaan Pengadaan.
+* Notifikasi/event lintas modul belum diimplementasikan. Payload dan mekanisme konsumsi harus disepakati dengan pengembang Perencanaan, Penjualan, dan Pembelian sebelum integrasi lintas modul.
+
+---
+
+### B. Kontrak Struktur Data Rekomendasi
+
+Data yang dikirimkan oleh Gudang dan diterima oleh modul Penjualan & Pembelian:
+
+| Field | Tipe Data | Deskripsi & Contoh |
+|---|---|---|
+| `id_rekomendasi` | `bigint / uuid` | Primary key unik rekomendasi |
+| `id_pengajuan_gudang` | `bigint / string` | ID unik kesepakatan surplus-defisit dari modul Gudang |
+| `jenis_rekomendasi` | `enum('penjualan', 'pembelian')` | Menentukan modul mana yang menampilkan: `penjualan` (desa surplus) atau `pembelian` (desa defisit) |
+| `id_entitas_asal` | `bigint` | Entitas desa pengirim / surplus (Penjual) |
+| `id_entitas_tujuan` | `bigint` | Entitas desa penerima / defisit (Pembeli) |
+| `id_pihak_mitra` | `bigint` | ID rekanan di tabel `master_pihak` yang mewakili desa mitra (wajib untuk transaksi) |
+| `id_gudang` | `bigint nullable` | Gudang sumber untuk rekomendasi Penjualan atau gudang tujuan untuk rekomendasi Pembelian |
+| `id_barang` | `bigint` | ID barang komoditas yang disepakati |
+| `nama_barang` | `string` | Nama komoditas (misal: "Beras Rojolele 25kg") |
+| `id_satuan` | `bigint` | Satuan transaksi (satuan dasar / KG) |
+| `qty_disetujui` | `decimal(18,4)` | Kuantitas yang disepakati antar-desa |
+| `harga_satuan_kesepakatan` | `decimal(18,2)` | **Tambahan Wajib:** Harga per unit yang disepakati antar-gudang (untuk auto-fill nominal transaksi) |
+| `id_unit_usaha` | `bigint` | Unit usaha yang menaungi barang (misal Sembako) |
+| `tgl_berlaku_sampai` | `datetime` | Batas kedaluwarsa rekomendasi (misal 48 jam) |
+| `id_transaksi_terbentuk` | `bigint nullable` | ID transaksi yang dibuat operator modul terkait |
+| `status` | `string` | `siap_dilempar`, `menunggu`, `diproses`, atau `kadaluarsa` |
+
+---
+
+### C. Alur Rekomendasi Bilateral (Desa Surplus vs Desa Defisit)
+
+Ketika kesepakatan antar-gudang telah disetujui kedua belah pihak:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                   GUDANG PUSAT / MATCHMAKING                     │
+│  Kesepakatan: Desa A (Surplus 500 kg) -> Desa B (Defisit 500 kg) │
+└─────────────────┬───────────────────────────────┬────────────────┘
+                  │                               │
+                  ▼                               ▼
+     [Desa A: Entitas Surplus]       [Desa B: Entitas Defisit]
+   ┌───────────────────────────┐   ┌───────────────────────────┐
+   │      MODUL PENJUALAN      │   │      MODUL PEMBELIAN      │
+   │  Tampil Rekomendasi Jual  │   │  Tampil Rekomendasi Beli  │
+   │  - Calon Pembeli: Desa B  │   │  - Calon Pemasok: Desa A  │
+   │  - Barang: Beras 500 kg   │   │  - Barang: Beras 500 kg   │
+   │  - Menunggu Roy Kasir     │   │  - Menunggu Roy Pembelian │
+   └───────────────────────────┘   └───────────────────────────┘
+```
+
+1. **Di Desa Surplus (Desa A):**
+   * Rekomendasi muncul di modul **Penjualan (Kasir / POS)**.
+   * Calon Pembeli: Entitas Desa B (terdaftar di `master_pihak`).
+   * Mengurangi stok surplus dan membukukan piutang / kas masuk bagi Desa A.
+2. **Di Desa Defisit (Desa B):**
+   * Rekomendasi muncul di modul **Pembelian (Pengadaan)**.
+   * Calon Pemasok: Entitas Desa A (terdaftar di `master_pihak`).
+   * Menghasilkan Purchase Order (PO) untuk memenuhi kekurangan konsumsi pangan warga Desa B.
+
+Persetujuan lengkap belum langsung menampilkan rekomendasi ke dua modul. Gudang harus menekan tombol **Lempar**; sesudah itu rekomendasi berstatus `menunggu` dan operator masing-masing modul tetap memilih apakah akan membuat transaksi.
+
+---
+
+### D. Peran Roy (Operator): Pemilihan Rekomendasi & Pembuatan Transaksi
+
+> [!IMPORTANT]
+> **Prinsip Segregation of Duties (Pemisahan Wewenang):**  
+> Pengiriman rekomendasi dari Gudang **TIDAK PERNAH** membuat transaksi otomatis, tidak membuat PO di database, dan tidak membuka laci kasir. Rekomendasi bersifat murni *sinyal penawaran/kebutuhan* (*advisory*).
+
+**Alur Kerja Roy (Operator):**
+1. Roy membuka halaman Pembelian (`pembelian.create`) atau Penjualan (`penjualan.pos`).
+2. Roy melihat daftar rekomendasi aktif yang berstatus `menunggu`.
+3. Roy mengklik tombol **"Gunakan Rekomendasi"** pada baris yang dipilih.
+4. Sistem membuka form transaksi dengan data yang **langsung terisi otomatis (*pre-filled*)**:
+   - Pihak rekanan (supplier / pembeli) terisi desa mitra.
+   - Barang, satuan, dan kuantitas terisi sesuai angka persetujuan.
+   - Harga satuan terisi harga kesepakatan antar-gudang.
+5. Roy melengkapi syarat komersial: metode bayar (tunai/transfer/kredit), rekening bank, dan tanggal jatuh tempo.
+6. **Transaksi resmi baru tercipta saat Roy menekan tombol simpan/bayar:**
+   - Pada Pembelian: Dokumen PO dibuat dengan status `disetujui` (atau draft).
+   - Pada Penjualan: Dokumen Penjualan dibuat dengan status `selesai` dan memotong stok via `StokService::keluar`.
+
+---
+
+### E. Siklus Status Rekomendasi & Pencegahan Rekomendasi Ganda (Idempotency)
+
+1. **Siklus Status:**
+   * `siap_dilempar`: Kedua entitas telah menyetujui dan stok sumber sudah direservasi; belum terlihat oleh modul transaksi.
+   * `menunggu`: Gudang sudah menekan tombol Lempar; rekomendasi dapat dipilih operator.
+   * `diproses`: Operator telah menyimpan transaksi dan mengaitkan ID transaksi pada `id_transaksi_terbentuk`.
+   * `ditolak`: Penolakan rekomendasi oleh operator belum tersedia pada integrasi saat ini.
+   * `kadaluarsa`: Melewati batas waktu `tgl_berlaku_sampai` tanpa diproses.
+
+2. **Pencegahan Pemrosesan Ganda (Anti-Double Processing):**
+   - **Database Index Constraint:** Kombinasi `[id_pengajuan_gudang, jenis_rekomendasi, id_entitas]` bersifat unik.
+   - **Pessimistic Locking (`lockForUpdate`):** Saat Roy menekan tombol simpan transaksi:
+     ```php
+     $rekomendasi = RekomendasiTransaksi::where('id_rekomendasi', $idRekomendasi)
+         ->lockForUpdate()
+         ->firstOrFail();
+
+     if ($rekomendasi->status !== 'menunggu') {
+         throw new \RuntimeException('Rekomendasi ini sudah pernah diproses atau tidak lagi valid.');
+     }
+
+     $rekomendasi->update([
+         'status' => 'diproses',
+         'id_transaksi_terbentuk' => $transaksiId,
+         'diproses_oleh' => auth()->id(),
+         'diproses_pada' => now(),
+     ]);
+     ```
+   - Dengan penguncian baris ini, meskipun kasir/pembeli mengklik ganda (*double-click*), sistem mencegah terbentuknya PO atau nota penjualan kedua.
+
+---
+
+### F. Kebijakan Pencadangan Stok: `qty_reserved` vs Re-Check Realtime
+
+Tabel `stok` di KDMP sudah memiliki kolom `qty_reserved`. Berdasarkan karakteristik transaksi antar-desa:
+
+| Skenario Transaksi | Kebijakan Pencadangan | Penjelasan Mekanisme |
+|---|:---:|---|
+| **Transaksi Kargo Antar-Desa (Volume Besar)** | **Soft-Reservation (`qty_reserved`)** | Setelah kedua entitas menyetujui dan alokasi dibuat, Gudang menaikkan `stok.qty_reserved += qty`. Stok ini tidak bisa dijual oleh kasir ke warga lokal selama masa tunggu. Masa berlaku adalah 48 jam sejak persetujuan lengkap. Proses terjadwal Gudang melepaskan cadangan yang kedaluwarsa dan menandai rekomendasi sebagai `kadaluarsa`. |
+| **Transaksi Fleksibel / Ritel Biasa** | **Re-Check Realtime (Just-In-Time)** | Stok fisik **tidak dikunci**. Ketika Roy membuka form dan menekan simpan, sistem memeriksa ulang: $\text{Stok Tersedia} = \text{qty\_on\_hand} - \text{qty\_reserved}$. Jika stok ternyata telah berkurang karena terjual di kasir, sistem menampilkan notifikasi: *"Stok aktual tidak mencukupi rekomendasi. Kuantitas disesuaikan dengan sisa yang ada atau batalkan."* |
+
+> **Rekomendasi Standar KDMP:** Gunakan **Soft-Reservation dengan batas waktu 48 jam** untuk menjaga komitmen pasokan ke desa mitra yang sedang mengalami defisit, sehingga desa defisit tidak kecewa karena barang tiba-tiba habis sebelum PO diterbitkan.
+
+**Batas integrasi saat ini:** Penjualan harus mengonsumsi reservasi rekomendasi ketika transaksi disimpan. Alur `PenjualanService` yang ada memakai `StokService::keluar()` biasa, yang mengurangi jumlah `qty_reserved` dari stok tersedia; karena itu pengembang Penjualan perlu menyediakan integrasi konsumsi reservasi sebelum rekomendasi ini digunakan untuk transaksi nyata.
+
+---
+
+## 9. Rencana Perubahan Kode (Action Items)
 
 ### 1. Modul Pembelian (`feature/pembelian-penjualan`):
 - [ ] **Model Relationship:** Tambahkan relasi `penerimaan()` di `app/Models/Pembelian/Pembelian.php`.
@@ -472,13 +618,16 @@ Untuk menghindari kesalahan potong stok pada entitas yang memiliki lebih dari sa
 - [ ] **View Button:** Pada `resources/views/pembelian/show.blade.php`, tambahkan tombol:
   *"Terima Barang di Gudang / Buat GRN"* aktif saat status `disetujui` atau `diterima`, mengarah ke:
   `/gudang/penerimaan/create?id_pembelian={$pembelian->id_pembelian}`.
+- [ ] **Integrasi Rekomendasi Pembelian:** Ganti stub dummy di `PembelianController::create()` dengan query ke tabel `rekomendasi_transaksi` berstatus `menunggu` untuk entitas pembeli.
 
 ### 2. Modul Penjualan (`feature/pembelian-penjualan`):
 - [ ] **Hapus Demo Stock:** Hapus ketergantungan pada `availableDemoStock()` dan gunakan pengecekan stok riil gudang.
 - [ ] **Integrasi FEFO Barang Biasa:** Panggil `StokService::keluar()` dengan `idBatch = null` pada saat finalisasi penjualan (`createSale`) di dalam `DB::transaction()`.
+- [ ] **Konsumsi Reservasi Rekomendasi:** Saat penjualan memakai rekomendasi Gudang, validasi rekomendasi dan gunakan reservasi `id_gudang`/barang dalam transaksi yang sama; jangan menolak stok hanya karena kuantitas itu sudah masuk `qty_reserved`.
 - [ ] **Jaminan Atomisitas:** Tangkap exception jika stok/batch tidak mencukupi agar seluruh penjualan dibatalkan dan stok tidak berubah sebagian.
 - [ ] **Dukungan Multi-Gudang POS:** Sediakan pilihan `id_gudang` pada POS (fallback ke gudang aktif pertama jika tunggal).
 - [ ] **Isolasi Konsinyasi:** Pastikan item titipan (`id_stok_konsinyasi`) tidak memanggil `StokService::keluar()`, melainkan memotong `stok_konsinyasi.qty_sisa`, menulis `kartu_konsinyasi`, dan posting jurnal `KJL`.
+- [ ] **Integrasi Rekomendasi Penjualan:** Tampilkan kartu rekomendasi penjualan dari tabel `rekomendasi_transaksi` di header kasir POS (`pos.blade.php`).
 
 ### 3. Modul Gudang (`feature/gudang-konsinyasi`):
 - [ ] **Model Relationship:** Tambahkan relasi `pembelian()` di `app/Models/Gudang/PenerimaanBarang.php`.
@@ -488,6 +637,7 @@ Untuk menghindari kesalahan potong stok pada entitas yang memiliki lebih dari sa
   - Mutasi fisik stok dan kartu stok.
   - **Tembakkan Event:** `event(new \App\Events\Gudang\BarangDiterimaGudang($header->id_entitas, $header->id_pembelian, $header->id_penerimaan));`
   - Teruskan payload ke antrean jurnal Keuangan dengan menyertakan `id_pembelian`.
+- [x] **Persetujuan, alokasi FIFO, reservasi 48 jam, dan tombol Lempar:** Gudang menyiapkan rekomendasi setelah persetujuan kedua entitas; rekomendasi baru berstatus `menunggu` setelah dikirim secara eksplisit ke modul transaksi.
 
 ### 4. Modul Keuangan (`feature/finance`):
 - [ ] **Idempotency Guard pada Consumer Antrean Jurnal:** Cegah duplikasi debit persediaan pada antrean GRN jika `id_pembelian` sudah dijurnal.
@@ -496,4 +646,12 @@ Untuk menghindari kesalahan potong stok pada entitas yang memiliki lebih dari sa
 ---
 *Dokumen ini dibuat sebagai acuan kerja implementasi bersama tim KDMP.*
 
+Berikut prompt yang sudah disesuaikan:
+Integrasikan PR Gudang ke modul Pembelian. Buat tabel antrean rekomendasi sebagai bagian dari pekerjaan modul Gudang, lalu sediakan implementasi untuk kontrak App\Services\Pembelian\PurchaseRecommendationProvider yang sudah disiapkan di modul Pembelian.
 
+Antrean yang dikirim ke Pembelian harus berjenis pembelian, ditujukan ke entitas aktif, dan berstatus menunggu. Data rekomendasi harus mencakup PR, barang, satuan, kuantitas, unit usaha, gudang, serta calon pemasok:
+- Desa mitra yang surplus komoditas, beserta ketersediaan dan harga standar jualnya.
+- Warga lokal yang memiliki komoditas tersebut, beserta ketersediaannya.
+Saat operator memilih rekomendasi, form PO di Pembelian harus terisi dengan data tersebut. PO hanya dibuat setelah operator menyimpan form, lalu antrean ditandai telah diproses dan dikaitkan dengan PO. Jangan membuat atau menyetujui PO secara otomatis.
+
+Jaga validasi agar rekomendasi hanya dapat digunakan oleh entitas tujuan dan tidak dapat diproses lebih dari sekali. Buat perubahan tabel dan integrasi di lingkup modul Gudang; gunakan kontrak provider Pembelian tanpa mengubah alur akuntansi.

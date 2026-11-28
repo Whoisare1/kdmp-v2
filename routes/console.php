@@ -13,3 +13,6 @@ Schedule::command('idempotency:prune --hours=72')->daily();
 
 // Proses antrean jurnal transaksi gudang secara berkala
 Schedule::command('jurnal:proses-gudang')->everyMinute();
+
+// Lepas reservasi rekomendasi surplus-defisit setelah masa berlaku 48 jam
+Schedule::command('gudang:lepaskan-reservasi-surplus')->everyMinute();

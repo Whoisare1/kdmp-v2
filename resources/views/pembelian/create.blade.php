@@ -20,12 +20,12 @@
             <section class="mb-4 rounded-sm border border-amber-300 bg-amber-50 p-4">
                 <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <h3 class="font-semibold text-amber-950">Permintaan Pengadaan (PR) Siap Diproses</h3>
+                        <h3 class="font-semibold text-amber-950">Permintaan Pengadaan dan Rekomendasi Gudang</h3>
                         <p class="mt-1 text-sm text-amber-900">
                             @if ($permintaanPembelianPending->isNotEmpty())
-                                {{ $permintaanPembelianPending->count() }} permintaan pengadaan telah disetujui dan menunggu penerbitan PO pembelian.
+                                {{ $permintaanPembelianPending->count() }} permintaan atau rekomendasi telah disetujui dan menunggu dibuat menjadi PO.
                             @else
-                                Semua permintaan pengadaan telah diproses menjadi PO atau belum ada PR baru yang disetujui.
+                                Belum ada permintaan atau rekomendasi baru yang siap dibuat menjadi PO.
                             @endif
                         </p>
                     </div>
@@ -59,7 +59,7 @@
                         <input type="hidden" name="id_permintaan_pembelian" value="{{ $permintaanPembelian->id_permintaan_pembelian }}" id="id_permintaan_pembelian">
                         <div class="mb-3 rounded-sm border border-sawah-300 bg-sawah-50 p-3">
                             <p class="text-sm text-sawah-900">
-                                <strong>Kebutuhan PR Terpilih:</strong> {{ $permintaanPembelian->kode_permintaan }} — 
+                                <strong>Kebutuhan Terpilih:</strong> {{ $permintaanPembelian->kode_permintaan }} —
                                 <strong>{{ $permintaanPembelian->barang->nama_barang }}</strong> sebanyak 
                                 <strong>{{ number_format((float) $permintaanPembelian->qty_diminta, 2, ',', '.') }} KG</strong> 
                                 untuk tujuan gudang <strong>{{ $permintaanPembelian->gudang->nama_gudang }}</strong>.
@@ -158,7 +158,7 @@
                                             <input type="number" step="0.0001" min="0" name="items[0][qty_dasar]" value="{{ $permintaanPembelian?->qty_diminta ?? old('items.0.qty_dasar') }}" @readonly($permintaanPembelian) class="w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
                                         </td>
                                         <td class="px-3 py-2">
-                                            <input type="number" step="0.01" min="0" name="items[0][harga_satuan]" class="quick-purchase-price w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
+                                            <input type="number" step="0.01" min="0" name="items[0][harga_satuan]" value="{{ old('items.0.harga_satuan', $permintaanPembelian?->pihak_rekomendasi?->harga_standar_rekomendasi) }}" class="quick-purchase-price w-full rounded-sm border border-paper-300 bg-paper-50 px-2 py-1.5">
                                         </td>
                                         <td class="px-3 py-2">
                                             @unless ($permintaanPembelian)
@@ -187,14 +187,21 @@
                             <select id="id_pihak" name="id_pihak" required class="mt-1 w-full rounded-sm border border-paper-300 bg-paper-50 px-3 py-2">
                                 <option value="">-- Pilih Pihak --</option>
                                 @foreach ($pihaks as $pihak)
-                                    <option value="{{ $pihak->id_pihak }}" data-source="{{ $pihak->jenis_pihak === 'entitas_lain' ? 'desa_lain' : 'warga_lokal' }}" data-is-village="{{ $pihak->id_entitas_mitra ? 'true' : 'false' }}" data-request-recommended="{{ $permintaanPembelian?->supplier_recommendations->contains('id_pihak', $pihak->id_pihak) ? 'true' : 'false' }}" @selected(old('id_pihak') == $pihak->id_pihak)>
-                                        {{ $pihak->nama_pihak }}{{ $pihak->jenis_pihak === 'petani' ? ' (Petani)' : '' }}{{ $permintaanPembelian?->supplier_recommendations->contains('id_pihak', $pihak->id_pihak) ? ' ★ Rekomendasi PR' : '' }}
+                                    <option value="{{ $pihak->id_pihak }}" data-source="{{ $pihak->jenis_pihak === 'entitas_lain' ? 'desa_lain' : 'warga_lokal' }}" data-is-village="{{ $pihak->id_entitas_mitra ? 'true' : 'false' }}" data-request-recommended="{{ $permintaanPembelian?->supplier_recommendations->contains('id_pihak', $pihak->id_pihak) ? 'true' : 'false' }}" data-recommended-price="{{ $permintaanPembelian?->supplier_recommendations->firstWhere('id_pihak', $pihak->id_pihak)?->harga_standar_rekomendasi }}" @selected(old('id_pihak') == $pihak->id_pihak || $permintaanPembelian?->pihak_rekomendasi?->id_pihak == $pihak->id_pihak)>
+                                        {{ $pihak->nama_pihak }}{{ $pihak->jenis_pihak === 'petani' ? ' (Petani)' : '' }}{{ $permintaanPembelian?->supplier_recommendations->contains('id_pihak', $pihak->id_pihak) ? ' ★ Rekomendasi' : '' }}
                                     </option>
                                 @endforeach
                             </select>
                             @if ($permintaanPembelian)
                                 <p class="mt-1 text-xs text-ink-500">
                                     Rekomendasi: {{ $permintaanPembelian->supplier_recommendations->pluck('nama')->join(', ') ?: 'Belum ada pemasok yang cocok di data master.' }}
+                                </p>
+                            @endif
+                            @if ($permintaanPembelian?->pihak_rekomendasi)
+                                <p class="mt-1 text-xs text-ink-500">
+                                    Asal: {{ $permintaanPembelian->pihak_rekomendasi->asal_rekomendasi }}.
+                                    Jumlah tersedia: {{ number_format((float) $permintaanPembelian->pihak_rekomendasi->jumlah_tersedia_rekomendasi, 2, ',', '.') }} {{ $permintaanPembelian->pihak_rekomendasi->satuan_rekomendasi }}.
+                                    Harga standar: Rp {{ number_format((float) $permintaanPembelian->pihak_rekomendasi->harga_standar_rekomendasi, 2, ',', '.') }} per {{ $permintaanPembelian->pihak_rekomendasi->satuan_rekomendasi }}; harga PO dapat disesuaikan.
                                 </p>
                             @endif
                         </label>
@@ -313,6 +320,16 @@
             }
 
             togglePaymentFields();
+        }
+
+        function updateRecommendedPrice() {
+            const supplier = document.getElementById('id_pihak');
+            const recommendedPrice = supplier.selectedOptions[0]?.dataset.recommendedPrice;
+            const priceInput = document.querySelector('#quick_purchase_rows .quick-purchase-price');
+
+            if (recommendedPrice && priceInput) {
+                priceInput.value = recommendedPrice;
+            }
         }
 
         function togglePaymentFields() {
@@ -471,6 +488,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             toggleForm();
             document.querySelectorAll('.quick-purchase-barang').forEach(updateQuickPurchaseUnits);
+            document.getElementById('id_pihak').addEventListener('change', updateRecommendedPrice);
         });
     </script>
 </x-layouts.app>

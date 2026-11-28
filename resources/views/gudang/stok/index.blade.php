@@ -46,6 +46,13 @@
                         $qtyDipesan = (float) $item->qty_reserved;
                         $stokMinimum = $item->stok_minimum;
                         $satuan = $item->barang->satuanDasar->kode_satuan ?? '';
+                        $kekuranganMinimum = $stokMinimum !== null
+                            ? max(0, (float) $stokMinimum - (float) $item->qty_tersedia_koperasi)
+                            : 0;
+                        $stokMaksimum = (float) ($item->stok_maksimum ?? 0);
+                        $saranKeMaksimum = $stokMaksimum > 0
+                            ? max(0, $stokMaksimum - (float) $item->qty_tersedia_koperasi)
+                            : null;
                         $stokMenipis = $stokMinimum !== null
                             && bccomp((string) $stokMinimum, '0', 4) > 0
                             && bccomp((string) $item->qty_tersedia_koperasi, (string) $stokMinimum, 4) <= 0;
@@ -69,6 +76,19 @@
                             <span class="mt-1 block text-xs text-ink-600/60">
                                 @if ($stokMinimum !== null && bccomp((string) $stokMinimum, '0', 4) > 0)
                                     Minimum entitas: {{ rtrim(rtrim(number_format((float) $stokMinimum, 4, ',', '.'), '0'), ',') }} {{ $satuan }}
+                                    @if ($filterStatus === 'menipis')
+                                        <span class="mt-1 block font-medium text-merah-700">
+                                            Kurang ke minimum: {{ rtrim(rtrim(number_format($kekuranganMinimum, 4, ',', '.'), '0'), ',') }} {{ $satuan }}
+                                        </span>
+                                        @if ($saranKeMaksimum !== null)
+                                            <span class="mt-1 block text-xs font-medium text-emerald-700">
+                                                Saran menuju stok maksimum: {{ rtrim(rtrim(number_format($saranKeMaksimum, 4, ',', '.'), '0'), ',') }} {{ $satuan }}
+                                            </span>
+                                            <span class="block text-xs text-ink-500">Saran ini dapat disesuaikan atau diabaikan oleh Perencanaan.</span>
+                                        @else
+                                            <span class="mt-1 block text-xs text-ink-500">Stok maksimum belum diatur; Perencanaan menentukan jumlah kebutuhan.</span>
+                                        @endif
+                                    @endif
                                 @else
                                     Minimum belum diatur
                                 @endif

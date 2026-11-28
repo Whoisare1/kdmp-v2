@@ -53,27 +53,110 @@ class PerencanaanDemoSeeder extends Seeder
             );
         }
 
+        $maxKetersediaanId = (int) (DB::table('ketersediaan_komoditas')->max('id') ?? 0);
+        $maxKebutuhanId = (int) (DB::table('kebutuhan_komoditas')->max('id') ?? 0);
+        $maxPerbandinganId = (int) (DB::table('perbandingan_harga')->max('id_perbandingan') ?? 0);
+        $maxHasilId = (int) (DB::table('hasil_kalkulasi')->max('id_hasil') ?? 0);
+
         foreach ($wilayah->values() as $index => $desa) {
             for ($bulan = 1; $bulan <= 12; $bulan++) {
                 foreach ($komoditasData as $data) {
                     $item = $komoditas[$data['nama']];
                     $produksi = (float) $data['produksi'][$index];
-                    DB::table('ketersediaan_komoditas')->updateOrInsert(
-                        ['id_wilayah' => $desa->id, 'id_komoditas' => $item->id, 'tahun' => 2026, 'bulan' => $bulan],
-                        ['id_sesi_survei' => null, 'jumlah_produksi' => $produksi, 'satuan' => 'KG', 'created_at' => $now]
-                    );
+
+                    $existingKetersediaan = DB::table('ketersediaan_komoditas')
+                        ->where('id_wilayah', $desa->id)
+                        ->where('id_komoditas', $item->id)
+                        ->where('tahun', 2026)
+                        ->where('bulan', $bulan)
+                        ->first();
+
+                    if ($existingKetersediaan) {
+                        DB::table('ketersediaan_komoditas')
+                            ->where('id', $existingKetersediaan->id)
+                            ->update([
+                                'id_sesi_survei' => null,
+                                'jumlah_produksi' => $produksi,
+                                'satuan' => 'KG',
+                            ]);
+                    } else {
+                        $maxKetersediaanId++;
+                        DB::table('ketersediaan_komoditas')->insert([
+                            'id' => $maxKetersediaanId,
+                            'id_wilayah' => $desa->id,
+                            'id_komoditas' => $item->id,
+                            'tahun' => 2026,
+                            'bulan' => $bulan,
+                            'id_sesi_survei' => null,
+                            'jumlah_produksi' => $produksi,
+                            'satuan' => 'KG',
+                            'created_at' => $now,
+                        ]);
+                    }
+
+                    $kebutuhan = (float) $data['kebutuhan'];
+
+                    $existingKebutuhan = DB::table('kebutuhan_komoditas')
+                        ->where('id_wilayah', $desa->id)
+                        ->where('id_komoditas', $item->id)
+                        ->where('tahun', 2026)
+                        ->where('bulan', $bulan)
+                        ->first();
+
+                    if ($existingKebutuhan) {
+                        DB::table('kebutuhan_komoditas')
+                            ->where('id', $existingKebutuhan->id)
+                            ->update([
+                                'kebutuhan_bulanan' => $kebutuhan,
+                                'satuan' => 'KG',
+                            ]);
+                    } else {
+                        $maxKebutuhanId++;
+                        DB::table('kebutuhan_komoditas')->insert([
+                            'id' => $maxKebutuhanId,
+                            'id_wilayah' => $desa->id,
+                            'id_komoditas' => $item->id,
+                            'tahun' => 2026,
+                            'bulan' => $bulan,
+                            'kelompok_umur' => 'dewasa',
+                            'jumlah_penduduk' => 1000,
+                            'per_kapita_harian' => 0.5,
+                            'faktor_musiman' => 1,
+                            'kebutuhan_bulanan' => $kebutuhan,
+                            'satuan' => 'KG',
+                            'created_at' => $now,
+                        ]);
+                    }
 
                     $harga = $data['harga'] + ($index * 500) + (($bulan - 1) * 100);
                     foreach ($entitas as $entitasItem) {
-                        DB::table('perbandingan_harga')->updateOrInsert(
-                            [
+                        $existingPerbandingan = DB::table('perbandingan_harga')
+                            ->where('id_entitas', $entitasItem->id_entitas)
+                            ->where('id_komoditas', $item->id)
+                            ->where('id_wilayah_sumber', $desa->id)
+                            ->where('bulan', $bulan)
+                            ->where('tahun', 2026)
+                            ->first();
+
+                        if ($existingPerbandingan) {
+                            DB::table('perbandingan_harga')
+                                ->where('id_perbandingan', $existingPerbandingan->id_perbandingan)
+                                ->update([
+                                    'harga_ditawarkan' => $harga,
+                                    'jumlah_tersedia' => $produksi,
+                                    'jarak_ke_gudang' => $index === 0 ? 0 : 4.2,
+                                    'estimasi_ongkir' => $index === 0 ? 0 : 500,
+                                    'harga_efektif' => $harga + ($index === 0 ? 0 : 500),
+                                ]);
+                        } else {
+                            $maxPerbandinganId++;
+                            DB::table('perbandingan_harga')->insert([
+                                'id_perbandingan' => $maxPerbandinganId,
                                 'id_entitas' => $entitasItem->id_entitas,
                                 'id_komoditas' => $item->id,
                                 'id_wilayah_sumber' => $desa->id,
                                 'bulan' => $bulan,
                                 'tahun' => 2026,
-                            ],
-                            [
                                 'harga_ditawarkan' => $harga,
                                 'jumlah_tersedia' => $produksi,
                                 'jarak_ke_gudang' => $index === 0 ? 0 : 4.2,
@@ -82,15 +165,43 @@ class PerencanaanDemoSeeder extends Seeder
                                 'rank_harga' => null,
                                 'dipilih' => false,
                                 'created_at' => $now,
-                            ]
-                        );
+                            ]);
+                        }
                     }
 
-                    $kebutuhan = (float) $data['kebutuhan'];
                     $selisih = $produksi - $kebutuhan;
-                    DB::table('hasil_kalkulasi')->updateOrInsert(
-                        ['id_wilayah' => $desa->id, 'id_komoditas' => $item->id, 'tahun' => 2026, 'bulan' => $bulan, 'versi' => 1],
-                        [
+
+                    $existingHasil = DB::table('hasil_kalkulasi')
+                        ->where('id_wilayah', $desa->id)
+                        ->where('id_komoditas', $item->id)
+                        ->where('tahun', 2026)
+                        ->where('bulan', $bulan)
+                        ->where('versi', 1)
+                        ->first();
+
+                    if ($existingHasil) {
+                        DB::table('hasil_kalkulasi')
+                            ->where('id_hasil', $existingHasil->id_hasil)
+                            ->update([
+                                'total_kebutuhan' => $kebutuhan,
+                                'total_ketersediaan' => $produksi,
+                                'selisih' => $selisih,
+                                'status_surplus_defisit' => $selisih > 0 ? 'surplus' : ($selisih < 0 ? 'defisit' : 'seimbang'),
+                                'persentase_kecukupan' => $kebutuhan > 0 ? ($produksi / $kebutuhan) * 100 : 0,
+                                'id_unit_usaha_rekomendasi' => $unitUsaha,
+                                'alasan_rekomendasi' => $selisih < 0 ? 'Kebutuhan melebihi produksi lokal; perlu PR ke gudang.' : 'Produksi lokal mencukupi kebutuhan desa.',
+                                'prioritas' => $selisih < 0 ? 1 : 3,
+                                'status' => 'disetujui',
+                            ]);
+                    } else {
+                        $maxHasilId++;
+                        DB::table('hasil_kalkulasi')->insert([
+                            'id_hasil' => $maxHasilId,
+                            'id_wilayah' => $desa->id,
+                            'id_komoditas' => $item->id,
+                            'tahun' => 2026,
+                            'bulan' => $bulan,
+                            'versi' => 1,
                             'total_kebutuhan' => $kebutuhan,
                             'total_ketersediaan' => $produksi,
                             'selisih' => $selisih,
@@ -101,8 +212,8 @@ class PerencanaanDemoSeeder extends Seeder
                             'prioritas' => $selisih < 0 ? 1 : 3,
                             'status' => 'disetujui',
                             'created_at' => $now,
-                        ]
-                    );
+                        ]);
+                    }
                 }
             }
         }

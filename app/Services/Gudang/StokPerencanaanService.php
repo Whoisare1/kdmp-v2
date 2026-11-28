@@ -7,6 +7,23 @@ use Illuminate\Support\Facades\DB;
 class StokPerencanaanService
 {
     /**
+     * Menghitung jumlah neraca M2 yang benar-benar dapat ditindaklanjuti Gudang.
+     * Surplus dibatasi stok yang boleh dijual; defisit dikurangi stok tersedia.
+     */
+    public function jumlahTindakLanjut(
+        string $statusNeraca,
+        float $selisih,
+        float $qtyStokTersedia,
+        float $qtyStokDapatDijual,
+    ): float {
+        return match ($statusNeraca) {
+            'surplus' => min(max(0, $selisih), max(0, $qtyStokDapatDijual)),
+            'defisit' => max(0, abs($selisih) - max(0, $qtyStokTersedia)),
+            default => 0.0,
+        };
+    }
+
+    /**
      * Mengubah stok dasar setiap barang ke satuan yang dipakai perencanaan.
      * Barang yang tidak memiliki konversi valid tidak ikut dijumlahkan.
      */

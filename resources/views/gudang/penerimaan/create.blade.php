@@ -352,8 +352,9 @@
                 });
                 const qtyDasarTarget = (Number(row.querySelector('.qtyInput').value) || 0)
                     * (Number(row.querySelector('.faktorInput').value) || 0);
+                const totalTidakLayak = Math.max(0, totalDasar - totalLayak);
                 row.querySelector('.batchSummary').textContent =
-                    `Total batch: ${totalDasar.toLocaleString('id-ID', { maximumFractionDigits: 4 })} / ${qtyDasarTarget.toLocaleString('id-ID', { maximumFractionDigits: 4 })} satuan dasar • Layak: ${totalLayak.toLocaleString('id-ID', { maximumFractionDigits: 4 })}`;
+                    `Total batch: ${totalDasar.toLocaleString('id-ID', { maximumFractionDigits: 4 })} / ${qtyDasarTarget.toLocaleString('id-ID', { maximumFractionDigits: 4 })} satuan dasar • Layak: ${totalLayak.toLocaleString('id-ID', { maximumFractionDigits: 4 })} • Tidak layak: ${totalTidakLayak.toLocaleString('id-ID', { maximumFractionDigits: 4 })}`;
                 row.querySelector('.qtyInput').setCustomValidity(
                     batchPanel.hidden || Math.abs(totalDasar - qtyDasarTarget) < 0.00005
                         ? ''
