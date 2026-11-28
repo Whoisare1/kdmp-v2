@@ -44,7 +44,7 @@
                 @if(auth()->user()?->hasPeran('admin_gudang') || auth()->user()?->hasPeran('manajer') || auth()->user()?->isSuperAdmin())
                     <a href="{{ route('master.barang.stok-minimum.index') }}"
                        class="inline-flex items-center justify-center rounded-sm border border-paper-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-paper-100 shadow-sm transition">
-                        ⚙️ Atur Stok Minimum & Batch
+                        ⚙️ Atur Stok Minimum &amp; Batch
                     </a>
                 @endif
                 <a href="{{ route('master.barang.hubungkan.create') }}"

@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ModuleCrudController;
 use App\Http\Controllers\Concerns\ResolvesEntitasAktif;
 use App\Models\Gudang\KartuStok;
 use App\Models\Master\Barang;
+use App\Models\Master\Gudang;
 use App\Models\Tenant\Entitas;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class KartuStokController extends ModuleCrudController
         $entitasId = $this->entitasAktifId();
 
         $filters = $request->validate([
+            'id_gudang' => ['nullable', 'integer', 'exists:gudang,id_gudang'],
             'id_barang' => ['nullable', 'integer', 'exists:master_barang,id_barang'],
             'jenis_mutasi' => ['nullable', 'in:IN,OUT,ADJ_IN,ADJ_OUT'],
             'bulan' => ['nullable', 'integer', 'between:1,12'],
@@ -62,6 +64,10 @@ class KartuStokController extends ModuleCrudController
             ->with(['barang.satuanDasar', 'petugas', 'gudang'])
             ->when($entitasId, fn ($q) => $q->where('id_entitas', $entitasId))
             ->when(
+                $filters['id_gudang'] ?? null,
+                fn ($query, $idGudang) => $query->where('id_gudang', $idGudang),
+            )
+            ->when(
                 $filters['id_barang'] ?? null,
                 fn ($query, $idBarang) => $query->where('id_barang', $idBarang),
             )
@@ -85,15 +91,23 @@ class KartuStokController extends ModuleCrudController
             $items = $query->orderByDesc('tanggal')->orderByDesc('id_kartu')->paginate(25)->withQueryString();
         }
 
-        $barangList = Barang::query()->where('is_active', true)->orderBy('nama_barang')->get();
+        $barangList = Barang::query()
+            ->when($entitasId, fn ($q) => $q->forEntitas($entitasId))
+            ->where('is_active', true)
+            ->orderBy('nama_barang')
+            ->get();
         $selectedBarang = ! empty($filters['id_barang']) ? Barang::query()->with('satuanDasar')->find($filters['id_barang']) : null;
-        $entitasAktifId = auth()->user()->id_entitas ?? (app()->bound('entitas_aktif') ? app('entitas_aktif') : null);
-        $entitas = $entitasAktifId ? Entitas::query()->find($entitasAktifId) : null;
+        $entitas = $entitasId ? Entitas::query()->find($entitasId) : null;
 
         return view('gudang.kartu-stok.index', [
             'items' => $items,
             'barangList' => $barangList,
             'barang' => $barangList,
+            'gudang' => Gudang::query()
+                ->when($entitasId, fn ($q) => $q->where('id_entitas', $entitasId))
+                ->where('is_active', true)
+                ->orderBy('nama_gudang')
+                ->get(),
             'selectedBarang' => $selectedBarang,
             'entitas' => $entitas,
             'filters' => $filters,

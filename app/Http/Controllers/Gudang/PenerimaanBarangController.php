@@ -15,11 +15,12 @@ use App\Models\Master\Pihak;
 use App\Models\Master\Satuan;
 use App\Models\Pembelian\Pembelian;
 use App\Rules\TenantOwnershipRule;
-use App\Services\StokService;
 use App\Services\StokBatchService;
+use App\Services\StokService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -75,7 +76,7 @@ class PenerimaanBarangController extends ModuleCrudController
     {
         $request = request();
         $entitasId = $this->entitasAktifId();
-        abort_if($entitasId <= 0, 403, 'Pilih entitas aktif untuk membuat penerimaan barang.');
+        abort_if(! $entitasId, 403, 'Pilih entitas aktif untuk membuat penerimaan barang.');
 
         $pembelianList = Pembelian::query()
             ->where('id_entitas', $entitasId)
@@ -84,6 +85,7 @@ class PenerimaanBarangController extends ModuleCrudController
             ->orderBy('tanggal_transaksi')
             ->orderBy('id_pembelian')
             ->get();
+
         $qtyDiterima = $this->qtyLayakTerkumpul($pembelianList->modelKeys());
         $pembelianTersedia = $pembelianList->map(function (Pembelian $pembelian) use ($qtyDiterima): array {
             $items = $this->sisaPerBarang($pembelian, $qtyDiterima[(int) $pembelian->id_pembelian] ?? []);
@@ -115,8 +117,8 @@ class PenerimaanBarangController extends ModuleCrudController
             ])->values()->all();
         }
 
-        $batchTrackingAvailable = true;
-        $pelacakanBarang = $entitasId !== null
+        $batchTrackingAvailable = Schema::hasColumn('barang_per_koperasi', 'lacak_batch');
+        $pelacakanBarang = $batchTrackingAvailable && $entitasId !== null
             ? DB::table('barang_per_koperasi')
                 ->where('id_entitas', $entitasId)
                 ->pluck('lacak_batch', 'id_barang')
@@ -269,10 +271,12 @@ class PenerimaanBarangController extends ModuleCrudController
             'pembelian',
             'detail.barang.satuanDasar',
             'detail.satuanInput',
-            'detail.batchDetails.batch',
             'antreanJurnal.unitUsaha',
             'antreanJurnal.jurnal',
         ];
+        if (Schema::hasTable('penerimaan_batch_detail')) {
+            $relations[] = 'detail.batchDetails.batch';
+        }
         $item = PenerimaanBarang::query()->with($relations)->findOrFail($id);
 
         return view('gudang.penerimaan.show', [
@@ -315,7 +319,8 @@ class PenerimaanBarangController extends ModuleCrudController
         ]);
 
         $entitasId = $this->entitasAktifId();
-        abort_if($entitasId <= 0, 403, 'Pilih entitas aktif untuk mencatat penerimaan barang.');
+        abort_if(! $entitasId, 403, 'Pilih entitas aktif untuk mencatat penerimaan barang.');
+
         $kodePenerimaan = $data['kode_penerimaan'];
         $sumberPenerimaan = $data['sumber_penerimaan']
             ?? (! empty($data['id_pembelian']) ? 'pembelian' : 'non_pembelian');
@@ -386,6 +391,7 @@ class PenerimaanBarangController extends ModuleCrudController
 
             $service = app(StokService::class);
             $antreanGroup = [];
+            $qtyDiterimaDalamForm = [];
 
             // Loop setiap item dan insert detail + update stok
             foreach ($data['items'] as $index => $item) {
@@ -445,7 +451,7 @@ class PenerimaanBarangController extends ModuleCrudController
                     }
                 }
                 $lacakBatch = $this->stokBatch->pelacakanAktif(
-                    (int) ($header->id_entitas ?? app('entitas_aktif')),
+                    $entitasId,
                     (int) $barang->id_barang,
                 );
                 $batchInputs = $item['batches'] ?? [];
@@ -615,7 +621,9 @@ class PenerimaanBarangController extends ModuleCrudController
                             'sumber_penerimaan' => $sumberPenerimaan,
                             'id_gudang' => (int) $data['id_gudang'],
                             'id_pembelian' => $header->id_pembelian,
+                            'kode_pembelian' => $pembelian?->kode_pembelian,
                             'id_pihak' => (int) $data['id_pihak'],
+                            'keterangan' => $header->catatan,
                             'items' => $g['items'],
                         ],
                         'status' => 'MENUNGGU',

@@ -32,6 +32,10 @@
                 <dd class="text-right font-medium text-ink-800">{{ $item->pihak->nama ?? '-' }}</dd>
                 <dt class="text-ink-600">Sumber Penerimaan</dt>
                 <dd class="text-right font-medium text-ink-800">{{ $sumberLabel }}</dd>
+                @if ($item->pembelian)
+                    <dt class="text-ink-600">Referensi Pembelian</dt>
+                    <dd class="text-right font-medium text-ink-800">{{ $item->pembelian->kode_pembelian }}</dd>
+                @endif
                 <dt class="text-ink-600">Status</dt>
                 <dd class="text-right font-medium text-sawah-600">{{ $item->status }}</dd>
                 <dt class="text-ink-600">Status Jurnal Akuntansi</dt>
